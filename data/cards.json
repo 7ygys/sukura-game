@@ -11,7 +11,22 @@
       "reaction": "副类型《对应》",
       "fullpower": "副类型《全力》"
     },
-    "note": "数值取自 sdrice na（与 APK 库中带 _sX 后缀的修订版一致）；altNames 为 APK 库中的另译名"
+    "note": "数值取自 sdrice na（与 APK 库中带 _sX 后缀的修订版一致）；altNames 为 APK 库中的另译名",
+    "terms": {
+      "aura": "装",
+      "life": "命",
+      "flare": "气",
+      "dust": "尘",
+      "distance": "间合",
+      "focus": "集中力",
+      "capacity": "纳",
+      "cost": "消费",
+      "note": "中文名采用社区通用叫法；卡面 damage X/Y 中 X 为装伤害、Y 为命伤害"
+    },
+    "damage": {
+      "aura": "装伤害（X）",
+      "life": "命伤害（Y）"
+    }
   },
   "goddesses": [
     {
