@@ -47,3 +47,9 @@ desktop.ini
 *.tmp
 *.log
 *~
+
+# 视频背景（本机素材，不进库）
+*.mp4
+*.mov
+*.webm
+
