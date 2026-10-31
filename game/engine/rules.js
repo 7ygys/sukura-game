@@ -60,11 +60,63 @@
     if (!back.length) return false;
     p.discard = [];
     p.hidden = [];
-    const rng = Engine.rng.makeRng(state.seed + state.tick * 7919 + who);
-    state.tick++;
-    p.deck = Engine.rng.shuffle(back, rng);
+    p.deck = Engine.rng.shuffle(back);
     log(state, 'P' + (who + 1) + ' 重组牌库（' + back.length + ' 张）');
     return true;
+  }
+
+  /* ---------- 基本动作 ---------- */
+
+  /**
+   * 五个基本动作。结晶的移动方向就是全部内容：
+   *   前进 距→装    后退 装→距    缠绕 尘→装    宿命 装→气    离脱 尘→距
+   *
+   * need() 里是可用条件；不满足时界面应该把图标变灰（用 _disable 素材）。
+   */
+  const BASIC = {
+    advance: {
+      name: '前进',
+      need: (st, p) => st.distance >= 1 && p.aura < Engine.state.INIT.AURA_MAX,
+      apply: (st, p) => { st.distance -= 1; p.aura += 1; }
+    },
+    retreat: {
+      name: '后退',
+      need: (st, p) => p.aura >= 1 && st.distance < 10,
+      apply: (st, p) => { p.aura -= 1; st.distance += 1; }
+    },
+    gather: {
+      name: '缠绕',
+      need: (st, p) => st.dust >= 1 && p.aura < Engine.state.INIT.AURA_MAX,
+      apply: (st, p) => { st.dust -= 1; p.aura += 1; }
+    },
+    charge: {
+      name: '宿命',
+      need: (st, p) => p.aura >= 1,
+      apply: (st, p) => { p.aura -= 1; p.flare += 1; }
+    },
+    disengage: {
+      name: '离脱',
+      need: (st, p) => st.distance <= 2 && st.distance < 10 && st.dust >= 1,
+      apply: (st, p) => { st.dust -= 1; st.distance += 1; }
+    }
+  };
+
+  /** 这个动作现在能不能做（给界面判断灰不灰用） */
+  function canBasic(state, who, which) {
+    const b = BASIC[which];
+    if (!b) return false;
+    return b.need(state, state.players[who]);
+  }
+
+  /** 执行一个基本动作 */
+  function basicAction(state, who, which) {
+    const b = BASIC[which];
+    if (!b) return { ok: false, error: '没有这个动作：' + which };
+    const p = state.players[who];
+    if (!b.need(state, p)) return { ok: false, error: b.name + '的条件不满足' };
+    b.apply(state, p);
+    log(state, 'P' + (who + 1) + ' ' + b.name);
+    return { ok: true };
   }
 
   /* ---------- 伤害 ---------- */
@@ -192,6 +244,7 @@
   }
 
   Engine.rules = {
+    BASIC, canBasic, basicAction,
     draw, reshuffle, sufferExhaustion,
     applyDamage, canTakeAura,
     startTurn, endTurn, tickAttachments,

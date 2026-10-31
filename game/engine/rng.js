@@ -1,33 +1,32 @@
 /* ============================================================
- * engine/rng.js —— 随机数（可复现）
+ * engine/rng.js —— 随机与洗牌
  *
- * 为什么不用 Math.random()：
- *   Math.random() 的结果没法重放。调试时"这张牌怎么来的"就查不清。
- *   这里用「种子 + 线性同余」，同一个种子必然产生同一串随机数。
+ * 决定：**不使用种子**。
+ *
+ * 理由：
+ *   1. 种子一旦被知道，牌序就能被算出来（对方能作弊）
+ *   2. 联机设计里双方各自洗自己的牌，本来就不需要共享随机源
+ *   3. 这个游戏不做悔棋 / 重放，所以"可复现"没有收益
+ *
+ * 所以直接用 Math.random()，完全随机。
  * ============================================================ */
 (function (root) {
   const Engine = (root.Engine = root.Engine || {});
 
-  /** 创建一个随机函数，返回 0~1 之间的小数 */
-  function makeRng(seed) {
-    let s = seed >>> 0;
-    if (s === 0) s = 1;
-    return function () {
-      // 数值来自 Numerical Recipes 的线性同余式
-      s = (s * 1664525 + 1013904223) >>> 0;
-      return s / 4294967296;
-    };
-  }
-
-  /** Fisher–Yates 洗牌：从后往前，每张和前面随机一张交换 */
-  function shuffle(arr, rng) {
+  /** 洗牌：Fisher–Yates，从后往前，每张和前面随机一张交换 */
+  function shuffle(arr) {
     const a = arr.slice();
     for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(rng() * (i + 1));
+      const j = Math.floor(Math.random() * (i + 1));
       const t = a[i]; a[i] = a[j]; a[j] = t;
     }
     return a;
   }
 
-  Engine.rng = { makeRng, shuffle };
+  /** 从数组里随机取一个 */
+  function pick(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+
+  Engine.rng = { shuffle, pick };
 })(typeof window !== 'undefined' ? window : globalThis);

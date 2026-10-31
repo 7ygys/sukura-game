@@ -29,6 +29,16 @@
         return { ok: true, state: next };
       }
 
+      case 'basic': {
+        if (action.player !== next.active)
+          return { ok: false, state, error: '不是你的回合' };
+        if (next.winner !== null)
+          return { ok: false, state, error: '已经结束' };
+        const r = R.basicAction(next, action.player, action.which);
+        if (!r.ok) return { ok: false, state, error: r.error };
+        return { ok: true, state: next };
+      }
+
       case 'damage': {
         // 受方选择如何分配（装 / 命）
         const ok = R.applyDamage(next, action.who, action.aura, action.life, action.choice);

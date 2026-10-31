@@ -33,73 +33,138 @@ function deckOf(key) {
   const special = g.cards.filter(c => c.kind === 'special').slice(0, 3);
   return normal.concat(special);
 }
+function fresh() {
+  return E.state.create({ myCards: deckOf('yurina'), oppCards: deckOf('saine') });
+}
+/** 固定先手为 P0 的状态：避免"谁先手"是随机的导致测试时灵时不灵 */
+function freshP0() {
+  const s = fresh();
+  s.active = 0;
+  s.players[0].firstTurnDone = true;
+  s.players[1].firstTurnDone = false;
+  return s;
+}
 
-/* ---------- 1. 随机 ---------- */
-group('随机与洗牌');
+/* ---------- 1. 洗牌 ---------- */
+group('洗牌');
 {
-  const a = E.rng.makeRng(42), b = E.rng.makeRng(42);
-  const sa = [1,2,3,4,5].map(() => a()), sb = [1,2,3,4,5].map(() => b());
-  eq('同种子两次随机结果一样', sa, sb);
-
   const arr = [1,2,3,4,5,6,7,8,9,10];
-  const sh = E.rng.shuffle(arr, E.rng.makeRng(7));
+  const sh = E.rng.shuffle(arr);
   eq('洗牌后数量不变', sh.length, 10);
   eq('洗牌后元素集合不变', sh.slice().sort((x,y)=>x-y), arr);
   eq('原数组没被改动', arr, [1,2,3,4,5,6,7,8,9,10]);
+
+  // 随机性：洗 200 次，应该出现很多种不同顺序
+  const seen = new Set();
+  for (let i = 0; i < 200; i++) seen.add(E.rng.shuffle(arr).join(','));
+  ok('200 次洗牌出现多种顺序（>=100 种）', seen.size >= 100, seen.size);
 }
 
 /* ---------- 2. 开局 ---------- */
 group('开局状态');
 {
-  const s = E.state.create({ myCards: deckOf('yurina'), oppCards: deckOf('saine'), seed: 12345 });
+  const s = fresh();
   eq('间合', s.distance, 10);
   eq('虚', s.dust, 8);
   eq('我的装', s.players[0].aura, 3);
   eq('我的命', s.players[0].life, 10);
   eq('我的手牌', s.players[0].hand.length, 3);
   eq('我的牌库', s.players[0].deck.length, 4);
-  eq('我的手牌+牌库=7', s.players[0].hand.length + s.players[0].deck.length, 7);
-  eq('王牌不进牌库', s.players[0].specials.length, 3);
+  eq('手牌+牌库 = 7（通常札总数）', s.players[0].hand.length + s.players[0].deck.length, 7);
+  eq('王牌单独放', s.players[0].specials.length, 3);
   ok('后手集中力为 1',
     s.players[1 - s.active].focus === 1 && s.players[s.active].focus === 0,
     s.players.map(p => p.focus));
 }
 
-/* ---------- 3. 第一个回合跳过默认处理 ---------- */
+/* ---------- 3. 回合流程 ---------- */
 group('回合流程');
 {
-  let s = E.state.create({ myCards: deckOf('yurina'), oppCards: deckOf('saine'), seed: 999 });
+  let s = fresh();
   const first = s.active;
   eq('第一个回合开始时手牌不增加', s.players[first].hand.length, 3);
   eq('第一个回合集中力不增加', s.players[first].focus, 0);
 
-  // 结束回合：手牌 3 → 弃到 2
-  const r1 = E.actions.applyAction(s, { type: 'endTurn', player: first });
-  ok('结束回合成功', r1.ok);
-  s = r1.state;
+  let r = E.actions.applyAction(s, { type: 'endTurn', player: first });
+  ok('结束回合成功', r.ok);
+  s = r.state;
   eq('结束时手牌弃到 2', s.players[first].hand.length, 2);
   eq('弃牌区 1 张', s.players[first].discard.length, 1);
   eq('换人', s.active, 1 - first);
   eq('回合数 +1', s.turn, 2);
 
-  // 对手第一个回合也跳过
-  const r2 = E.actions.applyAction(s, { type: 'endTurn', player: s.active });
-  s = r2.state;
-
-  // 回到先手：走正常开始处理（集中力+1、抽2）
+  r = E.actions.applyAction(s, { type: 'endTurn', player: s.active });
+  s = r.state;
   eq('第二个回合集中力 +1', s.players[first].focus, 1);
   eq('第二个回合抽 2 张 → 手牌 4', s.players[first].hand.length, 4);
 }
 
-/* ---------- 4. 焦燥与重组 ---------- */
+/* ---------- 4. 基本动作 ---------- */
+group('基本动作（结晶移动）');
+{
+  // 前进：距→装
+  let r = E.actions.applyAction(freshP0(), { type: 'basic', player: 0, which: 'advance' });
+  ok('前进可用', r.ok);
+  eq('前进后距离 10→9', r.state.distance, 9);
+  eq('前进后装 3→4', r.state.players[0].aura, 4);
+
+  // 后退：装→距（间合已满 10，不能后退）
+  r = E.actions.applyAction(freshP0(), { type: 'basic', player: 0, which: 'retreat' });
+  ok('间合 10 时后退被拒绝', !r.ok);
+
+  // 缠绕：尘→装
+  r = E.actions.applyAction(freshP0(), { type: 'basic', player: 0, which: 'gather' });
+  ok('缠绕可用', r.ok);
+  eq('缠绕后虚 8→7', r.state.dust, 7);
+  eq('缠绕后装 3→4', r.state.players[0].aura, 4);
+
+  // 宿命：装→气
+  r = E.actions.applyAction(freshP0(), { type: 'basic', player: 0, which: 'charge' });
+  ok('宿命可用', r.ok);
+  eq('宿命后装 3→2', r.state.players[0].aura, 2);
+  eq('宿命后气 0→1', r.state.players[0].flare, 1);
+
+  // 离脱：尘→距（只在间合 ≤2 时）
+  let s = freshP0(); s.distance = 3;
+  r = E.actions.applyAction(s, { type: 'basic', player: 0, which: 'disengage' });
+  ok('间合 3 时离脱被拒绝', !r.ok);
+
+  s = freshP0(); s.distance = 2;
+  r = E.actions.applyAction(s, { type: 'basic', player: 0, which: 'disengage' });
+  ok('间合 2 时离脱可用', r.ok);
+  eq('离脱后间合 2→3', r.state.distance, 3);
+  eq('离脱后虚 8→7', r.state.dust, 7);
+}
+
+group('基本动作的边界');
+{
+  let s = freshP0(); s.distance = 0;
+  ok('间合 0 时不能前进', !E.actions.applyAction(s, { type: 'basic', player: 0, which: 'advance' }).ok);
+
+  s = freshP0(); s.players[0].aura = 5;
+  ok('装满 5 时不能前进', !E.actions.applyAction(s, { type: 'basic', player: 0, which: 'advance' }).ok);
+
+  s = freshP0(); s.players[0].aura = 0;
+  ok('装 0 时不能后退', !E.actions.applyAction(s, { type: 'basic', player: 0, which: 'retreat' }).ok);
+  ok('装 0 时不能宿命', !E.actions.applyAction(s, { type: 'basic', player: 0, which: 'charge' }).ok);
+
+  s = freshP0(); s.dust = 0;
+  ok('虚 0 时不能缠绕', !E.actions.applyAction(s, { type: 'basic', player: 0, which: 'gather' }).ok);
+  s.distance = 2;
+  ok('虚 0 时不能离脱', !E.actions.applyAction(s, { type: 'basic', player: 0, which: 'disengage' }).ok);
+
+  s = freshP0();
+  ok('非当前回合玩家不能行动',
+    !E.actions.applyAction(s, { type: 'basic', player: 1 - s.active, which: 'advance' }).ok);
+}
+
+/* ---------- 5. 焦燥与重组 ---------- */
 group('山札切れ（焦燥 + 重组）');
 {
-  let s = E.state.create({ myCards: deckOf('yurina'), oppCards: deckOf('saine'), seed: 555 });
+  const s = freshP0();
   const who = 0;
-  // 把牌库抽干：4 张全抽走
   E.rules.draw(s, who, 4);
   eq('牌库空了', s.players[who].deck.length, 0);
-  // 造 3 张弃牌，让重组有料
   s.players[who].discard = s.players[who].hand.splice(0, 3);
 
   const auraBefore = s.players[who].aura;
@@ -108,15 +173,14 @@ group('山札切れ（焦燥 + 重组）');
 
   eq('焦燥扣了 1 点装', s.players[who].aura, auraBefore - 1);
   eq('焦燥没有扣命', s.players[who].life, lifeBefore);
-  eq('重组后牌库 3 张', s.players[who].deck.length, 2);  // 3 张洗回，再抽走 1
+  eq('重组后洗回 3 张、抽走 1 张', s.players[who].deck.length, 2);
   eq('弃牌区清空', s.players[who].discard.length, 0);
 }
 
-/* ---------- 5. 伤害 ---------- */
+/* ---------- 6. 伤害 ---------- */
 group('伤害分配');
 {
-  const s = E.state.create({ myCards: deckOf('yurina'), oppCards: deckOf('saine'), seed: 7 });
-
+  const s = freshP0();
   const a = E.actions.applyAction(s, { type: 'damage', who: 0, aura: 2, life: 1, choice: 'aura' });
   ok('选装成功', a.ok);
   eq('装 3-2', a.state.players[0].aura, 1);
@@ -128,19 +192,19 @@ group('伤害分配');
   ok('选命成功', c.ok);
   eq('命 10-1', c.state.players[0].life, 9);
 
-  // 打到 0 命判负
-  let t = E.state.clone(s);
+  const t = E.state.clone(s);
   t.players[0].life = 1;
   E.rules.applyDamage(t, 0, 0, 1, 'life');
   eq('命归零时对方获胜', t.winner, 1);
 }
 
-/* ---------- 6. 接口约定 ---------- */
+/* ---------- 7. 不可变性 ---------- */
 group('不可变性');
 {
-  const s = E.state.create({ myCards: deckOf('yurina'), oppCards: deckOf('saine'), seed: 3 });
+  const s = freshP0();
   const before = JSON.stringify(s);
   E.actions.applyAction(s, { type: 'endTurn', player: s.active });
+  E.actions.applyAction(s, { type: 'basic', player: s.active, which: 'charge' });
   ok('applyAction 不修改原状态', JSON.stringify(s) === before);
 }
 

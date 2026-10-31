@@ -51,15 +51,9 @@
    * @param {object} opts
    *   opts.myCards   我的 10 张卡（7 通常 + 3 王牌，卡对象数组）
    *   opts.oppCards  对手的 10 张
-   *   opts.seed      随机种子
    */
   function create(opts) {
-    const seed = (opts && opts.seed) || 1;
-    const rng = Engine.rng.makeRng(seed);
-
     const state = {
-      seed,
-      tick: 0,               // 随机数已消耗次数（调试用）
       turn: 1,
       active: 0,             // 0 = 先手，1 = 后手
       phase: 'start',        // start | main | end
@@ -75,12 +69,12 @@
       const p = state.players[i];
       const normal = cards.filter(c => c.kind === 'normal');
       const special = cards.filter(c => c.kind === 'special');
-      p.deck = Engine.rng.shuffle(normal, rng);
+      p.deck = Engine.rng.shuffle(normal);
       p.specials = special.map(c => Object.assign({}, c, { used: false }));
     });
 
     // 先手随机
-    state.active = rng() < 0.5 ? 0 : 1;
+    state.active = Math.random() < 0.5 ? 0 : 1;
     // 后手多 1 点集中力
     state.players[1 - state.active].focus = 1;
 
