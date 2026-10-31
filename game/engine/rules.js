@@ -928,11 +928,17 @@
       Engine.state.emit(state, 'respond', { who: who, cardId: card.id });
       pd.responseCard = card;
 
-      // 对应牌自己的效果：先走"使用它"的效果（例如見切り 的间合⇔虚），再算减伤
+      // 对应牌自己的效果：先走"使用它"的效果，再算减伤
       const rtable = (Engine.effects && Engine.effects.cards) || {};
       const re = rtable[card.id];
       if (re && re.onUse) re.onUse(state, who, card);
       if (re && re.onRespond) re.onRespond(state, who, pd, card);
+
+      // 规则 9-4-ⅰ：对应是「入れ子解決」——它的【攻击后】当场结算，
+      // 如果它生成了攻击，那次攻击要**先**打完，才轮到原来那次攻击
+      if (re && re.onAfterAttack) {
+        re.onAfterAttack(state, who, Object.assign({}, pd, { usedAsResponse: true }));
+      }
 
       log(state, 'P' + (who + 1) + ' 用「' + card.name + '」对应');
     } else {
@@ -947,6 +953,14 @@
         const spec = state.attackQueue.shift();
         Engine.effects.generateAttack(state, pd.attacker, spec);
       }
+      return { ok: true };
+    }
+
+    // 对应牌打出了新攻击 → 原攻击挂起，等它打完再继续（嵌套解决）
+    if (state.pending && state.pending !== pd) {
+      state.pending.noRespond = state.pending.noRespond || true;
+      state.attackStack = state.attackStack || [];
+      state.attackStack.push(pd);
       return { ok: true };
     }
 
@@ -980,6 +994,17 @@
     const dmg = pd.damage;
     const ok = applyDamage(state, who, dmg.aura, dmg.life, pd.both ? 'both' : choice);
     if (!ok) return { ok: false, error: '装不够，不能选装' };
+
+    // 嵌套攻击打完了 → 把挂起的原攻击接回来，继续它的「选伤害」
+    if (state.attackStack && state.attackStack.length) {
+      const outer = state.attackStack.pop();
+      outer.stage = 'damage';
+      state.pending = outer;
+      // 原攻击也要按新间合重新确认一次
+      const miss = recheckRange(state);
+      if (!miss) return { ok: true };
+      // 落空了就继续往下（可能还有更外层的）
+    }
 
     // 【攻击后】效果（规则 9-4-ⅶ）
     const table = (Engine.effects && Engine.effects.cards) || {};

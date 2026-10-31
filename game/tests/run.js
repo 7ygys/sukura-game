@@ -400,18 +400,26 @@ function withHand(who, ids) {
   s = r.state;
 
   r = E.actions.applyAction(s, { type: 'respond', player: 1, cardId: '02-saine-o-n-3' });
-  ok('用「石突」对应成功', r.ok, r.error);
+  ok('用「石突き」对应成功', r.ok, r.error);
   s = r.state;
-  eq('对应后标记 responded', s.pending.responded, true);
-  eq('对应后进入选伤害阶段', s.pending.stage, 'damage');
+
+  // 规则 9-4-ⅰ：对应是嵌套解决 → 石突き 的反击**先**打，原攻击挂起
+  ok('石突き 的反击先上桌', !!s.pending && s.pending.cardName.indexOf('石突き') === 0);
+  eq('原攻击挂在栈里', s.attackStack.length, 1);
   eq('对应牌进弃牌区', s.players[1].discard.length, 1);
 
-  // 对应方来选伤害
-  r = E.actions.applyAction(s, { type: 'resolveDamage', player: 1, choice: 'life' });
-  ok('受伤方选择扣命', r.ok, r.error);
-  eq('命 10→8（一闪 2/2）', r.state.players[1].life, 8);
-  // 石突き 是以《对应》使用的 → 它的【攻击后】会再打一发
-  ok('石突き 触发反击', !!r.state.pending && r.state.pending.cardName.indexOf('石突き') === 0);
+  // 反击（2/1，不可被对应）打在原攻击者身上
+  r = E.actions.applyAction(s, { type: 'respond', player: 0, cardId: null });
+  ok('反击不可被对应不影响「不对应」', r.ok, r.error);
+  r = E.actions.applyAction(r.state, { type: 'resolveDamage', player: 0, choice: 'life' });
+  ok('反击结算成功', r.ok, r.error);
+  eq('原攻击者命 10→9（反击 2/1 选命）', r.state.players[0].life, 9);
+
+  // 反击打完，原攻击才回来
+  ok('原攻击接回来', !!r.state.pending && r.state.pending.cardName === '一閃');
+  eq('原攻击回到选伤害阶段', r.state.pending.stage, 'damage');
+  r = E.actions.applyAction(r.state, { type: 'resolveDamage', player: 1, choice: 'life' });
+  eq('被攻击方命 10→8（一閃 2/2）', r.state.players[1].life, 8);
 }
 
 {
