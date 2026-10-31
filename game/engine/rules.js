@@ -60,12 +60,12 @@
     let got = 0;
 
     for (let i = 0; i < n; i++) {
-      // 牌库空了 → 先焦燥再重组；如果连弃牌区都是空的，那就真抽不到了
+      // 牌库空了 → 焦燥（1/1 伤害）。注意：焦燥**不会**自动帮你重组牌库，
+      // 重组是回合开始时另外选的，而且要付 1 点命（规则 9-7）。
       if (!p.deck.length) {
-        if (!reshuffle(state, who)) break;
         sufferExhaustion(state, who);
-        // 焦燥可能直接把玩家打死（命归零），死了就别再抽了
         if (state.winner !== null) break;
+        if (!p.deck.length) break;
       }
       if (!p.deck.length) break;
 
@@ -99,11 +99,17 @@
    *
    * @returns {boolean} 是否真的洗回了牌
    */
-  function reshuffle(state, who) {
+  function reshuffle(state, who, payLife) {
     const p = state.players[who];
 
     const back = p.discard.concat(p.hidden).filter(c => c.kind === 'normal');
     if (!back.length) return false;
+
+    // 规则 9-7-ⅰ：由规则产生的再构成，先失去 1 点命
+    if (payLife) {
+      log(state, 'P' + (who + 1) + ' 重组的代价：命 -1');
+      applyDamage(state, who, 0, 1, 'life');
+    }
 
     p.discard = [];
     p.hidden = [];
@@ -216,7 +222,19 @@
         p.focus++;
       }
       tickAttachments(state, who);
-      draw(state, who, I.TURN_DRAW);
+
+      // ⅲ 重组牌库（可选，付 1 点命）→ ⅳ 抽 2
+      const material = p.discard.concat(p.hidden).filter(c => c.kind === 'normal').length;
+      if (p.deck.length <= 1 && material > 0) {
+        state.choice = {
+          who: who, sourceId: 'reshuffle',
+          prompt: '牌库快空了，是否重组？（会失去 1 点命）',
+          options: ['yes', 'no']
+        };
+        log(state, 'P' + (who + 1) + ' 可以选择重组牌库');
+      } else {
+        draw(state, who, I.TURN_DRAW);
+      }
     }
 
     tryRevive(state, who);       // 回合开始时检查「再起」

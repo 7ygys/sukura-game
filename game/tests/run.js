@@ -190,22 +190,80 @@ group('基本动作的边界');
 }
 
 /* ---------- 5. 焦燥与重组 ---------- */
-group('山札切れ（焦燥 + 重组）');
+group('焦燥与重组');
 {
-  const s = freshP0();
+  const s = fresh();
   const who = 0;
-  E.rules.draw(s, who, 4);
+  E.rules.draw(s, who, 4);                 // 把牌库抽干
   eq('牌库空了', s.players[who].deck.length, 0);
-  s.players[who].discard = s.players[who].hand.splice(0, 3);
 
+  s.players[who].discard = s.players[who].hand.splice(0, 3);   // 造 3 张弃牌
   const auraBefore = s.players[who].aura;
   const lifeBefore = s.players[who].life;
-  E.rules.draw(s, who, 1);
 
+  E.rules.draw(s, who, 1);                 // 空牌库再抽 → 焦燥
   eq('焦燥扣了 1 点装', s.players[who].aura, auraBefore - 1);
   eq('焦燥没有扣命', s.players[who].life, lifeBefore);
-  eq('重组后洗回 3 张、抽走 1 张', s.players[who].deck.length, 2);
+  eq('焦燥不会自动重组', s.players[who].deck.length, 0);
+  eq('弃牌区还在', s.players[who].discard.length, 3);
+}
+
+{
+  const s = fresh();
+  const who = 0;
+  E.rules.draw(s, who, 4);
+  s.players[who].discard = s.players[who].hand.splice(0, 3);
+  const lifeBefore = s.players[who].life;
+  const flareBefore = s.players[who].flare;
+
+  const did = E.rules.reshuffle(s, who, true);   // 规则重组：付 1 点命
+  ok('重组成功', !!did);
+  eq('重组要先失去 1 点命', s.players[who].life, lifeBefore - 1);
+  eq('失去的命进到气', s.players[who].flare, flareBefore + 1);
   eq('弃牌区清空', s.players[who].discard.length, 0);
+  eq('3 张洗回牌库', s.players[who].deck.length, 3);
+}
+
+{
+  // 王牌不进牌库
+  const s = fresh();
+  const who = 0;
+  s.players[who].discard = [cardById('01-yurina-o-s-1')];
+  s.players[who].deck = [];
+  const did2 = E.rules.reshuffle(s, who, false);
+  ok('只有王牌时不能重组', !did2);
+}
+
+group('回合开始的重组询问');
+{
+  const s = fresh();
+  s.active = 0;
+  s.players[0].firstTurnDone = true;
+  s.players[0].deck = s.players[0].deck.slice(0, 1);   // 只剩 1 张
+  s.players[0].discard = [cardById('01-yurina-o-n-1'), cardById('01-yurina-o-n-2')];
+
+  E.rules.startTurn(s);
+  ok('牌库快空时会询问是否重组', !!s.choice && s.choice.sourceId === 'reshuffle');
+
+  const lifeBefore = s.players[0].life;
+  const handBefore = s.players[0].hand.length;
+  const r = E.actions.applyAction(s, { type: 'choose', player: 0, option: 'yes' });
+  ok('选「是」可以重组', r.ok, r.error);
+  eq('重组的代价：命 -1', r.state.players[0].life, lifeBefore - 1);
+  eq('重组后抽了 2 张', r.state.players[0].hand.length, handBefore + 2);
+  ok('重组后询问消失', !r.state.choice);
+}
+
+{
+  const s = fresh();
+  s.active = 0;
+  s.players[0].firstTurnDone = true;
+  s.players[0].deck = s.players[0].deck.slice(0, 1);
+  s.players[0].discard = [cardById('01-yurina-o-n-1')];
+  E.rules.startTurn(s);
+  const r = E.actions.applyAction(s, { type: 'choose', player: 0, option: 'no' });
+  ok('选「否」也能抽牌', r.ok, r.error);
+  eq('不重组：命不变', r.state.players[0].life, 10);
 }
 
 /* ---------- 6. 伤害 ---------- */

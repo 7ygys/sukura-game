@@ -47,6 +47,151 @@
     return (state.turnUsed || [0, 0])[who] >= 3;
   }
 
+  /* ==========================================================================
+   * 效果工具集（Engine.fx）
+   * ==========================================================================
+   *
+   * 卡牌效果千变万化，但底层动作其实就那么几种：
+   *   抽牌、加集中力、加气、造成伤害、生成攻击、搬结晶、让对手畏缩、重组牌库……
+   *
+   * 这里把它们各做成一个小函数，写卡的时候直接调用，不用每次重写一遍细节。
+   * ========================================================================== */
+  const fx = {
+
+    /** 抽 n 张（会自己处理焦燥） */
+    draw(state, who, n) {
+      return Engine.rules.draw(state, who, n);
+    },
+
+    /** 获得集中力（畏缩中会先解除畏缩，规则 5-1-4） */
+    gainFocus(state, who, n) {
+      const p = state.players[who];
+      for (let i = 0; i < (n || 1); i++) {
+        if (p.staggered) { p.staggered = false; log(state, 'P' + (who + 1) + ' 解除畏缩'); }
+        else if (p.focus < Engine.state.INIT.FOCUS_MAX) p.focus++;
+      }
+    },
+
+    /** 失去集中力 */
+    loseFocus(state, who, n) {
+      const p = state.players[who];
+      p.focus = Math.max(0, p.focus - (n || 1));
+    },
+
+    /** 气 +n（直接从虚取，气没有上限） */
+    gainFlare(state, who, n) {
+      const p = state.players[who];
+      const take = Math.min(state.dust, n || 1);
+      state.dust -= take;
+      p.flare += take;
+    },
+
+    /** 直接造成伤害（不是攻击，不走对应流程） */
+    damage(state, who, aura, life, choice) {
+      return Engine.rules.applyDamage(state, who, aura, life, choice || 'life');
+    },
+
+    /** 让某个玩家畏缩 */
+    stagger(state, who) {
+      return Engine.rules.stagger(state, who);
+    },
+
+    /** 生成一次攻击（走完整流程） */
+    attack(state, who, spec) {
+      return generateAttack(state, who, spec);
+    },
+
+    /** 搬结晶：from/to ∈ dust/distance/aura/flare/life */
+    moveCrystal(state, who, from, to, n) {
+      const p = state.players[who];
+      const get = (k) => (k === 'dust' || k === 'distance') ? state[k] : p[k];
+      const set = (k, v) => { if (k === 'dust' || k === 'distance') state[k] = v; else p[k] = v; };
+      const num = Math.min(get(from), n || 1);
+      if (num <= 0) return 0;
+      set(from, get(from) - num);
+      set(to, get(to) + num);
+      Engine.state.emit(state, 'move', { who: who, from: from, to: to, n: num });
+      return num;
+    },
+
+    /** 弃手牌 */
+    discardHand(state, who, n, filter) {
+      const p = state.players[who];
+      let done = 0;
+      for (let i = p.hand.length - 1; i >= 0 && done < (n || 1); i--) {
+        const c = p.hand[i];
+        if (filter && !filter(c)) continue;
+        p.hand.splice(i, 1);
+        p.discard.push(c);
+        done++;
+      }
+      return done;
+    },
+
+    /** 盖成伏札 */
+    hideHand(state, who, n, filter) {
+      const p = state.players[who];
+      let done = 0;
+      for (let i = p.hand.length - 1; i >= 0 && done < (n || 1); i--) {
+        const c = p.hand[i];
+        if (filter && !filter(c)) continue;
+        p.hand.splice(i, 1);
+        p.hidden.push(c);
+        done++;
+      }
+      return done;
+    },
+
+    /** 重组牌库（规则 9-7：由规则生成的再构成要先失去 1 点命） */
+    reshuffle(state, who) {
+      return Engine.rules.reshuffle(state, who, true);
+    },
+
+    /** 让玩家做选择：options 是 {id: 显示文字} */
+    ask(state, who, sourceId, prompt, options) {
+      state.choice = {
+        who: who,
+        sourceId: sourceId,
+        prompt: prompt,
+        options: options
+      };
+    }
+  };
+
+  /**
+   * 选择分支表：sourceId → { optionId: function(state, who) }
+   * 卡牌效果里用 fx.ask 提问，玩家点了哪个就执行对应的函数。
+   */
+  const choices = {};
+
+  // 回合开始时的「要不要重组牌库」
+  choices.reshuffle = {
+    yes(state, who) {
+      Engine.rules.reshuffle(state, who, true);
+      Engine.rules.draw(state, who, Engine.state.INIT.TURN_DRAW);
+    },
+    no(state, who) {
+      Engine.rules.draw(state, who, Engine.state.INIT.TURN_DRAW);
+    }
+  };
+
+  /** 解决一次选择 */
+  function resolveChoice(state, who, optionId) {
+    const c = state.choice;
+    if (!c) return { ok: false, error: '现在没有待选择的事项' };
+    if (c.who !== who) return { ok: false, error: '不该由你来选' };
+    if (!c.options || c.options.indexOf(optionId) < 0)
+      return { ok: false, error: '没有这个选项：' + optionId };
+
+    const table = choices[c.sourceId] || {};
+    state.choice = null;
+    if (table[optionId]) table[optionId](state, who);
+    return { ok: true };
+  }
+
+  /** 小工具：写日志 */
+  function log(state, msg) { Engine.state.log(state, msg); }
+
   /* ---------- 一张卡一个函数 ---------- */
 
   const cards = {
@@ -146,5 +291,6 @@
     "04-tokoyo-o-s-3": (state, who) => state.players[who].focus === 2
   };
 
-  Engine.effects = { cards, revive, kesshi, hassou, kyouchi, renka, generateAttack };
+  Engine.effects = { cards, revive, choices, resolveChoice, fx,
+    kesshi, hassou, kyouchi, renka, generateAttack };
 })(typeof window !== 'undefined' ? window : globalThis);
