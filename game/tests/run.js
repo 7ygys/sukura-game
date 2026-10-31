@@ -1159,7 +1159,86 @@ group('即再起');
     d.state.players[0].specials.find(x => x.id === '01-yurina-o-s-3').used, false);
 }
 
-/* ---------- 19. 不可变性 ---------- */
+/* ---------- 19. 全部 44 张卡的冒烟测试 ---------- */
+group('44 张卡都能打出且不丢牌');
+{
+  function countCards(s) {
+    let n = 0;
+    s.players.forEach(p => {
+      n += p.hand.length + p.deck.length + p.discard.length
+         + p.hidden.length + p.attachments.length + p.specials.length;
+    });
+    return n;
+  }
+
+  // 把各种待处理状态都推进到底
+  function settle(st) {
+    let guard = 0;
+    while (guard++ < 30) {
+      if (st.exhaust && st.exhaust.remaining > 0) {
+        const r = E.actions.applyAction(st, { type: 'resolveExhaust', player: st.exhaust.who, choice: 'life' });
+        if (r.ok) { st = r.state; continue; }
+      }
+      if (st.nabu) {
+        const nb = st.nabu;
+        const fd = Math.min(st.dust, nb.cap);
+        const r = E.actions.applyAction(st, { type: 'confirmNabu', player: nb.who, fromDust: fd, fromAura: nb.cap - fd });
+        if (r.ok) { st = r.state; continue; }
+        break;
+      }
+      if (st.choice) {
+        const r = E.actions.applyAction(st, { type: 'choose', player: st.choice.who, option: st.choice.options[0] });
+        if (r.ok) { st = r.state; continue; }
+      }
+      if (st.pending) {
+        const pd = st.pending;
+        const r = pd.stage === 'respond'
+          ? E.actions.applyAction(st, { type: 'respond', player: pd.defender, cardId: null })
+          : E.actions.applyAction(st, { type: 'resolveDamage', player: pd.defender, choice: 'life' });
+        if (r.ok) { st = r.state; continue; }
+      }
+      break;
+    }
+    return st;
+  }
+
+  const allCards = [];
+  db.goddesses.forEach(g => g.cards.forEach(c => allCards.push({ c: c, g: g.key })));
+
+  let okCount = 0, failList = [];
+  allCards.forEach(function (item) {
+    const c = item.c;
+    let s = freshP0();
+    s.players[0].focus = 2;
+    s.players[0].flare = 10;
+    s.dust = 10;
+    s.players[0].life = 3;         // 让「决死」类条件成立
+    // 攻击牌要站在它自己的适正距离里
+    s.distance = (c.range && c.range.length) ? c.range[0] : 4;
+    s.players[0].hand = c.kind === 'special' ? [] : [JSON.parse(JSON.stringify(c))];
+    // 王牌：换成这张，其余两张换掉
+    s.players[0].specials = [Object.assign(JSON.parse(JSON.stringify(c)), { used: false })];
+
+    const before = countCards(s);
+    let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: c.id });
+    if (!r.ok) {
+      // 「只能用于对应」这类是设计如此，不算失败
+      if (r.error && r.error.indexOf('只能用于对应') >= 0) { okCount++; return; }
+      failList.push(c.id + ' 打出失败：' + r.error);
+      return;
+    }
+    let st = settle(r.state);
+    if (countCards(st) !== before) {
+      failList.push(c.id + ' 打出后牌数变了 ' + before + '→' + countCards(st));
+      return;
+    }
+    okCount++;
+  });
+
+  ok('44 张卡全部能打出／结算且不丢牌（' + okCount + '/' + allCards.length + '）', failList.length === 0, failList.slice(0, 6));
+}
+
+/* ---------- 20. 不可变性 ---------- */
 group('不可变性');
 {
   const s = freshP0();
