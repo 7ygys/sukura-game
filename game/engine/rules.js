@@ -170,8 +170,10 @@
     if (choice === 'aura') {
       // 装不够就不能选装——这是规则里明确的"不合法选择"
       if (p.aura < auraDmg) return false;
+      // 规则 5-8-3-1：装里的结晶被打掉后**移动到虚**，不是消失
       p.aura -= auraDmg;
-      log(state, 'P' + (who + 1) + ' 装 -' + auraDmg + '（余 ' + p.aura + '）');
+      state.dust += auraDmg;
+      log(state, 'P' + (who + 1) + ' 装 -' + auraDmg + '（余 ' + p.aura + '）→ 虚 +' + auraDmg);
     } else {
       // 命里的结晶被打掉后**不会消失**，它飞到气里去
       p.life -= lifeDmg;

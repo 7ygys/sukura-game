@@ -73,7 +73,7 @@ group('开局状态');
 {
   const s = fresh();
   eq('间合', s.distance, 10);
-  eq('虚', s.dust, 8);
+  eq('虚初始为空（36 颗都在命/装/间合）', s.dust, 0);
   eq('我的装', s.players[0].aura, 3);
   eq('我的命', s.players[0].life, 10);
   eq('我的手牌', s.players[0].hand.length, 3);
@@ -121,10 +121,12 @@ group('基本动作（结晶移动）');
   r = E.actions.applyAction(freshP0(), { type: 'basic', player: 0, which: 'retreat' });
   ok('间合 10 时后退被拒绝', !r.ok);
 
-  // 缠绕：尘→装
-  r = E.actions.applyAction(freshP0(), { type: 'basic', player: 0, which: 'gather' });
+  // 缠绕：尘→装（虚一开始是空的，先靠伤害攒出虚）
+  let sg = freshP0();
+  sg.dust = 3;
+  r = E.actions.applyAction(sg, { type: 'basic', player: 0, which: 'gather' });
   ok('缠绕可用', r.ok);
-  eq('缠绕后虚 8→7', r.state.dust, 7);
+  eq('缠绕后虚 3→2', r.state.dust, 2);
   eq('缠绕后装 3→4', r.state.players[0].aura, 4);
 
   // 宿命：装→气
@@ -138,11 +140,11 @@ group('基本动作（结晶移动）');
   r = E.actions.applyAction(s, { type: 'basic', player: 0, which: 'disengage' });
   ok('间合 3 时离脱被拒绝', !r.ok);
 
-  s = freshP0(); s.distance = 2;
+  s = freshP0(); s.distance = 2; s.dust = 3;
   r = E.actions.applyAction(s, { type: 'basic', player: 0, which: 'disengage' });
   ok('间合 2 时离脱可用', r.ok);
   eq('离脱后间合 2→3', r.state.distance, 3);
-  eq('离脱后虚 8→7', r.state.dust, 7);
+  eq('离脱后虚 3→2', r.state.dust, 2);
 }
 
 group('集中力（基本动作的代价）');
@@ -400,7 +402,7 @@ function withHand(who, ids) {
   r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-s-2' });
   ok('气 3 时可以打出王牌', r.ok, r.error);
   eq('打出后气 3→0', r.state.players[0].flare, 0);
-  eq('付出去的气进虚（8+3=11）', r.state.dust, 11);
+  eq('付出去的气进虚（0+3=3）', r.state.dust, 3);
   eq('王牌标记为已使用', r.state.players[0].specials.find(x => x.id === '01-yurina-o-s-2').used, true);
   eq('王牌不进弃牌区', r.state.players[0].discard.length, 0);
 }
@@ -604,7 +606,41 @@ group('摇波的其余效果');
   eq('虚 8+2（付的费）-4（装只收得下 4 颗）= 6', r.state.dust, 6);
 }
 
-/* ---------- 11. 不可变性 ---------- */
+/* ---------- 11. 结晶守恒 ---------- */
+group('樱花结晶总数守恒');
+{
+  function total(s) {
+    let n = s.distance + s.dust;
+    s.players.forEach(p => {
+      n += p.life + p.aura + p.flare;
+      (p.attachments || []).forEach(a => { n += a.crystals || 0; });
+    });
+    return n;
+  }
+  const s = fresh();
+  eq('开局总数 = 36（间合10 + 装6 + 命20）', total(s), 36);
+
+  // 打一套操作，看总数有没有变
+  let cur = s;
+  const ops = [
+    { type: 'basic', player: 0, which: 'charge' },
+    { type: 'basic', player: 0, which: 'charge' },
+    { type: 'basic', player: 0, which: 'retreat' },
+    { type: 'basic', player: 0, which: 'charge' }
+  ];
+  ops.forEach(op => { const r = E.actions.applyAction(cur, op); if (r.ok) cur = r.state; });
+  eq('做了一堆基本动作后仍是 36', total(cur), 36);
+
+  // 受伤也守恒
+  const d = E.state.clone(cur);
+  E.rules.applyDamage(d, 0, 0, 2, 'life');
+  eq('失去 2 点命后仍是 36', total(d), 36);
+  const d2 = E.state.clone(cur);
+  E.rules.applyDamage(d2, 1, 3, 0, 'aura');
+  eq('失去 3 点装后仍是 36', total(d2), 36);
+}
+
+/* ---------- 12. 不可变性 ---------- */
 group('不可变性');
 {
   const s = freshP0();

@@ -107,7 +107,8 @@
       const get = (k) => (k === 'dust' || k === 'distance') ? state[k] : p[k];
       const set = (k, v) => { if (k === 'dust' || k === 'distance') state[k] = v; else p[k] = v; };
       let num = Math.min(get(from), n || 1);
-      // 目标区域有上限：装 5、间合 10（收不下的直接消失）
+      // 目标区域有上限：装 5、间合 10。
+      // 收不下的**留在原处**——全场结晶总数永远是 36 颗，不会凭空消失。
       if (to === 'aura') num = Math.min(num, Engine.state.INIT.AURA_MAX - p.aura);
       if (to === 'distance') num = Math.min(num, 10 - state.distance);
       if (num <= 0) return 0;
