@@ -198,7 +198,117 @@ group('伤害分配');
   eq('命归零时对方获胜', t.winner, 1);
 }
 
-/* ---------- 7. 不可变性 ---------- */
+/* ---------- 7. 出牌与攻防（阶段 3） ---------- */
+group('出牌与攻防');
+
+// 下面几组需要"指定的手牌"，所以先写两个小工具
+function cardById(id) {
+  for (const g of db.goddesses) {
+    const c = g.cards.find(x => x.id === id);
+    if (c) return JSON.parse(JSON.stringify(c));
+  }
+  throw new Error('找不到卡：' + id);
+}
+function withHand(who, ids) {
+  const s = freshP0();
+  s.players[who].hand = ids.map(cardById);
+  s.players[who].discard = [];
+  return s;
+}
+
+{
+  // 斩：攻击，适正距离 3-4，伤害 3/1
+  let s = withHand(0, ['01-yurina-o-n-1']);
+  s.distance = 3;
+
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-1' });
+  ok('距离合适时可以打出「斩」', r.ok, r.error);
+  eq('打出后手牌 -1', r.state.players[0].hand.length, 0);
+  eq('打出的牌进弃牌区', r.state.players[0].discard.length, 1);
+  eq('生成待处理的攻击', r.state.pending.kind, 'attack');
+  eq('伤害记在 pending 里（装）', r.state.pending.damage.aura, 3);
+  eq('伤害记在 pending 里（命）', r.state.pending.damage.life, 1);
+  eq('先进入「是否对应」阶段', r.state.pending.stage, 'respond');
+
+  // 距离不对
+  s = withHand(0, ['01-yurina-o-n-1']);
+  s.distance = 8;
+  r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-1' });
+  ok('距离 8 时不能打出「斩」（3-4）', !r.ok);
+
+  ok('待处理攻击存在时，不能做别的事',
+    !E.actions.applyAction(
+      Object.assign(E.state.clone(withHand(0, ['01-yurina-o-n-1'])), {
+        distance: 3,
+        pending: { kind: 'attack', attacker: 0, defender: 1, stage: 'respond', damage: { aura: 1, life: 1 } }
+      }),
+      { type: 'basic', player: 0, which: 'charge' }
+    ).ok);
+}
+
+{
+  // 对应：一闪(2/2, 距离3) 被 石突(攻击+对应) 对应
+  let s = withHand(0, ['01-yurina-o-n-2']);
+  s.players[1].hand = [cardById('02-saine-o-n-3')];
+  s.distance = 3;
+
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-2' });
+  ok('打出「一闪」', r.ok, r.error);
+  s = r.state;
+
+  r = E.actions.applyAction(s, { type: 'respond', player: 1, cardId: '02-saine-o-n-3' });
+  ok('用「石突」对应成功', r.ok, r.error);
+  s = r.state;
+  eq('对应后标记 responded', s.pending.responded, true);
+  eq('对应后进入选伤害阶段', s.pending.stage, 'damage');
+  eq('对应牌进弃牌区', s.players[1].discard.length, 1);
+
+  // 对应方来选伤害
+  r = E.actions.applyAction(s, { type: 'resolveDamage', player: 1, choice: 'life' });
+  ok('受伤方选择扣命', r.ok, r.error);
+  eq('命 10→8（一闪 2/2）', r.state.players[1].life, 8);
+  eq('攻防结束，pending 清空', r.state.pending, null);
+}
+
+{
+  // 不对应：直接进入选伤害
+  let s = withHand(0, ['01-yurina-o-n-2']);
+  s.players[1].hand = [];
+  s.distance = 3;
+
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-2' });
+  s = r.state;
+  r = E.actions.applyAction(s, { type: 'respond', player: 1, cardId: null });
+  ok('可以选择不对应', r.ok, r.error);
+  eq('不对应后也是进入选伤害', r.state.pending.stage, 'damage');
+
+  // 装不够时不能选装（一闪 2/2，装 0）
+  const s2 = E.state.clone(r.state);
+  s2.players[1].aura = 0;
+  const r2 = E.actions.applyAction(s2, { type: 'resolveDamage', player: 1, choice: 'aura' });
+  ok('装 0 时不能选装（2/2）', !r2.ok);
+
+  const r3 = E.actions.applyAction(r.state, { type: 'resolveDamage', player: 1, choice: 'aura' });
+  ok('装 3 时选装成功', r3.ok, r3.error);
+  eq('装 3-2=1', r3.state.players[1].aura, 1);
+}
+
+{
+  // 王牌费用：浦波岚 cost 3
+  let s = withHand(0, ['01-yurina-o-s-2']);   // 浦波岚：王牌，攻击+对应，0-10，2/-
+  s.players[0].flare = 0;
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-s-2' });
+  ok('气 0 时打不出 3 费王牌', !r.ok);
+
+  s.players[0].flare = 3;
+  r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-s-2' });
+  ok('气 3 时可以打出王牌', r.ok, r.error);
+  eq('打出后气 3→0', r.state.players[0].flare, 0);
+  eq('王牌标记为已使用', r.state.players[0].specials.find(x => x.id === '01-yurina-o-s-2').used, true);
+  eq('王牌不进弃牌区', r.state.players[0].discard.length, 0);
+}
+
+/* ---------- 8. 不可变性 ---------- */
 group('不可变性');
 {
   const s = freshP0();
