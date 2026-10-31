@@ -163,6 +163,21 @@
       return Engine.rules.reshuffle(state, who, true);
     },
 
+    /** 加伤：本回合下一次《攻击》+X/+Y */
+    boost(state, who, aura, life) {
+      const p = state.players[who];
+      p.buff = p.buff || { aura: 0, life: 0 };
+      p.buff.aura += (aura || 0);
+      p.buff.life += (life || 0);
+      Engine.state.log(state, '本回合下一次《攻击》+' + (aura||0) + '/+' + (life||0));
+    },
+
+    /** 减伤／加伤：直接改一次正在进行中的攻击（对应时用） */
+    modifyAttack(pd, aura, life) {
+      pd.damage.aura = Math.max(0, pd.damage.aura + (aura || 0));
+      pd.damage.life = Math.max(0, pd.damage.life + (life || 0));
+    },
+
     /** 让玩家做选择：options 是 {id: 显示文字} */
     ask(state, who, sourceId, prompt, options) {
       state.choice = {
@@ -179,6 +194,12 @@
    * 卡牌效果里用 fx.ask 提问，玩家点了哪个就执行对应的函数。
    */
   const choices = {};
+
+  // 詩舞：选一项
+  choices.shibu = {
+    aura_to_flare(state, who) { Engine.effects.fx.moveCrystal(state, who, 'aura', 'flare', 1); },
+    dust_to_dist(state, who) { Engine.effects.fx.moveCrystal(state, who, 'dust', 'distance', 1); }
+  };
 
   // スカーレットイマジン：把选中的那张手牌盖成伏札
   choices.imagine = {};
@@ -508,6 +529,125 @@
         if (renka(state, who)) {
           Engine.effects.fx.moveCrystal(state, who, 'dust', 'distance', 1);
         }
+      }
+    },
+
+    /* ===== 常世 ===== */
+
+    // 梳流：【攻击后】境地（自集中力=2）→ 这张牌放回牌库顶
+    "04-tokoyo-o-n-1": {
+      onAfterAttack(state, who) {
+        if (!kyouchi(state, who)) return;
+        const p = state.players[who];
+        const i = p.discard.findIndex(function (c) { return c.id === '04-tokoyo-o-n-1'; });
+        if (i >= 0) {
+          const card = p.discard.splice(i, 1)[0];
+          p.deck.unshift(card);
+          Engine.state.log(state, '梳流：放回牌库顶');
+        }
+      }
+    },
+
+    // 雅打ち：境地时，作为对应可以打消这次非全力的《攻击》
+    "04-tokoyo-o-n-2": {
+      onRespond(state, who, pd) {
+        if (!kyouchi(state, who)) return;
+        const c = pd.card;
+        if (c && (c.types || []).indexOf('fullpower') >= 0) return;
+        pd.cancelled = true;
+        Engine.state.log(state, '雅打ち：打消这次攻击');
+      }
+    },
+
+    // 跳ね兔：间合 ≤3 → 虚→间合
+    "04-tokoyo-o-n-3": {
+      onUse(state, who) {
+        if (state.distance <= 3) Engine.effects.fx.moveCrystal(state, who, 'dust', 'distance', 1);
+        else Engine.state.log(state, '跳ね兔：间合不是 3 以下，无事发生');
+      }
+    },
+
+    // 詩舞：获得 1 集中力，然后选一项
+    "04-tokoyo-o-n-4": {
+      onUse(state, who) {
+        Engine.effects.fx.gainFocus(state, who, 1);
+        Engine.effects.fx.ask(state, who, 'shibu', '选一项', ['aura_to_flare', 'dust_to_dist']);
+      }
+    },
+
+    // 要返し（全力）：弃牌/伏札至多 2 张放牌库底；虚→自装
+    "04-tokoyo-o-n-5": {
+      onUse(state, who) {
+        const p = state.players[who];
+        const pool = p.discard.concat(p.hidden).slice(0, 2);
+        pool.forEach(function (c) {
+          [p.discard, p.hidden].forEach(function (arr) {
+            const idx = arr.findIndex(function (x) { return x.id === c.id; });
+            if (idx >= 0) { arr.splice(idx, 1); p.deck.push(c); }
+          });
+        });
+        if (pool.length) Engine.state.log(state, '要返し：把 ' + pool.length + ' 张牌放到牌库底');
+        Engine.effects.fx.moveCrystal(state, who, 'dust', 'aura', 1);
+      }
+    },
+
+    // 風舞台（付与・纳2）：展开时 自装→虚；破弃时 虚→间合
+    "04-tokoyo-o-n-6": {
+      onExpanded(state, who) {
+        Engine.effects.fx.moveCrystal(state, who, 'aura', 'dust', 1);
+      },
+      onBreak(state, who) {
+        Engine.effects.fx.moveCrystal(state, who, 'dust', 'distance', 1);
+      }
+    },
+
+    // 晴舞台（付与・纳2・终端）：展开时 集中力变 2；破弃时 打 3-6 / -1
+    "04-tokoyo-o-n-7": {
+      onExpanded(state, who) {
+        state.players[who].focus = 2;
+      },
+      onBreak(state, who) {
+        generateAttack(state, who, { name: '晴舞台（破弃）', range: [3,4,5,6], aura: 0, life: 1 });
+      }
+    },
+
+    // 久遠ノ花（王牌攻击・对应）：对应时打消这次《攻击》
+    "04-tokoyo-o-s-1": {
+      onRespond(state, who, pd) {
+        pd.cancelled = true;
+        Engine.state.log(state, '久遠ノ花：打消这次攻击');
+      }
+    },
+
+    // 千歳ノ鳥：攻击后 重组牌库（不受焦燥伤害）
+    "04-tokoyo-o-s-2": {
+      onAfterAttack(state, who) {
+        Engine.rules.reshuffle(state, who, false);
+        Engine.state.log(state, '千歳ノ鳥：重组牌库（不受伤）');
+      }
+    },
+
+    // 無窮ノ風：不可被对应；攻击后对手弃 1 张非攻击牌
+    "04-tokoyo-o-s-3": {
+      onAttack(state, who, ctx) { ctx.noRespond = true; },
+      onAfterAttack(state, who) {
+        const opp = state.players[1 - who];
+        const i = opp.hand.findIndex(function (c) { return (c.types || []).indexOf('attack') < 0; });
+        if (i >= 0) {
+          opp.discard.push(opp.hand.splice(i, 1)[0]);
+          Engine.state.log(state, '無窮ノ風：对手弃掉 1 张非攻击牌');
+        } else {
+          Engine.state.log(state, '無窮ノ風：对手手牌全是攻击，公开手牌');
+        }
+      }
+    },
+
+    // 常世ノ月（王牌行动・费2）：自集中力=2，敌集中力=0，对手畏缩
+    "04-tokoyo-o-s-4": {
+      onUse(state, who) {
+        state.players[who].focus = 2;
+        state.players[1 - who].focus = 0;
+        Engine.effects.fx.stagger(state, 1 - who);
       }
     }
   };

@@ -916,7 +916,98 @@ group('绯弥香的效果');
   eq('虚 3+2(费)-1 = 4', r.state.dust, 4);
 }
 
-/* ---------- 15. 不可变性 ---------- */
+/* ---------- 15. 常世 11 张 ---------- */
+group('常世的效果');
+{
+  // 跳ね兔：间合 ≤3 才生效
+  let s = withHand(0, ['04-tokoyo-o-n-3']);
+  s.distance = 3; s.dust = 3;
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '04-tokoyo-o-n-3' });
+  ok('打出跳ね兔', r.ok, r.error);
+  eq('间合 3→4', r.state.distance, 4);
+  eq('虚 3→2', r.state.dust, 2);
+
+  s = withHand(0, ['04-tokoyo-o-n-3']);
+  s.distance = 5; s.dust = 3;
+  r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '04-tokoyo-o-n-3' });
+  eq('间合 5 时不生效', r.state.distance, 5);
+}
+
+{
+  // 詩舞：+1 集中力，然后选一项
+  let s = withHand(0, ['04-tokoyo-o-n-4']);
+  s.players[0].focus = 0; s.players[0].aura = 3; s.dust = 3;
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '04-tokoyo-o-n-4' });
+  ok('打出詩舞', r.ok, r.error);
+  eq('集中力 0→1', r.state.players[0].focus, 1);
+  ok('弹出了选项', !!r.state.choice);
+  const r2 = E.actions.applyAction(r.state, { type: 'choose', player: 0, option: 'aura_to_flare' });
+  eq('装 3→2', r2.state.players[0].aura, 2);
+  eq('气 0→1', r2.state.players[0].flare, 1);
+}
+
+{
+  // 雅打ち：境地时可以打消攻击
+  let s = withHand(0, ['01-yurina-o-n-1']);     // 斬 3/1
+  s.distance = 3;
+  s.players[1].hand = [cardById('04-tokoyo-o-n-2')];
+  s.players[1].focus = 2;                       // 境地
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-1' });
+  r = E.actions.applyAction(r.state, { type: 'respond', player: 1, cardId: '04-tokoyo-o-n-2' });
+  ok('用雅打ち对应', r.ok, r.error);
+  ok('攻击被打消（没有待结算）', !r.state.pending);
+  eq('命没掉', r.state.players[1].life, 10);
+}
+
+{
+  // 久遠ノ花：打消攻击
+  let s = withHand(0, ['01-yurina-o-n-1']);
+  s.distance = 3;
+  s.players[1].hand = [cardById('04-tokoyo-o-s-1')];
+  s.players[1].flare = 5;
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-1' });
+  r = E.actions.applyAction(r.state, { type: 'respond', player: 1, cardId: '04-tokoyo-o-s-1' });
+  ok('用久遠ノ花对应', r.ok, r.error);
+  ok('攻击被打消', !r.state.pending);
+}
+
+{
+  // 常世ノ月：双方集中力重设 + 畏缩
+  let s = withHand(0, ['04-tokoyo-o-s-4']);
+  s.players[0].flare = 2;
+  s.players[0].focus = 0;
+  s.players[1].focus = 2;
+  const r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '04-tokoyo-o-s-4' });
+  ok('打出常世ノ月', r.ok, r.error);
+  eq('自集中力 = 2', r.state.players[0].focus, 2);
+  eq('敌集中力 = 0', r.state.players[1].focus, 0);
+  eq('对手畏缩', r.state.players[1].staggered, true);
+}
+
+{
+  // 風舞台：展开时 自装→虚
+  let s = withHand(0, ['04-tokoyo-o-n-6']);
+  s.dust = 3; s.players[0].aura = 3;
+  const r = autoNabu(E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '04-tokoyo-o-n-6' }));
+  ok('展开風舞台', r.ok, r.error);
+  // 纳 2 颗从虚取（3→1），展开时 自装→虚 +1（1→2）
+  eq('虚 3-2+1 = 2', r.state.dust, 2);
+  eq('装 3-1 = 2（展开时效果）', r.state.players[0].aura, 2);
+}
+
+{
+  // 無窮ノ風：不可被对应
+  let s = withHand(0, ['04-tokoyo-o-s-3']);
+  s.distance = 5;
+  s.players[0].flare = 1;
+  s.players[1].hand = [cardById('02-saine-o-n-2')];   // 薙斬り（带对应）
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '04-tokoyo-o-s-3' });
+  ok('打出無窮ノ風', r.ok, r.error);
+  r = E.actions.applyAction(r.state, { type: 'respond', player: 1, cardId: '02-saine-o-n-2' });
+  ok('不可被对应', !r.ok);
+}
+
+/* ---------- 16. 不可变性 ---------- */
 group('不可变性');
 {
   const s = freshP0();

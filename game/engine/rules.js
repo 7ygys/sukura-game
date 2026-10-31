@@ -153,6 +153,11 @@
 
     log(state, '付与「' + card.name + '」展开，纳 ' + nb.cap +
       '（虚 -' + fromDust + '，装 -' + fromAura + '）');
+
+    // 【展开时】效果（规则 9-2-3 ⅳ）
+    const et = (Engine.effects && Engine.effects.cards) || {};
+    const ee = et[card.id];
+    if (ee && ee.onExpanded) ee.onExpanded(state, who, card);
     Engine.state.emit(state, 'enhance', { who: who });
 
     state.nabu = null;
@@ -784,6 +789,17 @@
       log(state, 'P' + (who + 1) + ' 用「' + card.name + '」对应');
     } else {
       log(state, 'P' + (who + 1) + ' 不对应');
+    }
+
+    // 被打消了：不结算伤害，也不触发【攻击后】
+    if (pd.cancelled) {
+      log(state, '这次的《攻击》被打消了');
+      state.pending = null;
+      if (state.attackQueue && state.attackQueue.length) {
+        const nextSpec = state.attackQueue.shift();
+        Engine.effects.generateAttack(state, pd.attacker, nextSpec);
+      }
+      return { ok: true };
     }
 
     pd.stage = 'damage';          // 进入"选伤害"
