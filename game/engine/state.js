@@ -64,6 +64,7 @@
       distance: INIT.DISTANCE,
       dust: INIT.DUST,
       taijin: 2,                 // 达人距离（规则 5-2-2，默认 2）
+      distanceMod: 0,            // 间合的临时修正（效果造成的，不搬结晶）
       turnUsed: [0, 0],          // 本回合各自使用了几张牌（连火判定用）
       players: [makePlayer(opts.myName), makePlayer(opts.oppName)],
       winner: null,

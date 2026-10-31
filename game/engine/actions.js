@@ -62,6 +62,15 @@
       return { ok: false, state, error: '有一张攻击还没结算' };
     }
 
+    // 执行完任何动作后，都检查一次「即再起」（规则 10-8：条件满足就立刻回未使用）
+    function afterAction(st) {
+      if (Engine.rules && Engine.rules.tryRevive) {
+        Engine.rules.tryRevive(st, 0, 'instant');
+        Engine.rules.tryRevive(st, 1, 'instant');
+      }
+      return st;
+    }
+
     switch (action.type) {
 
       /* ---------------------------------------------------------------
@@ -71,7 +80,7 @@
         if (action.player !== next.active)
           return { ok: false, state, error: '不是你的回合' };
         R.endTurn(next, action.discardIdx);
-        return { ok: true, state: next };
+        return { ok: true, state: afterAction(next) };
       }
 
       /* ---------------------------------------------------------------
@@ -83,7 +92,7 @@
         const r = R.basicAction(next, action.player, action.which,
           { free: !!action.free, pay: action.pay, cardId: action.cardId });
         if (!r.ok) return { ok: false, state, error: r.error };
-        return { ok: true, state: next };
+        return { ok: true, state: afterAction(next) };
       }
 
       /* ---------------------------------------------------------------
@@ -92,13 +101,13 @@
       case 'confirmNabu': {
         const r = R.confirmNabu(next, action.player, action.fromDust, action.fromAura);
         if (!r.ok) return { ok: false, state, error: r.error };
-        return { ok: true, state: next };
+        return { ok: true, state: afterAction(next) };
       }
 
       case 'cancelNabu': {
         const r = R.cancelNabu(next, action.player);
         if (!r.ok) return { ok: false, state, error: r.error };
-        return { ok: true, state: next };
+        return { ok: true, state: afterAction(next) };
       }
 
       /* ---------------------------------------------------------------
@@ -114,13 +123,13 @@
         R.applyDamage(next, ex.who, 1, 1, choice);
         ex.remaining -= 1;
         if (ex.remaining <= 0) next.exhaust = null;
-        return { ok: true, state: next };
+        return { ok: true, state: afterAction(next) };
       }
 
       case 'confirmEndTurn': {
         const r = R.confirmEndTurn(next, action.player, action.cardIds);
         if (!r.ok) return { ok: false, state, error: r.error };
-        return { ok: true, state: next };
+        return { ok: true, state: afterAction(next) };
       }
 
       case 'choose': {
@@ -128,7 +137,7 @@
         if (!r.ok) return { ok: false, state, error: r.error };
         // 选项可能改了间合 → 攻击要重新确认距离
         R.recheckRange(next);
-        return { ok: true, state: next };
+        return { ok: true, state: afterAction(next) };
       }
 
       /* ---------------------------------------------------------------
@@ -139,7 +148,7 @@
           return { ok: false, state, error: '不是你的回合' };
         const r = R.hideCard(next, action.player, action.cardId);
         if (!r.ok) return { ok: false, state, error: r.error };
-        return { ok: true, state: next };
+        return { ok: true, state: afterAction(next) };
       }
 
       /* ---------------------------------------------------------------
@@ -150,7 +159,7 @@
           return { ok: false, state, error: '不是你的回合' };
         const r = R.playCard(next, action.player, action.cardId);
         if (!r.ok) return { ok: false, state, error: r.error };
-        return { ok: true, state: next };
+        return { ok: true, state: afterAction(next) };
       }
 
       /* ---------------------------------------------------------------
@@ -164,7 +173,7 @@
           return { ok: false, state, error: '你不是这次攻击的受害者' };
         const r = R.respond(next, action.player, action.cardId || null);
         if (!r.ok) return { ok: false, state, error: r.error };
-        return { ok: true, state: next };
+        return { ok: true, state: afterAction(next) };
       }
 
       /* ---------------------------------------------------------------
@@ -173,7 +182,7 @@
       case 'resolveDamage': {
         const r = R.resolveDamage(next, action.player, action.choice);
         if (!r.ok) return { ok: false, state, error: r.error };
-        return { ok: true, state: next };
+        return { ok: true, state: afterAction(next) };
       }
 
       /* ---------------------------------------------------------------
@@ -182,7 +191,7 @@
       case 'damage': {
         const ok = R.applyDamage(next, action.who, action.aura, action.life, action.choice);
         if (!ok) return { ok: false, state, error: '装不够，不能选装' };
-        return { ok: true, state: next };
+        return { ok: true, state: afterAction(next) };
       }
 
       default:

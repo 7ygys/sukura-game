@@ -410,7 +410,8 @@ function withHand(who, ids) {
   r = E.actions.applyAction(s, { type: 'resolveDamage', player: 1, choice: 'life' });
   ok('受伤方选择扣命', r.ok, r.error);
   eq('命 10→8（一闪 2/2）', r.state.players[1].life, 8);
-  eq('攻防结束，pending 清空', r.state.pending, null);
+  // 石突き 是以《对应》使用的 → 它的【攻击后】会再打一发
+  ok('石突き 触发反击', !!r.state.pending && r.state.pending.cardName.indexOf('石突き') === 0);
 }
 
 {
@@ -1095,7 +1096,70 @@ group('全力 / 距离再确认');
   eq('命没掉', r.state.players[1].life, 10);
 }
 
-/* ---------- 17. 不可变性 ---------- */
+/* ---------- 17. 牌不会凭空消失 ---------- */
+group('卡牌守恒');
+{
+  function countCards(s) {
+    let n = 0;
+    s.players.forEach(p => {
+      n += p.hand.length + p.deck.length + p.discard.length
+         + p.hidden.length + p.attachments.length + p.specials.length;
+    });
+    return n;
+  }
+  let s = fresh();
+  eq('开局 20 张（双方各 7 通常 + 3 王牌）', countCards(s), 20);
+
+  // 反复洗牌不应该丢牌
+  const who = s.active;
+  s.players[who].discard = s.players[who].deck.splice(0, 2);
+  const before = countCards(s);
+  E.rules.reshuffle(s, who, true);
+  eq('重组之后总牌数不变', countCards(s), before);
+  eq('牌库 = 剩下的 2 张 + 洗回的 2 张 = 4', s.players[who].deck.length, 4);
+}
+
+/* ---------- 18. 临时间合修正 / 即再起 ---------- */
+group('临时间合修正');
+{
+  // distanceMod 不改结晶，只改"现在的间合"
+  const s = fresh();
+  s.distance = 5;
+  s.distanceMod = 1;
+  eq('结晶数没变', s.distance, 5);
+  eq('实际间合 +1', E.rules.effDistance(s), 6);
+  s.distanceMod = -2;
+  eq('减 2 也可以', E.rules.effDistance(s), 3);
+
+  // 攻击判断用的是实际间合
+  let t2 = withHand(0, ['01-yurina-o-n-1']);   // 斬 3-4
+  t2.distance = 2;
+  t2.distanceMod = 1;                           // 实际间合 3
+  const r = E.actions.applyAction(t2, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-1' });
+  ok('实际间合 3 时可以打出斬（3-4）', r.ok, r.error);
+}
+
+group('即再起');
+{
+  // 浮舟宿：自命降到 3 以下 → 立刻回未使用
+  let s = withHand(0, []);
+  s.players[0].flare = 2;
+  const sp = s.players[0].specials.find(x => x.id === '01-yurina-o-s-3');
+  s.players[0].hand = [cardById('01-yurina-o-s-3')];
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-s-3' });
+  ok('打出浮舟宿', r.ok, r.error);
+  eq('用掉后是已使用', r.state.players[0].specials.find(x => x.id === '01-yurina-o-s-3').used, true);
+
+  // 现在让命掉到 3（即再起条件）
+  const s2 = E.state.clone(r.state);
+  s2.players[0].life = 4;
+  const d = E.actions.applyAction(s2, { type: 'damage', who: 0, aura: 0, life: 1, choice: 'life' });
+  ok('扣到 3 点命', d.ok, d.error);
+  eq('即再起：浮舟宿 回到未使用',
+    d.state.players[0].specials.find(x => x.id === '01-yurina-o-s-3').used, false);
+}
+
+/* ---------- 19. 不可变性 ---------- */
 group('不可变性');
 {
   const s = freshP0();

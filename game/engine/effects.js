@@ -661,7 +661,7 @@
    * 这类攻击没有"卡"，但仍然要走「适正距离确认 → 对应 → 伤害」的流程。
    */
   function generateAttack(state, who, spec) {
-    if (spec.range.indexOf(state.distance) < 0) {
+    if (spec.range.indexOf(Engine.rules.effDistance(state)) < 0) {
       Engine.state.log(state, '「' + spec.name + '」因距离不符取消（间合 ' + state.distance + '）');
       return null;
     }

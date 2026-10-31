@@ -74,7 +74,10 @@
       got++;
     }
 
-    if (got) log(state, 'P' + (who + 1) + ' 抽 ' + got + ' 张');
+    if (got) {
+      log(state, 'P' + (who + 1) + ' 抽 ' + got + ' 张');
+      Engine.state.emit(state, 'draw', { who: who, n: got });
+    }
     if (exhaustCount > 0) {
       log(state, 'P' + (who + 1) + ' 焦燥 ' + exhaustCount + ' 点（待结算）');
       state.exhaust = { who: who, remaining: exhaustCount };
@@ -119,9 +122,11 @@
 
     p.discard = [];
     p.hidden = [];
-    p.deck = Engine.rng.shuffle(back);
+    // 注意：要**把原来牌库里剩下的牌也算进去**再洗，不能直接覆盖
+    const all = p.deck.concat(back);
+    p.deck = Engine.rng.shuffle(all);
 
-    log(state, 'P' + (who + 1) + ' 重组牌库（' + back.length + ' 张）');
+    log(state, 'P' + (who + 1) + ' 重组牌库（' + back.length + ' 张洗回，共 ' + all.length + ' 张）');
     return true;
   }
 
@@ -149,7 +154,7 @@
 
     state.endTurnPending = null;
     state.phase = 'end';
-    tryRevive(state, who);        // 规则 10-7：再起在「结束阶段」检查
+    tryRevive(state, who, 'normal');   // 规则 10-7：再起在「结束阶段」检查
     state.active = 1 - state.active;
     state.turn++;
     startTurn(state);
@@ -404,7 +409,7 @@
       if (material > 0) {
         state.choice = {
           who: who, sourceId: 'reshuffle',
-          prompt: '牌库快空了，是否重组？（会失去 1 点命）',
+          prompt: '是否重组牌库？（现有 ' + p.deck.length + ' 张，会失去 1 点命）',
           options: ['yes', 'no']
         };
         log(state, 'P' + (who + 1) + ' 可以选择重组牌库');
@@ -491,7 +496,7 @@
     }
 
     state.phase = 'end';
-    tryRevive(state, who);        // 规则 10-7：再起在「结束阶段」检查
+    tryRevive(state, who, 'normal');   // 规则 10-7：再起在「结束阶段」检查
     state.active = 1 - state.active;   // 0↔1 切换
     state.turn++;
     startTurn(state);
@@ -517,7 +522,7 @@
     // 规则 9-6-1：间合 ≤ 达人距离（默认 2）时**什么都不会发生**，即不能前进。
     advance: {
       name: '前进',
-      need: (st, p) => st.distance > taijinOf(st) && p.aura < Engine.state.INIT.AURA_MAX,
+      need: (st, p) => effDistance(st) > taijinOf(st) && p.aura < Engine.state.INIT.AURA_MAX,
       apply: (st, p, who) => { moveCrystal(st, who, 'distance', 'aura', 1); }
     },
 
@@ -545,7 +550,7 @@
     // 离脱：虚 → 距。规则 9-6-5：间合 > 达人距离时什么都不会发生
     disengage: {
       name: '离脱',
-      need: (st, p) => st.distance <= taijinOf(st) && st.distance < 10 && st.dust >= 1,
+      need: (st, p) => effDistance(st) <= taijinOf(st) && st.distance < 10 && st.dust >= 1,
       apply: (st, p, who) => { moveCrystal(st, who, 'dust', 'distance', 1); }
     }
   };
@@ -555,6 +560,16 @@
    * 除了动作本身的条件，还要**有 1 点集中力**——基本动作不是免费的。
    * 集中力每回合最多涨到 2，所以一回合最多做两次基本动作。
    */
+  /**
+   * 「現在の間合」（规则 5-2-1）：
+   *   = 间合里的结晶数 + 各种效果造成的修正（distanceMod）
+   * 修正不需要搬结晶，是凭空加上去的，效果结束就消失。
+   */
+  function effDistance(state) {
+    const d = state.distance + (state.distanceMod || 0);
+    return Math.max(0, Math.min(10, d));
+  }
+
   /** 达人距离：默认 2，付与札可以加（例如圏域 +1） */
   function taijinOf(state) {
     let base = 2;
@@ -623,9 +638,9 @@
   function recheckRange(state) {
     const pd = state.pending;
     if (!pd || pd.cancelled) return false;
-    if (!pd.range || pd.range.indexOf(state.distance) >= 0) return false;
+    if (!pd.range || pd.range.indexOf(effDistance(state)) >= 0) return false;
 
-    log(state, '对应改变了间合，攻击落空（间合 ' + state.distance + '）');
+    log(state, '对应改变了间合，攻击落空（间合 ' + effDistance(state) + '）');
     state.pending = null;
     if (state.attackQueue && state.attackQueue.length) {
       const spec = state.attackQueue.shift();
@@ -651,7 +666,7 @@
   function inRange(state, card) {
     // range 为 null 的牌（行动/付与）没有距离要求
     if (!card.range) return true;
-    return card.range.indexOf(state.distance) >= 0;
+    return card.range.indexOf(effDistance(state)) >= 0;
   }
 
   /**
@@ -719,7 +734,7 @@
 
     // ---- 攻击要检查距离 ----
     if (isAttack && !inRange(state, card)) {
-      return { ok: false, error: '距离 ' + state.distance + ' 不在适正距离内' };
+      return { ok: false, error: '距离 ' + effDistance(state) + ' 不在适正距离内' };
     }
 
     // ---- 付与：先检查总量，再让玩家自己决定「虚取几颗、装取几颗」 ----
@@ -915,7 +930,7 @@
     }
 
     // 对应可能改变了间合（例如見切り），所以要重新确认适正距离（规则 9-4-ⅲ）
-    if (!pd.cancelled && pd.range && pd.range.indexOf(state.distance) < 0) {
+    if (!pd.cancelled && pd.range && pd.range.indexOf(effDistance(state)) < 0) {
       log(state, '对应改变了间合，攻击落空（间合 ' + state.distance + '）');
       state.pending = null;
       if (state.attackQueue && state.attackQueue.length) {
@@ -964,9 +979,10 @@
       table[pd.responseCardId].onAfterAttack(state, pd.defender, Object.assign({}, pd, { usedAsResponse: true }));
     }
 
-    // 还有排队中的攻击就接着打（律動弧戟那种三段攻击）
-    state.pending = null;
-    if (state.attackQueue && state.attackQueue.length) {
+    // 只有"还是这次攻击"时才清空——
+    // 【攻击后】可能已经生成了新的攻击（八方振り / 石突き / 破弃时那种）
+    if (state.pending === pd) state.pending = null;
+    if (!state.pending && state.attackQueue && state.attackQueue.length) {
       const nextSpec = state.attackQueue.shift();
       Engine.effects.generateAttack(state, pd.attacker, nextSpec);
       return { ok: true };
@@ -1002,12 +1018,14 @@
    * 每张王牌的条件写在 Engine.effects.revive[cardId] 里（阶段 5 填），
    * 现在表是空的，所以暂时没有王牌会自动恢复。
    */
-  function tryRevive(state, who) {
+  function tryRevive(state, who, mode) {
     const p = state.players[who];
     const table = (Engine.effects && Engine.effects.revive) || {};
     let revived = 0;
     p.specials.forEach(function (sp) {
       if (!sp.used || !sp.revive) return;
+      // mode: 'normal' = 结束阶段的再起；'instant' = 随时触发的即再起
+      if (mode && sp.revive !== mode) return;
       const cond = table[sp.id];
       if (typeof cond !== 'function') return;
       if (cond(state, who, sp)) {
@@ -1054,7 +1072,7 @@
     // 回合
     startTurn, endTurn, tickAttachments,
     // 基本动作
-    BASIC, canBasic, basicAction, hideCard, taijinOf, shadowAura, moveCrystal, recheckRange, confirmNabu, cancelNabu, confirmEndTurn,
+    BASIC, canBasic, basicAction, hideCard, taijinOf, shadowAura, moveCrystal, recheckRange, effDistance, confirmNabu, cancelNabu, confirmEndTurn,
     // 再起
     tryRevive, stagger,
     // 出牌与攻防
