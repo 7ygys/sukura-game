@@ -42,6 +42,7 @@ function freshP0() {
   s.active = 0;
   s.players[0].firstTurnDone = true;
   s.players[1].firstTurnDone = false;
+  s.players[0].focus = 2;      // 基本动作要花集中力，测试里先给满
   return s;
 }
 
@@ -134,6 +135,34 @@ group('基本动作（结晶移动）');
   ok('间合 2 时离脱可用', r.ok);
   eq('离脱后间合 2→3', r.state.distance, 3);
   eq('离脱后虚 8→7', r.state.dust, 7);
+}
+
+group('集中力（基本动作的代价）');
+{
+  let s = freshP0();
+  s.players[0].focus = 2;
+  let r = E.actions.applyAction(s, { type: 'basic', player: 0, which: 'charge' });
+  ok('有集中力时可以行动', r.ok, r.error);
+  eq('行动后集中力 2→1', r.state.players[0].focus, 1);
+
+  r = E.actions.applyAction(r.state, { type: 'basic', player: 0, which: 'charge' });
+  ok('第二次还能行动', r.ok, r.error);
+  eq('行动后集中力 1→0', r.state.players[0].focus, 0);
+
+  r = E.actions.applyAction(r.state, { type: 'basic', player: 0, which: 'charge' });
+  ok('集中力 0 时不能再行动', !r.ok);
+
+  // 数量检查：一个回合最多两次基本动作
+  const s2 = freshP0();
+  s2.players[0].focus = 2;
+  let cnt = 0;
+  let cur = s2;
+  for (let i = 0; i < 5; i++) {
+    const rr = E.actions.applyAction(cur, { type: 'basic', player: 0, which: 'charge' });
+    if (!rr.ok) break;
+    cur = rr.state; cnt++;
+  }
+  eq('集中力 2 → 最多做 2 次基本动作', cnt, 2);
 }
 
 group('基本动作的边界');
@@ -304,6 +333,7 @@ function withHand(who, ids) {
   r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-s-2' });
   ok('气 3 时可以打出王牌', r.ok, r.error);
   eq('打出后气 3→0', r.state.players[0].flare, 0);
+  eq('付出去的气进虚（8+3=11）', r.state.dust, 11);
   eq('王牌标记为已使用', r.state.players[0].specials.find(x => x.id === '01-yurina-o-s-2').used, true);
   eq('王牌不进弃牌区', r.state.players[0].discard.length, 0);
 }

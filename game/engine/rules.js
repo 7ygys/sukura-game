@@ -304,10 +304,17 @@
     }
   };
 
-  /** 这个基本动作现在能不能做 */
+  /**
+   * 这个基本动作现在能不能做。
+   * 除了动作本身的条件，还要**有 1 点集中力**——基本动作不是免费的。
+   * 集中力每回合最多涨到 2，所以一回合最多做两次基本动作。
+   */
   function canBasic(state, who, which) {
     const b = BASIC[which];
-    return !!(b && b.need(state, state.players[who]));
+    if (!b) return false;
+    const p = state.players[who];
+    if (p.focus < 1) return false;
+    return b.need(state, p);
   }
 
   /** 执行一个基本动作 */
@@ -316,10 +323,12 @@
     if (!b) return { ok: false, error: '没有这个动作：' + which };
 
     const p = state.players[who];
+    if (p.focus < 1) return { ok: false, error: '集中力不足（基本动作要花 1 点）' };
     if (!b.need(state, p)) return { ok: false, error: b.name + '的条件不满足' };
 
+    p.focus -= 1;          // 付 1 点集中力
     b.apply(state, p);
-    log(state, 'P' + (who + 1) + ' ' + b.name);
+    log(state, 'P' + (who + 1) + ' ' + b.name + '（集中力 -1）');
     return { ok: true };
   }
 
@@ -408,8 +417,10 @@
     // ============================================================
 
     if (card.kind === 'special') {
-      p.flare -= card.cost || 0;
-      log(state, '支付 ' + (card.cost || 0) + ' 点气');
+      const cost = card.cost || 0;
+      p.flare -= cost;
+      state.dust += cost;        // 付出去的气变成虚里的结晶
+      log(state, '支付 ' + cost + ' 点气 → 虚 +' + cost);
     }
 
     if (!fromSpecial) p.hand.splice(idx, 1);
