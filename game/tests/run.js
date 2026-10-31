@@ -508,23 +508,25 @@ group('付与（展开 / 纳 / 破弃）');
 }
 
 {
-  // 多张付与可以同时存在
-  const A = '01-yurina-o-n-6';   // 纳 2
-  const B = '01-yurina-o-n-7';   // 纳 4
+  // 多张付与可以同时存在（注意：気炎万丈是《全力》，同一回合不能连开两张）
+  const A = '01-yurina-o-n-6';   // 圧気 纳 2
+  const B = '02-saine-o-n-5';    // 圏域 纳 2
   let s = withHand(0, [A, B]);
-  s.dust = 10; s.players[0].aura = 5;
+  s.dust = 10; s.players[0].aura = 5; s.distance = 5;
   let r = autoNabu(E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: A }));
   ok('展开第一张付与', r.ok, r.error);
   r = autoNabu(E.actions.applyAction(r.state, { type: 'playCard', player: 0, cardId: B }));
   ok('展开第二张付与', r.ok, r.error);
   eq('付与区 2 张', r.state.players[0].attachments.length, 2);
-  eq('虚 10-2-4=4', r.state.dust, 4);
+  eq('虚 10-2-2=6', r.state.dust, 6);
 
   // 两张一起走回合开始
   E.rules.tickAttachments(r.state, 0);
-  eq('两张各移 1 颗（虚 +2）', r.state.dust, 6);
+  // 圏域 会把结晶送到间合，所以虚只 +1、间合 +1
+  eq('一张进虚一张进间合（虚）', r.state.dust, 7);
+  eq('间合 5→6', r.state.distance, 6);
   eq('第一张纳 2→1', r.state.players[0].attachments[0].crystals, 1);
-  eq('第二张纳 4→3', r.state.players[0].attachments[1].crystals, 3);
+  eq('第二张纳 2→1', r.state.players[0].attachments[1].crystals, 1);
 }
 
 /* ---------- 9. 卡牌效果（阶段 11） ---------- */
@@ -1041,7 +1043,59 @@ group('常世的效果');
   ok('不可被对应', !r.ok);
 }
 
-/* ---------- 16. 不可变性 ---------- */
+/* ---------- 16. 全力与适正距离再确认 ---------- */
+group('全力 / 距离再确认');
+{
+  // 本回合已经做过基本动作 → 不能再用《全力》卡
+  let s = withHand(0, ['01-yurina-o-n-4']);   // 居合（全力）
+  s.players[0].focus = 2;
+  s.distance = 5;
+  const r1 = E.actions.applyAction(s, { type: 'basic', player: 0, which: 'charge' });
+  ok('先做一次基本动作', r1.ok, r1.error);
+  const r2 = E.actions.applyAction(r1.state, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-4' });
+  ok('做过基本动作后不能用《全力》', !r2.ok);
+}
+
+{
+  // 本回合已经出过牌 → 不能再用《全力》卡
+  let s = withHand(0, ['01-yurina-o-n-4', '01-yurina-o-n-1']);
+  s.distance = 3;
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-1' });
+  ok('先出一张斬', r.ok, r.error);
+  r = E.actions.applyAction(r.state, { type: 'respond', player: 1, cardId: null });
+  r = E.actions.applyAction(r.state, { type: 'resolveDamage', player: 1, choice: 'aura' });
+  const r2 = E.actions.applyAction(r.state, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-4' });
+  ok('出过牌后不能用《全力》', !r2.ok);
+}
+
+{
+  // 什么都没做的回合可以用《全力》
+  let s = withHand(0, ['01-yurina-o-n-4']);
+  s.distance = 4;
+  const r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-4' });
+  ok('本回合没行动过 → 可以用《全力》', r.ok, r.error);
+}
+
+{
+  // 对应改变了间合 → 攻击落空
+  let s = withHand(0, ['01-yurina-o-n-2']);   // 一閃 适正距离 3
+  s.distance = 3;
+  s.players[1].hand = [cardById('02-saine-o-n-4')];   // 見切り（八相时才能当对应用）
+  s.dust = 5;                                         // 虚是全场共享的
+  s.players[1].aura = 1;                              // 八相：自装 ≤1
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-2' });
+  ok('打出一閃', r.ok, r.error);
+  r = E.actions.applyAction(r.state, { type: 'respond', player: 1, cardId: '02-saine-o-n-4' });
+  ok('用見切り对应', r.ok, r.error);
+  // 見切り 会问方向，选 虚→间合（间合变 4，一閃 打不到）
+  r = E.actions.applyAction(r.state, { type: 'choose', player: 1, option: 'dust_to_dist' });
+  ok('选择方向', r.ok, r.error);
+  eq('间合 3→4', r.state.distance, 4);
+  ok('间合变了，攻击落空（没有待结算）', !r.state.pending);
+  eq('命没掉', r.state.players[1].life, 10);
+}
+
+/* ---------- 17. 不可变性 ---------- */
 group('不可变性');
 {
   const s = freshP0();

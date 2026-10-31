@@ -126,6 +126,8 @@
       case 'choose': {
         const r = Engine.effects.resolveChoice(next, action.player, action.option);
         if (!r.ok) return { ok: false, state, error: r.error };
+        // 选项可能改了间合 → 攻击要重新确认距离
+        R.recheckRange(next);
         return { ok: true, state: next };
       }
 

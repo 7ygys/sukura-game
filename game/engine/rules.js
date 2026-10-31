@@ -149,6 +149,7 @@
 
     state.endTurnPending = null;
     state.phase = 'end';
+    tryRevive(state, who);        // 规则 10-7：再起在「结束阶段」检查
     state.active = 1 - state.active;
     state.turn++;
     startTurn(state);
@@ -180,8 +181,9 @@
     const card = p.hand[idx];
 
     p.hand.splice(idx, 1);
-    state.dust -= fromDust;
-    p.aura -= fromAura;
+    // 结晶从虚/装「搬到付与札上」，这两步也要各自发事件给动画
+    if (fromDust) moveCrystal(state, who, 'dust', 'attach', fromDust);
+    if (fromAura) moveCrystal(state, who, 'aura', 'attach', fromAura);
     p.attachments.push(Object.assign({}, card, { crystals: nb.cap }));
 
     state.turnUsed[who] = (state.turnUsed[who] || 0) + 1;
@@ -228,6 +230,50 @@
     p.hidden.push(card);
     log(state, 'P' + (who + 1) + ' 盖牌「' + card.name + '」→ 可免费做一次基本动作');
     return { ok: true };
+  }
+
+  /* ==========================================================================
+   * 一·六、结晶移动（唯一入口）
+   * ==========================================================================
+   *
+   * 场上所有樱花结晶的移动都必须走这里：
+   *   前进 距→装    后退 装→距    缠绕 尘→装    宿命 装→气    离脱 尘→距
+   *   受伤 装→虚    命伤 命→气    付与 虚/装→付与札
+   *
+   * 为什么统一：界面要按"这次是哪一种移动"来播动画。
+   * 如果各处自己改数字，界面就只能靠"哪个数变了"去猜，必然猜错。
+   *
+   * 区域名：'distance' 'dust' 'aura' 'flare' 'life' 'attach'
+   */
+  function moveCrystal(state, who, from, to, n) {
+    const p = state.players[who];
+    const get = (k) => (k === 'dust' || k === 'distance') ? state[k] : p[k];
+    const set = (k, v) => { if (k === 'dust' || k === 'distance') state[k] = v; else p[k] = v; };
+
+    // 「付与札」不是数值区域：减/加由调用方自己处理，这里只负责发事件
+    let num;
+    if (from === 'attach') {
+      num = n || 1;                      // 调用方已经从卡片上扣掉了
+    } else {
+      num = Math.min(get(from) || 0, n || 1);
+      if (to === 'aura') num = Math.min(num, Engine.state.INIT.AURA_MAX - p.aura);
+      if (to === 'distance') num = Math.min(num, 10 - state.distance);
+      if (from === 'distance' && (p.attachments || []).some((a) => {
+        const e = (Engine.effects && Engine.effects.cards || {})[a.id];
+        return e && e.blockArrowFromDistance;
+      })) {
+        Engine.state.log(state, '「スモーク」：间合的结晶不能被箭头移动');
+        return 0;
+      }
+      if (num <= 0) return 0;
+      set(from, get(from) - num);
+    }
+
+    if (to !== 'attach') set(to, get(to) + num);
+
+    // 给界面播动画用
+    Engine.state.emit(state, 'move', { who: who, from: from, to: to, n: num });
+    return num;
   }
 
   /* ==========================================================================
@@ -289,13 +335,11 @@
         p.attachments = keep;
         rest -= shieldFromAttach;
       }
-      p.aura -= rest;
-      state.dust += rest;
+      moveCrystal(state, who, 'aura', 'dust', rest);
       log(state, 'P' + (who + 1) + ' 装 -' + auraDmg + '（余 ' + p.aura + '）→ 虚 +' + auraDmg);
     } else {
       // 命里的结晶被打掉后**不会消失**，它飞到气里去
-      p.life -= lifeDmg;
-      p.flare += lifeDmg;
+      moveCrystal(state, who, 'life', 'flare', lifeDmg);
       log(state, 'P' + (who + 1) + ' 命 -' + lifeDmg + '（余 ' + p.life + '）→ 气 +' + lifeDmg);
     }
 
@@ -339,6 +383,7 @@
     p.buff = { aura: 0, life: 0 };
     p.terminated = false;
     p.fullpowerUsed = false;
+    p.usedBasicThisTurn = false;
 
     if (!p.firstTurnDone) {
       p.firstTurnDone = true;
@@ -368,7 +413,6 @@
       }
     }
 
-    tryRevive(state, who);       // 回合开始时检查「再起」
     state.phase = 'main';
     log(state, '—— 第 ' + state.turn + ' 回合 · P' + (who + 1) + ' ——');
     return state;
@@ -386,14 +430,19 @@
     const table = (Engine.effects && Engine.effects.cards) || {};
     p.attachments.forEach(a => {
       if (a.crystals > 0) {
-        a.crystals--;
-        // 圏域：本该进虚的结晶改为进间合
         const e = table[a.id];
-        if (e && e.redirectTo === 'distance' && state.distance < 10) {
-          state.distance++;
+        // 圏域：本该进虚的结晶改为进间合；间合满了就**留在牌上**不动
+        if (e && e.redirectTo === 'distance') {
+          if (state.distance >= 10) {
+            keep.push(a);
+            return;
+          }
+          a.crystals--;
+          moveCrystal(state, who, 'attach', 'distance', 1);
           log(state, '「' + a.name + '」：结晶改为送至间合');
         } else {
-          state.dust++;
+          a.crystals--;
+          moveCrystal(state, who, 'attach', 'dust', 1);
         }
       }
       if (a.crystals > 0) {
@@ -442,6 +491,7 @@
     }
 
     state.phase = 'end';
+    tryRevive(state, who);        // 规则 10-7：再起在「结束阶段」检查
     state.active = 1 - state.active;   // 0↔1 切换
     state.turn++;
     startTurn(state);
@@ -468,35 +518,35 @@
     advance: {
       name: '前进',
       need: (st, p) => st.distance > taijinOf(st) && p.aura < Engine.state.INIT.AURA_MAX,
-      apply: (st, p) => { st.distance -= 1; p.aura += 1; }
+      apply: (st, p, who) => { moveCrystal(st, who, 'distance', 'aura', 1); }
     },
 
     // 后退：装 → 距 → 拉开距离
     retreat: {
       name: '后退',
       need: (st, p) => p.aura >= 1 && st.distance < 10,
-      apply: (st, p) => { p.aura -= 1; st.distance += 1; }
+      apply: (st, p, who) => { moveCrystal(st, who, 'aura', 'distance', 1); }
     },
 
     // 缠绕：虚 → 装 → 从公共池补充护甲
     gather: {
       name: '缠绕',
       need: (st, p) => st.dust >= 1 && p.aura < Engine.state.INIT.AURA_MAX,
-      apply: (st, p) => { st.dust -= 1; p.aura += 1; }
+      apply: (st, p, who) => { moveCrystal(st, who, 'dust', 'aura', 1); }
     },
 
     // 宿命：装 → 气 → 消耗护甲换王牌费用
     charge: {
       name: '宿命',
       need: (st, p) => p.aura >= 1,
-      apply: (st, p) => { p.aura -= 1; p.flare += 1; }
+      apply: (st, p, who) => { moveCrystal(st, who, 'aura', 'flare', 1); }
     },
 
     // 离脱：虚 → 距。规则 9-6-5：间合 > 达人距离时什么都不会发生
     disengage: {
       name: '离脱',
       need: (st, p) => st.distance <= taijinOf(st) && st.distance < 10 && st.dust >= 1,
-      apply: (st, p) => { st.dust -= 1; st.distance += 1; }
+      apply: (st, p, who) => { moveCrystal(st, who, 'dust', 'distance', 1); }
     }
   };
 
@@ -542,8 +592,8 @@
 
     const p = state.players[who];
     if (p.terminated) return { ok: false, error: '终端：本回合不能再使用牌或做基本动作' };
-    if (p.fullpowerUsed && card && card.kind !== 'special')
-      return { ok: false, error: '全力行动：本回合已经用过一张牌了' };
+    // 用了《全力》卡之后就进入全力行动，不能再做基本动作
+    if (p.fullpowerUsed) return { ok: false, error: '全力行动：本回合已经用过牌了' };
     if (!b.need(state, p)) return { ok: false, error: b.name + '的条件不满足' };
 
     if (!free) {
@@ -559,10 +609,29 @@
       }
     }
 
-    b.apply(state, p);
+    p.usedBasicThisTurn = true;
+    b.apply(state, p, who);
     Engine.state.emit(state, 'basic', { who: who, which: which });
     log(state, 'P' + (who + 1) + ' ' + b.name + (free ? '（免费）' : ''));
     return { ok: true };
+  }
+
+  /**
+   * 重新确认适正距离（规则 9-4-ⅲ）。
+   * 对应把间合改了（例如見切り）之后要再查一次，打不到就落空。
+   */
+  function recheckRange(state) {
+    const pd = state.pending;
+    if (!pd || pd.cancelled) return false;
+    if (!pd.range || pd.range.indexOf(state.distance) >= 0) return false;
+
+    log(state, '对应改变了间合，攻击落空（间合 ' + state.distance + '）');
+    state.pending = null;
+    if (state.attackQueue && state.attackQueue.length) {
+      const spec = state.attackQueue.shift();
+      Engine.effects.generateAttack(state, pd.attacker, spec);
+    }
+    return true;
   }
 
   /* ==========================================================================
@@ -620,6 +689,18 @@
     const types = card.types || [];
     const isAttack = types.indexOf('attack') >= 0;
     const isEnhance = types.indexOf('enhance') >= 0;
+
+    // 终端：本回合已经不能再用牌
+    if (p.terminated) return { ok: false, error: '终端：本回合不能再使用牌或做基本动作' };
+    // 全力行动中，除了那一张切札之外不能再出牌
+    if (p.fullpowerUsed && !fromSpecial)
+      return { ok: false, error: '全力行动：本回合已经用过牌了' };
+    // 规则 8-2-2：《全力》卡只能在「全力行动」里用。
+    // 简化判断：本回合已经出过牌或做过基本动作 → 就进不了全力行动
+    if (types.indexOf('fullpower') >= 0 &&
+        (state.turnUsed[who] > 0 || p.usedBasicThisTurn)) {
+      return { ok: false, error: '《全力》卡只能在全力行动中使用（本回合已经行动过了）' };
+    }
 
     // ---- 「能不能用」的额外条件（例如底力的决死前置） ----
     const table0 = (Engine.effects && Engine.effects.cards) || {};
@@ -787,7 +868,11 @@
       }
       if (!card) return { ok: false, error: '没有这张牌' };
 
-      const canReact = (card.types || []).indexOf('reaction') >= 0;
+      // 有《对应》类型，或者效果自己声明了"可以当对应用"
+      let canReact = (card.types || []).indexOf('reaction') >= 0;
+      const rtab = (Engine.effects && Engine.effects.cards) || {};
+      const rcard = rtab[card.id];
+      if (!canReact && rcard && rcard.canRespond) canReact = !!rcard.canRespond(state, who);
       if (!canReact) return { ok: false, error: '这张牌没有《对应》' };
 
       // 对应牌自己的使用条件（例如氷雨只能对应王牌）
@@ -818,14 +903,26 @@
       pd.responseCardId = card.id;
       pd.responseCard = card;
 
-      // 对应牌自己的减伤效果（例如浦波嵐 -2/+0）
+      // 对应牌自己的效果：先走"使用它"的效果（例如見切り 的间合⇔虚），再算减伤
       const rtable = (Engine.effects && Engine.effects.cards) || {};
       const re = rtable[card.id];
+      if (re && re.onUse) re.onUse(state, who, card);
       if (re && re.onRespond) re.onRespond(state, who, pd, card);
 
       log(state, 'P' + (who + 1) + ' 用「' + card.name + '」对应');
     } else {
       log(state, 'P' + (who + 1) + ' 不对应');
+    }
+
+    // 对应可能改变了间合（例如見切り），所以要重新确认适正距离（规则 9-4-ⅲ）
+    if (!pd.cancelled && pd.range && pd.range.indexOf(state.distance) < 0) {
+      log(state, '对应改变了间合，攻击落空（间合 ' + state.distance + '）');
+      state.pending = null;
+      if (state.attackQueue && state.attackQueue.length) {
+        const spec = state.attackQueue.shift();
+        Engine.effects.generateAttack(state, pd.attacker, spec);
+      }
+      return { ok: true };
     }
 
     // 被打消了：不结算伤害，也不触发【攻击后】
@@ -957,7 +1054,7 @@
     // 回合
     startTurn, endTurn, tickAttachments,
     // 基本动作
-    BASIC, canBasic, basicAction, hideCard, taijinOf, shadowAura, confirmNabu, cancelNabu, confirmEndTurn,
+    BASIC, canBasic, basicAction, hideCard, taijinOf, shadowAura, moveCrystal, recheckRange, confirmNabu, cancelNabu, confirmEndTurn,
     // 再起
     tryRevive, stagger,
     // 出牌与攻防

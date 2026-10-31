@@ -383,6 +383,8 @@
   // 見切り：间合(1) ⇔ 虚（双向箭头，由使用者选方向）
     // 另：【常时】八相时可以当《对应》用（types 里已经带 reaction，这里只做条件判断）
     "02-saine-o-n-4": {
+      // 这张牌平时不能对应，只有八相（自装≤1）时才当《对应》用
+      canRespond(state, who) { return hassou(state, who); },
       onUse(state, who) {
         Engine.effects.fx.ask(state, who, 'mikiri', '间合(1) ⇔ 虚：选方向', ['dist_to_dust', 'dust_to_dist']);
       }
