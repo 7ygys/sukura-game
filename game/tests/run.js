@@ -390,7 +390,7 @@ group('付与（展开 / 纳 / 破弃）');
   E.rules.tickAttachments(s, 0);
   eq('结晶耗尽后付与区清空', s.players[0].attachments.length, 0);
   eq('破弃的牌进弃牌区', s.players[0].discard.length, 1);
-  eq('破弃牌名字正确', s.players[0].discard[0].name, '气合斩');
+  eq('破弃牌名字正确', s.players[0].discard[0].name, '圧気');
   eq('虚 7→8', s.dust, dustBefore + 2);
 }
 
