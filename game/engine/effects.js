@@ -106,6 +106,18 @@
       const p = state.players[who];
       const get = (k) => (k === 'dust' || k === 'distance') ? state[k] : p[k];
       const set = (k, v) => { if (k === 'dust' || k === 'distance') state[k] = v; else p[k] = v; };
+      // スモーク：箭头效果不能把间合的结晶移走
+      if (from === 'distance') {
+        const blocked = (p.attachments || []).some(function (a) {
+          const e = (Engine.effects.cards || {})[a.id];
+          return e && e.blockArrowFromDistance;
+        });
+        if (blocked) {
+          Engine.state.log(state, '「スモーク」：间合的结晶不能被箭头移动');
+          return 0;
+        }
+      }
+
       let num = Math.min(get(from), n || 1);
       // 目标区域有上限：装 5、间合 10。
       // 收不下的**留在原处**——全场结晶总数永远是 36 颗，不会凭空消失。
@@ -168,6 +180,32 @@
    */
   const choices = {};
 
+  // スカーレットイマジン：把选中的那张手牌盖成伏札
+  choices.imagine = {};
+  choices.imagine.resolve = function (state, who, optionId) {
+    const p = state.players[who];
+    const i = p.hand.findIndex(function (c) { return c.id === optionId; });
+    if (i < 0) return false;
+    const card = p.hand.splice(i, 1)[0];
+    p.hidden.push(card);
+    Engine.state.log(state, '把「' + card.name + '」盖成伏札');
+    return true;
+  };
+
+
+  // スカーレットイマジン：把选中的那张手牌盖成伏札
+  choices.imagine = {};
+  // 选项是动态的（手牌 id），所以用 Proxy 风格：resolveChoice 找不到时按 id 处理
+  choices.imagine.resolve = function (state, who, optionId) {
+    const p = state.players[who];
+    const i = p.hand.findIndex(function (c) { return c.id === optionId; });
+    if (i < 0) return false;
+    const card = p.hand.splice(i, 1)[0];
+    p.hidden.push(card);
+    Engine.state.log(state, '把「' + card.name + '」盖成伏札');
+    return true;
+  };
+
   // 見切り：间合(1) ⇔ 虚
   choices.mikiri = {
     dist_to_dust(state, who) { Engine.effects.fx.moveCrystal(state, who, 'distance', 'dust', 1); },
@@ -195,7 +233,12 @@
 
     const table = choices[c.sourceId] || {};
     state.choice = null;
-    if (table[optionId]) table[optionId](state, who);
+    if (table[optionId]) { table[optionId](state, who); return { ok: true }; }
+    // 动态选项（比如"选一张手牌"）：交给 resolve 自己处理
+    if (typeof table.resolve === 'function') {
+      if (!table.resolve(state, who, optionId)) return { ok: false, error: '这个选项无效' };
+      return { ok: true };
+    }
     return { ok: true };
   }
 
@@ -316,7 +359,7 @@
       }
     },
 
-    // 見切り：间合(1) ⇔ 虚（双向箭头，由使用者选方向）
+  // 見切り：间合(1) ⇔ 虚（双向箭头，由使用者选方向）
     // 另：【常时】八相时可以当《对应》用（types 里已经带 reaction，这里只做条件判断）
     "02-saine-o-n-4": {
       onUse(state, who) {
@@ -393,10 +436,52 @@
 
     /* ===== 绯弥香 ===== */
 
+    // シュート：纯攻击
+
+    // ラピッドファイア：【常时】连火（本回合第 3 张以后）→ +1/+1
+    "03-himika-o-n-2": {
+      onAttack(state, who, ctx) {
+        if (renka(state, who)) { ctx.aura += 1; ctx.life += 1; }
+      }
+    },
+
+    // マグナムカノン：【攻击后】自命 → 虚
+    "03-himika-o-n-3": {
+      onAfterAttack(state, who) {
+        Engine.effects.fx.moveCrystal(state, who, 'life', 'dust', 1);
+      }
+    },
+
     // フルバースト（全力）：两种伤害都要吃
     "03-himika-o-n-4": {
       onAttack(state, who, ctx) { ctx.both = true; }
     },
+
+    // バックステップ：抽 1 张；虚 → 间合
+    "03-himika-o-n-5": {
+      onUse(state, who) {
+        Engine.effects.fx.draw(state, who, 1);
+        Engine.effects.fx.moveCrystal(state, who, 'dust', 'distance', 1);
+      }
+    },
+
+    // バックドラフト：让对手畏缩；连火 → 本回合下一次其他女神的攻击 +1/+1
+    "03-himika-o-n-6": {
+      onUse(state, who) {
+        Engine.effects.fx.stagger(state, 1 - who);
+        if (renka(state, who)) {
+          state.players[who].nextOtherAttack = { bonus: { aura: 1, life: 1 } };
+          Engine.state.log(state, '连火：下一次其他女神的《攻击》+1/+1');
+        }
+      }
+    },
+
+    // スモーク（付与・纳3）：【展开中】箭头效果不能移动间合里的结晶
+    "03-himika-o-n-7": {
+      blockArrowFromDistance: true
+    },
+
+    // レッドバレット：纯攻击（费 0）
 
     // クリムゾンゼロ：两种伤害都吃；间合 0 时不可被对应
     "03-himika-o-s-2": {
@@ -404,8 +489,27 @@
         ctx.both = true;
         if (state.distance === 0) ctx.noRespond = true;
       }
-    }
+    },
 
+    // スカーレットイマジン：抽 2 张，然后把 1 张手牌盖成伏札
+    "03-himika-o-s-3": {
+      onUse(state, who) {
+        Engine.effects.fx.draw(state, who, 2);
+        const p = state.players[who];
+        if (!p.hand.length) return;
+        Engine.effects.fx.ask(state, who, 'imagine', '选 1 张手牌盖成伏札',
+          p.hand.map(function (c) { return c.id; }));
+      }
+    },
+
+    // ヴァーミリオン・フィールド：连火 → 虚 → 间合
+    "03-himika-o-s-4": {
+      onUse(state, who) {
+        if (renka(state, who)) {
+          Engine.effects.fx.moveCrystal(state, who, 'dust', 'distance', 1);
+        }
+      }
+    }
   };
 
   /* ---------- 效果生成的攻击 ---------- */

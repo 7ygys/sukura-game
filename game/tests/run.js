@@ -821,7 +821,102 @@ group('两种伤害都要吃');
   eq('命仍然 -1', r2.state.players[1].life, 9);
 }
 
-/* ---------- 14. 不可变性 ---------- */
+/* ---------- 14. 绯弥香 11 张 ---------- */
+group('绯弥香的效果');
+{
+  // ラピッドファイア：连火（本回合第 3 张以后）→ +1/+1
+  let s = withHand(0, ['03-himika-o-n-2']);
+  s.distance = 7;
+  s.turnUsed[0] = 0;
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '03-himika-o-n-2' });
+  eq('不是连火时 2/1', r.state.pending.damage, { aura: 2, life: 1 });
+
+  s = withHand(0, ['03-himika-o-n-2']);
+  s.distance = 7;
+  s.turnUsed[0] = 2;                       // 之前已经用了 2 张
+  r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '03-himika-o-n-2' });
+  eq('连火时 3/2', r.state.pending.damage, { aura: 3, life: 2 });
+}
+
+{
+  // マグナムカノン：攻击后 自命 → 虚
+  let s = withHand(0, ['03-himika-o-n-3']);
+  s.distance = 6;
+  s.dust = 1;
+  s.players[1].aura = 3;
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '03-himika-o-n-3' });
+  r = E.actions.applyAction(r.state, { type: 'respond', player: 1, cardId: null });
+  const dustBefore = r.state.dust;
+  r = E.actions.applyAction(r.state, { type: 'resolveDamage', player: 1, choice: 'aura' });
+  eq('自命 10→9', r.state.players[0].life, 9);
+  // 虚的增加 = 对方装伤 3 颗 + 自己自命→虚 1 颗
+  eq('虚 +4（对方装伤 3 + 自命→虚 1）', r.state.dust, dustBefore + 4);
+}
+
+{
+  // バックステップ：抽 1 + 虚→间合
+  let s = withHand(0, ['03-himika-o-n-5']);
+  s.distance = 5; s.dust = 3;
+  s.players[0].deck = [cardById('03-himika-o-n-1')];   // 保证牌库有牌，不触发焦燥
+  const handBefore = s.players[0].hand.length;
+  const r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '03-himika-o-n-5' });
+  ok('打出バックステップ', r.ok, r.error);
+  eq('手牌 -1+1 = 不变', r.state.players[0].hand.length, handBefore);
+  eq('间合 5→6', r.state.distance, 6);
+  eq('虚 3→2', r.state.dust, 2);
+}
+
+{
+  // バックドラフト：让对手畏缩
+  let s = withHand(0, ['03-himika-o-n-6']);
+  s.dust = 3;
+  const r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '03-himika-o-n-6' });
+  ok('打出バックドラフト', r.ok, r.error);
+  eq('对手畏缩', r.state.players[1].staggered, true);
+}
+
+{
+  // スモーク：间合的结晶不能被箭头移动（見切り 的 dist→dust 会被挡）
+  let s = withHand(0, ['03-himika-o-n-7']);
+  s.dust = 5; s.distance = 8; s.players[0].aura = 3;
+  let r = autoNabu(E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '03-himika-o-n-7' }));
+  ok('展开スモーク', r.ok, r.error);
+  s = r.state;
+  eq('达人距离不变（スモーク 不加达人距离）', E.rules.taijinOf(s), 2);
+
+  const d0 = s.distance;
+  E.effects.fx.moveCrystal(s, 0, 'distance', 'dust', 1);
+  eq('箭头被挡住，间合不变', s.distance, d0);
+}
+
+{
+  // スカーレットイマジン：抽 2 然后盖 1 张
+  let s = withHand(0, ['03-himika-o-s-3']);
+  s.players[0].flare = 3;
+  s.players[0].hand = [cardById('03-himika-o-s-3'), cardById('03-himika-o-n-1')];
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '03-himika-o-s-3' });
+  ok('打出スカーレットイマジン', r.ok, r.error);
+  ok('弹出了「盖哪张」的选择', !!r.state.choice);
+  const pick = r.state.players[0].hand[0].id;
+  const r2 = E.actions.applyAction(r.state, { type: 'choose', player: 0, option: pick });
+  ok('选择生效', r2.ok, r2.error);
+  eq('盖了 1 张伏札', r2.state.players[0].hidden.length, 1);
+}
+
+{
+  // ヴァーミリオン：连火时 虚→间合
+  let s = withHand(0, ['03-himika-o-s-4']);
+  s.players[0].flare = 2;
+  s.dust = 3; s.distance = 5;
+  s.turnUsed[0] = 2;
+  const r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '03-himika-o-s-4' });
+  ok('打出ヴァーミリオン', r.ok, r.error);
+  eq('间合 5→6', r.state.distance, 6);
+  // 虚 3 + 付掉的 2 点气 - 移走的 1 颗 = 4
+  eq('虚 3+2(费)-1 = 4', r.state.dust, 4);
+}
+
+/* ---------- 15. 不可变性 ---------- */
 group('不可变性');
 {
   const s = freshP0();

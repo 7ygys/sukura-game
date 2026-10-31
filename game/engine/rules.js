@@ -677,7 +677,8 @@
             const mn = Math.min.apply(null, ctx.range);
             if (mn - 1 >= 0) ctx.range.push(mn - 1);   // 距离扩大（近1）
           }
-          ctx.noRespondNormal = true;
+          if (na.bonus) { ctx.aura += na.bonus.aura || 0; ctx.life += na.bonus.life || 0; }
+          if (na.noRespond) ctx.noRespondNormal = true;
           p.nextOtherAttack = null;
           log(state, '気迫：这次攻击不可被通常札对应，且距离扩大（近1）');
         }
