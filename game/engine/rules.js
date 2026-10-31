@@ -202,8 +202,14 @@
     const keep = [];
     p.attachments.forEach(a => {
       if (a.crystals > 0) { a.crystals--; state.dust++; }
-      if (a.crystals > 0) keep.push(a);
-      else log(state, '付与「' + a.name + '」结晶耗尽，破弃');
+      if (a.crystals > 0) {
+        keep.push(a);
+      } else {
+        // 结晶耗尽 → 破弃：这张付与札进弃牌区
+        // （阶段 5 会在这里触发它的「破弃时」效果）
+        p.discard.push(Object.assign({}, a, { crystals: 0 }));
+        log(state, '付与「' + a.name + '」结晶耗尽，破弃');
+      }
     });
     p.attachments = keep;
   }
@@ -361,33 +367,64 @@
     if (idx < 0) return { ok: false, error: '手上没有这张牌' };
 
     const card = p.hand[idx];
+    const types = card.types || [];
+    const isAttack = types.indexOf('attack') >= 0;
+    const isEnhance = types.indexOf('enhance') >= 0;
 
-    // ---- 王牌要付费用 ----
+    // ---- 王牌要付费用（气） ----
     if (card.kind === 'special') {
       const cost = card.cost || 0;
       if (p.flare < cost) return { ok: false, error: '气不够（需要 ' + cost + '）' };
-      p.flare -= cost;
-      log(state, '支付 ' + cost + ' 点气');
     }
 
     // ---- 攻击要检查距离 ----
-    const isAttack = (card.types || []).indexOf('attack') >= 0;
     if (isAttack && !inRange(state, card)) {
       return { ok: false, error: '距离 ' + state.distance + ' 不在适正距离内' };
     }
 
-    // ---- 牌离开手牌 ----
-    p.hand.splice(idx, 1);
+    // ---- 付与要检查「纳」的结晶够不够 ----
+    // 付与札上的结晶叫「纳」，从虚里取，虚不够就补着从装里取。
+    // 注意这里只是**检查**，还没真的扣，避免出错时把状态改坏了。
+    let capDust = 0, capAura = 0;
+    if (isEnhance) {
+      const cap = card.capacity || 0;
+      capDust = Math.min(state.dust, cap);
+      capAura = cap - capDust;
+      if (p.aura < capAura) {
+        return { ok: false, error: '虚和装都不够放「纳 ' + cap + '」的结晶' };
+      }
+    }
+
+    // ============================================================
+    // 到这里所有检查都过了，下面开始真正改动状态
+    // ============================================================
 
     if (card.kind === 'special') {
-      // 王牌用掉后进"已使用"状态（再起时才会回来）
+      p.flare -= card.cost || 0;
+      log(state, '支付 ' + (card.cost || 0) + ' 点气');
+    }
+
+    p.hand.splice(idx, 1);
+    log(state, 'P' + (who + 1) + ' 打出「' + card.name + '」');
+
+    // ---- 付与：放进付与区，身上带「纳」颗结晶 ----
+    if (isEnhance) {
+      const cap = card.capacity || 0;
+      state.dust -= capDust;
+      p.aura -= capAura;
+      p.attachments.push(Object.assign({}, card, { crystals: cap }));
+      log(state, '付与「' + card.name + '」展开，纳 ' + cap +
+        '（虚 -' + capDust + (capAura ? '，装 -' + capAura : '') + '）');
+      return { ok: true };
+    }
+
+    // ---- 王牌用掉后进"已使用"，通常札进弃牌区 ----
+    if (card.kind === 'special') {
       const sp = p.specials.find(s => s.id === card.id);
       if (sp) sp.used = true;
     } else {
       p.discard.push(card);
     }
-
-    log(state, 'P' + (who + 1) + ' 打出「' + card.name + '」');
 
     // ---- 攻击 → 进入待处理，等对方决定要不要对应 ----
     if (isAttack) {
@@ -399,15 +436,14 @@
         cardId: card.id,
         cardName: card.name,
         damage: { aura: dmg.aura || 0, life: dmg.life || 0 },
-        stage: 'respond',      // respond → damage
+        stage: 'respond',
         responded: false
       };
       return { ok: true };
     }
 
-    // ---- 行动 / 付与：阶段 3 里还没有具体效果 ----
-    // （阶段 5 会在这里按 card.id 去查 effects 表）
-    log(state, '「' + card.name + '」暂时没有实装效果');
+    // ---- 纯行动牌：阶段 4 还没有具体效果 ----
+    log(state, '「' + card.name + '」的文本效果留到阶段 5');
     return { ok: true };
   }
 

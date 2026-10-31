@@ -308,7 +308,82 @@ function withHand(who, ids) {
   eq('王牌不进弃牌区', r.state.players[0].discard.length, 0);
 }
 
-/* ---------- 8. 不可变性 ---------- */
+/* ---------- 8. 付与与破弃（阶段 4） ---------- */
+group('付与（展开 / 纳 / 破弃）');
+{
+  // 气合斩：付与，纳 2
+  const ENH = '01-yurina-o-n-6';
+
+  // 虚足够时，全部从虚取
+  let s = withHand(0, [ENH]);
+  s.dust = 8; s.players[0].aura = 3;
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: ENH });
+  ok('付与可以展开', r.ok, r.error);
+  s = r.state;
+  eq('付与区 1 张', s.players[0].attachments.length, 1);
+  eq('纳 2 颗结晶', s.players[0].attachments[0].crystals, 2);
+  eq('虚 8→6', s.dust, 6);
+  eq('装没被动过', s.players[0].aura, 3);
+  eq('付与不进弃牌区', s.players[0].discard.length, 0);
+
+  // 虚不够时，差额从装补
+  s = withHand(0, [ENH]);
+  s.dust = 0; s.players[0].aura = 3;
+  r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: ENH });
+  ok('虚 0 时从装补足结晶', r.ok, r.error);
+  eq('装 3→1', r.state.players[0].aura, 1);
+  eq('虚还是 0', r.state.dust, 0);
+  eq('纳仍然是 2', r.state.players[0].attachments[0].crystals, 2);
+
+  // 虚和装都不够
+  s = withHand(0, [ENH]);
+  s.dust = 0; s.players[0].aura = 1;
+  r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: ENH });
+  ok('虚+装都不够时不能展开', !r.ok);
+}
+
+{
+  const ENH = '01-yurina-o-n-6';
+  let s = withHand(0, [ENH]);
+  s.dust = 8; s.players[0].aura = 3;
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: ENH });
+  s = r.state;
+
+  // 每回合开始：付与札各送 1 颗结晶到虚
+  const dustBefore = s.dust;              // 6
+  E.rules.tickAttachments(s, 0);
+  eq('回合开始移 1 颗到虚（纳 2→1）', s.players[0].attachments[0].crystals, 1);
+  eq('虚 6→7', s.dust, dustBefore + 1);
+
+  // 再移一次，结晶耗尽 → 破弃
+  E.rules.tickAttachments(s, 0);
+  eq('结晶耗尽后付与区清空', s.players[0].attachments.length, 0);
+  eq('破弃的牌进弃牌区', s.players[0].discard.length, 1);
+  eq('破弃牌名字正确', s.players[0].discard[0].name, '气合斩');
+  eq('虚 7→8', s.dust, dustBefore + 2);
+}
+
+{
+  // 多张付与可以同时存在
+  const A = '01-yurina-o-n-6';   // 纳 2
+  const B = '01-yurina-o-n-7';   // 纳 4
+  let s = withHand(0, [A, B]);
+  s.dust = 10; s.players[0].aura = 5;
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: A });
+  ok('展开第一张付与', r.ok, r.error);
+  r = E.actions.applyAction(r.state, { type: 'playCard', player: 0, cardId: B });
+  ok('展开第二张付与', r.ok, r.error);
+  eq('付与区 2 张', r.state.players[0].attachments.length, 2);
+  eq('虚 10-2-4=4', r.state.dust, 4);
+
+  // 两张一起走回合开始
+  E.rules.tickAttachments(r.state, 0);
+  eq('两张各移 1 颗（虚 +2）', r.state.dust, 6);
+  eq('第一张纳 2→1', r.state.players[0].attachments[0].crystals, 1);
+  eq('第二张纳 4→3', r.state.players[0].attachments[1].crystals, 3);
+}
+
+/* ---------- 9. 不可变性 ---------- */
 group('不可变性');
 {
   const s = freshP0();
