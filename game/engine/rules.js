@@ -149,6 +149,7 @@
       if (i < 0) return { ok: false, error: '手牌里没有这张：' + id };
       const card = p.hand.splice(i, 1)[0];
       p.hidden.push(card);
+      Engine.state.emit(state, 'cardTo', { who: who, cardId: card.id, to: 'hidden' });
       log(state, '盖上伏札 ' + card.name);
     }
 
@@ -186,6 +187,7 @@
     const card = p.hand[idx];
 
     p.hand.splice(idx, 1);
+    Engine.state.emit(state, 'cardTo', { who: who, cardId: card.id, to: 'attach' });
     // 结晶从虚/装「搬到付与札上」，这两步也要各自发事件给动画
     if (fromDust) moveCrystal(state, who, 'dust', 'attach', fromDust);
     if (fromAura) moveCrystal(state, who, 'aura', 'attach', fromAura);
@@ -233,6 +235,7 @@
 
     const card = p.hand.splice(idx, 1)[0];
     p.hidden.push(card);
+    Engine.state.emit(state, 'cardTo', { who: who, cardId: card.id, to: 'hidden' });
     log(state, 'P' + (who + 1) + ' 盖牌「' + card.name + '」→ 可免费做一次基本动作');
     return { ok: true };
   }
@@ -341,10 +344,12 @@
         rest -= shieldFromAttach;
       }
       moveCrystal(state, who, 'aura', 'dust', rest);
+      Engine.state.emit(state, 'damage', { who: who, kind: 'aura', n: rest });
       log(state, 'P' + (who + 1) + ' 装 -' + auraDmg + '（余 ' + p.aura + '）→ 虚 +' + auraDmg);
     } else {
       // 命里的结晶被打掉后**不会消失**，它飞到气里去
       moveCrystal(state, who, 'life', 'flare', lifeDmg);
+      Engine.state.emit(state, 'damage', { who: who, kind: 'life', n: lifeDmg });
       log(state, 'P' + (who + 1) + ' 命 -' + lifeDmg + '（余 ' + p.life + '）→ 气 +' + lifeDmg);
     }
 
@@ -766,7 +771,10 @@
       log(state, '支付 ' + cost + ' 点气 → 虚 +' + cost);
     }
 
-    if (!fromSpecial) p.hand.splice(idx, 1);
+    if (!fromSpecial) {
+      p.hand.splice(idx, 1);
+      Engine.state.emit(state, 'cardTo', { who: who, cardId: card.id, to: 'discard' });
+    }
     state.turnUsed[who] = (state.turnUsed[who] || 0) + 1;
     if ((card.types || []).indexOf('fullpower') >= 0) {
       p.fullpowerUsed = true;
@@ -774,6 +782,7 @@
     }
     if ((card.types || []).indexOf('terminal') >= 0) p.terminated = true;
     log(state, 'P' + (who + 1) + ' 打出「' + card.name + '」');
+    Engine.state.emit(state, 'play', { who: who, cardId: card.id, name: card.name });
 
     // ---- 王牌用掉后进"已使用"，通常札进弃牌区 ----
     if (card.kind === 'special') {
@@ -916,6 +925,7 @@
 
       pd.responded = true;
       pd.responseCardId = card.id;
+      Engine.state.emit(state, 'respond', { who: who, cardId: card.id });
       pd.responseCard = card;
 
       // 对应牌自己的效果：先走"使用它"的效果（例如見切り 的间合⇔虚），再算减伤
@@ -943,6 +953,7 @@
     // 被打消了：不结算伤害，也不触发【攻击后】
     if (pd.cancelled) {
       log(state, '这次的《攻击》被打消了');
+      Engine.state.emit(state, 'cancel', { who: pd.defender });
       state.pending = null;
       if (state.attackQueue && state.attackQueue.length) {
         const nextSpec = state.attackQueue.shift();
