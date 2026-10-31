@@ -208,6 +208,7 @@
     state.turnUsed[who] = 0;
     p.buff = { aura: 0, life: 0 };
     p.terminated = false;
+    p.fullpowerUsed = false;
 
     if (!p.firstTurnDone) {
       p.firstTurnDone = true;
@@ -223,9 +224,9 @@
       }
       tickAttachments(state, who);
 
-      // ⅲ 重组牌库（可选，付 1 点命）→ ⅳ 抽 2
+      // ⅲ 重组牌库（每回合都会问，付 1 点命）→ ⅳ 抽 2
       const material = p.discard.concat(p.hidden).filter(c => c.kind === 'normal').length;
-      if (p.deck.length <= 1 && material > 0) {
+      if (material > 0) {
         state.choice = {
           who: who, sourceId: 'reshuffle',
           prompt: '牌库快空了，是否重组？（会失去 1 点命）',
@@ -388,6 +389,8 @@
 
     const p = state.players[who];
     if (p.terminated) return { ok: false, error: '终端：本回合不能再使用牌或做基本动作' };
+    if (p.fullpowerUsed && card && card.kind !== 'special')
+      return { ok: false, error: '全力行动：本回合已经用过一张牌了' };
     if (!b.need(state, p)) return { ok: false, error: b.name + '的条件不满足' };
 
     if (!free) {
@@ -465,6 +468,14 @@
     const isAttack = types.indexOf('attack') >= 0;
     const isEnhance = types.indexOf('enhance') >= 0;
 
+    // ---- 「能不能用」的额外条件（例如底力的决死前置） ----
+    const table0 = (Engine.effects && Engine.effects.cards) || {};
+    const c0 = table0[card.id];
+    if (c0 && c0.canUse) {
+      const r0 = c0.canUse(state, who, card);
+      if (r0 !== true) return { ok: false, error: r0 || '这张牌现在不能使用' };
+    }
+
     // ---- 王牌要付费用（气） ----
     if (card.kind === 'special') {
       const cost = card.cost || 0;
@@ -502,6 +513,10 @@
 
     if (!fromSpecial) p.hand.splice(idx, 1);
     state.turnUsed[who] = (state.turnUsed[who] || 0) + 1;
+    if ((card.types || []).indexOf('fullpower') >= 0) {
+      p.fullpowerUsed = true;
+      log(state, '全力行动：本回合不能再使用其他牌或基本动作');
+    }
     if ((card.types || []).indexOf('terminal') >= 0) p.terminated = true;
     log(state, 'P' + (who + 1) + ' 打出「' + card.name + '」');
 
@@ -539,8 +554,28 @@
       };
       p.buff = { aura: 0, life: 0 };
       // 常时效果（例如决死加伤）在这里算
-      const eff = (Engine.effects && Engine.effects.cards && Engine.effects.cards[card.id]);
+      const eff = table0[card.id];
       if (eff && eff.onAttack) eff.onAttack(state, who, ctx, card);
+      // 【展开中】效果：自己场上的付与札也能改这次攻击
+      (p.attachments || []).forEach(function (a) {
+        const ae = table0[a.id];
+        if (ae && ae.onModifyAttack) ae.onModifyAttack(state, who, ctx, card, a);
+      });
+      // 気迫 给的「下一次其他女神的攻击」加成
+      const na = p.nextOtherAttack;
+      if (na) {
+        const g = String(card.id).split('-')[1];
+        if (g !== 'yurina') {
+          if (ctx.range.length) {
+            const mn = Math.min.apply(null, ctx.range);
+            if (mn - 1 >= 0) ctx.range.push(mn - 1);   // 距离扩大（近1）
+          }
+          ctx.noRespondNormal = true;
+          p.nextOtherAttack = null;
+          log(state, '気迫：这次攻击不可被通常札对应，且距离扩大（近1）');
+        }
+      }
+
       if (!ctx.chokoku && ctx.aura > 5) ctx.aura = 5;
       state.pending = {
         kind: 'attack',
@@ -549,6 +584,7 @@
         cardId: card.id,
         cardName: card.name,
         damage: { aura: ctx.aura, life: ctx.life },
+        noRespond: ctx.noRespondNormal ? 'normal' : false,
         range: ctx.range,
         chokoku: ctx.chokoku,
         card: card,
@@ -558,8 +594,13 @@
       return { ok: true };
     }
 
-    // ---- 纯行动牌：阶段 4 还没有具体效果 ----
-    log(state, '「' + card.name + '」的文本效果留到阶段 5');
+    // ---- 行动牌：走它自己的【使用时】效果 ----
+    const effAction = table0[card.id];
+    if (effAction && effAction.onUse) {
+      effAction.onUse(state, who, card);
+    } else {
+      log(state, '「' + card.name + '」暂时没有实装效果');
+    }
     return { ok: true };
   }
 
@@ -581,6 +622,7 @@
     if (pd.stage !== 'respond') return { ok: false, error: '已经过了对应时机' };
 
     if (cardId) {
+      if (pd.noRespond === true) return { ok: false, error: '这次攻击不可被对应' };
       const p = state.players[who];
 
       // 对应牌可能来自手牌，也可能是还没用过的王牌
@@ -596,6 +638,8 @@
 
       const canReact = (card.types || []).indexOf('reaction') >= 0;
       if (!canReact) return { ok: false, error: '这张牌没有《对应》' };
+      if (pd.noRespond === 'normal' && card.kind === 'normal')
+        return { ok: false, error: '这次攻击不可被通常札对应' };
 
       // 王牌当对应用，一样要付气，付掉的气进虚
       if (fromSpecial) {
@@ -614,6 +658,12 @@
       pd.responded = true;
       pd.responseCardId = card.id;
       pd.responseCard = card;
+
+      // 对应牌自己的减伤效果（例如浦波嵐 -2/+0）
+      const rtable = (Engine.effects && Engine.effects.cards) || {};
+      const re = rtable[card.id];
+      if (re && re.onRespond) re.onRespond(state, who, pd, card);
+
       log(state, 'P' + (who + 1) + ' 用「' + card.name + '」对应');
     } else {
       log(state, 'P' + (who + 1) + ' 不对应');

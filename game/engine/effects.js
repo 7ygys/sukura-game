@@ -106,7 +106,10 @@
       const p = state.players[who];
       const get = (k) => (k === 'dust' || k === 'distance') ? state[k] : p[k];
       const set = (k, v) => { if (k === 'dust' || k === 'distance') state[k] = v; else p[k] = v; };
-      const num = Math.min(get(from), n || 1);
+      let num = Math.min(get(from), n || 1);
+      // 目标区域有上限：装 5、间合 10（收不下的直接消失）
+      if (to === 'aura') num = Math.min(num, Engine.state.INIT.AURA_MAX - p.aura);
+      if (to === 'distance') num = Math.min(num, 10 - state.distance);
       if (num <= 0) return 0;
       set(from, get(from) - num);
       set(to, get(to) + num);
@@ -226,6 +229,59 @@
         generateAttack(state, who, {
           name: '圧気（破弃）', range: [1, 2, 3, 4], aura: 3, life: 0
         });
+      }
+    },
+
+    // 居合：全力 + 【常时】间合 ≤2 时 -1/-1
+    "01-yurina-o-n-4": {
+      onAttack(state, who, ctx) {
+        if (state.distance <= 2) { ctx.aura = Math.max(0, ctx.aura - 1); ctx.life = Math.max(0, ctx.life - 1); }
+      }
+    },
+
+    // 気迫（行动）：获得 1 集中力；本回合下一次"其他女神"的攻击
+    //   获得「不可被对应（通常札）」与「距离扩大（近1）」
+    "01-yurina-o-n-5": {
+      onUse(state, who) {
+        const fx = Engine.effects.fx;
+        fx.gainFocus(state, who, 1);
+        state.players[who].nextOtherAttack = { noRespond: 'normal', near: 1 };
+        Engine.state.log(state, '本回合下一次其他女神的《攻击》+不可被对应（通常札）+距离扩大（近1）');
+      }
+    },
+
+    // 気炎万丈（付与・纳4・全力）：【展开中】决死 → 你"其他女神"的攻击 +1/+1 且获得超克
+    "01-yurina-o-n-7": {
+      onModifyAttack(state, who, ctx, card) {
+        if (!kesshi(state, who)) return;
+        const g = (card && card.id || '').split('-')[1];
+        if (g === 'yurina') return;            // 只对自己以外的女神生效
+        ctx.aura += 1;
+        ctx.life += 1;
+        ctx.chokoku = true;
+      }
+    },
+
+    // 浦波嵐（王牌攻击・对应）：【攻击后】被对应的攻击 -2/+0
+    "01-yurina-o-s-2": {
+      onRespond(state, who, pd) {
+        pd.damage.aura = Math.max(0, pd.damage.aura - 2);
+        Engine.state.log(state, '浦波嵐：被对应的攻击 -2/+0');
+      }
+    },
+
+    // 浮舟宿（王牌行动・费2）：虚（5）→ 自装
+    "01-yurina-o-s-3": {
+      onUse(state, who) {
+        Engine.effects.fx.moveCrystal(state, who, 'dust', 'aura', 5);
+      }
+    },
+
+    // 天音揺波の底力（王牌攻击・全力）：【常时】不是决死就不能用
+    "01-yurina-o-s-4": {
+      canUse(state, who) {
+        if (!kesshi(state, who)) return '决死未达成（自命不是 3 以下），不能使用此牌';
+        return true;
       }
     },
 

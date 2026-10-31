@@ -37,6 +37,12 @@ function deckOf(key) {
 function fresh() {
   return E.state.create({ myCards: deckOf('yurina'), oppCards: deckOf('saine') });
 }
+/** 回合开始会问重组，测试里默认回答「否」 */
+function answerNo(s) {
+  if (!s.choice) return s;
+  const r = E.actions.applyAction(s, { type: 'choose', player: s.choice.who, option: 'no' });
+  return r.ok ? r.state : s;
+}
 /** 固定先手为 P0 的状态：避免"谁先手"是随机的导致测试时灵时不灵 */
 function freshP0() {
   const s = fresh();
@@ -97,7 +103,7 @@ group('回合流程');
   eq('回合数 +1', s.turn, 2);
 
   r = E.actions.applyAction(s, { type: 'endTurn', player: s.active });
-  s = r.state;
+  s = answerNo(r.state);
   eq('第二个回合集中力 +1', s.players[first].focus, 1);
   eq('第二个回合抽 2 张 → 手牌 4', s.players[first].hand.length, 4);
 }
@@ -243,7 +249,7 @@ group('回合开始的重组询问');
   s.players[0].discard = [cardById('01-yurina-o-n-1'), cardById('01-yurina-o-n-2')];
 
   E.rules.startTurn(s);
-  ok('牌库快空时会询问是否重组', !!s.choice && s.choice.sourceId === 'reshuffle');
+  ok('回合开始会询问是否重组', !!s.choice && s.choice.sourceId === 'reshuffle');
 
   const lifeBefore = s.players[0].life;
   const handBefore = s.players[0].hand.length;
@@ -532,7 +538,73 @@ group('卡牌效果');
   eq('生成攻击的伤害 3/0', s.pending.damage, { aura: 3, life: 0 });
 }
 
-/* ---------- 10. 不可变性 ---------- */
+/* ---------- 10. 摇波剩下几张 ---------- */
+group('摇波的其余效果');
+{
+  // 居合：间合 ≤2 时 -1/-1
+  let s = withHand(0, ['01-yurina-o-n-4']);
+  s.distance = 4;
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-4' });
+  eq('间合 4 时居合 = 4/3', r.state.pending.damage, { aura: 4, life: 3 });
+
+  s = withHand(0, ['01-yurina-o-n-4']);
+  s.distance = 2;
+  r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-4' });
+  eq('间合 2 时居合 = 3/2', r.state.pending.damage, { aura: 3, life: 2 });
+}
+
+{
+  // 気迫：加 1 集中力
+  const s = withHand(0, ['01-yurina-o-n-5']);
+  s.players[0].focus = 0;
+  const r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-5' });
+  ok('打出気迫', r.ok, r.error);
+  eq('集中力 0→1', r.state.players[0].focus, 1);
+  ok('记下了下一次其他女神的攻击加成', !!r.state.players[0].nextOtherAttack);
+}
+
+{
+  // 浦波嵐：对应时被对应的攻击 -2/+0
+  let s = withHand(0, ['01-yurina-o-n-1']);      // 斬 3/1
+  s.distance = 3;
+  s.players[1].hand = [cardById('01-yurina-o-s-2')];
+  s.players[1].flare = 3;
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-1' });
+  s = r.state;
+  eq('对应前 3/1', s.pending.damage, { aura: 3, life: 1 });
+  r = E.actions.applyAction(s, { type: 'respond', player: 1, cardId: '01-yurina-o-s-2' });
+  ok('用浦波嵐对应', r.ok, r.error);
+  eq('对应后 1/1', r.state.pending.damage, { aura: 1, life: 1 });
+}
+
+{
+  // 底力：决死未达成时不能用
+  let s = withHand(0, ['01-yurina-o-s-4']);
+  s.players[0].flare = 5;
+  s.players[0].life = 8;
+  s.distance = 3;
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-s-4' });
+  ok('命 8 时不能用底力', !r.ok);
+
+  s.players[0].life = 3;
+  r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-s-4' });
+  ok('命 3 时可以用底力', r.ok, r.error);
+  eq('底力 5/5', r.state.pending.damage, { aura: 5, life: 5 });
+}
+
+{
+  // 浮舟宿：虚 5 → 装
+  let s = withHand(0, ['01-yurina-o-s-3']);
+  s.players[0].flare = 2;
+  s.dust = 8;
+  s.players[0].aura = 1;
+  const r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-s-3' });
+  ok('打出浮舟宿', r.ok, r.error);
+  eq('装被填到上限 5', r.state.players[0].aura, 5);
+  eq('虚 8+2（付的费）-4（装只收得下 4 颗）= 6', r.state.dust, 6);
+}
+
+/* ---------- 11. 不可变性 ---------- */
 group('不可变性');
 {
   const s = freshP0();
