@@ -363,10 +363,18 @@
    */
   function playCard(state, who, cardId) {
     const p = state.players[who];
-    const idx = handIndexOf(p, cardId);
-    if (idx < 0) return { ok: false, error: '手上没有这张牌' };
 
-    const card = p.hand[idx];
+    // 牌可能在手牌里，也可能是一张「还没用过的王牌」
+    // （王牌不占手牌，放在王牌区，随时可以打）
+    let card = null, fromSpecial = false, idx = handIndexOf(p, cardId);
+    if (idx >= 0) {
+      card = p.hand[idx];
+    } else {
+      const sp = p.specials.find(s => s.id === cardId && !s.used);
+      if (sp) { card = sp; fromSpecial = true; }
+    }
+    if (!card) return { ok: false, error: '手上没有这张牌' };
+
     const types = card.types || [];
     const isAttack = types.indexOf('attack') >= 0;
     const isEnhance = types.indexOf('enhance') >= 0;
@@ -404,7 +412,7 @@
       log(state, '支付 ' + (card.cost || 0) + ' 点气');
     }
 
-    p.hand.splice(idx, 1);
+    if (!fromSpecial) p.hand.splice(idx, 1);
     log(state, 'P' + (who + 1) + ' 打出「' + card.name + '」');
 
     // ---- 付与：放进付与区，身上带「纳」颗结晶 ----
