@@ -113,6 +113,27 @@
   }
 
   /* ==========================================================================
+   * 一·五、盖牌（伏札）
+   * ========================================================================== */
+
+  /**
+   * 主动盖一张牌（背面朝上放进伏札区）。
+   *
+   * 规则：盖牌之后，**可以立刻免费做一次基本动作**。
+   * 这个"免费"很重要——它不花集中力。
+   */
+  function hideCard(state, who, cardId) {
+    const p = state.players[who];
+    const idx = handIndexOf(p, cardId);
+    if (idx < 0) return { ok: false, error: '手上没有这张牌' };
+
+    const card = p.hand.splice(idx, 1)[0];
+    p.hidden.push(card);
+    log(state, 'P' + (who + 1) + ' 盖牌「' + card.name + '」→ 可免费做一次基本动作');
+    return { ok: true };
+  }
+
+  /* ==========================================================================
    * 二、伤害
    * ========================================================================== */
 
@@ -318,17 +339,17 @@
   }
 
   /** 执行一个基本动作 */
-  function basicAction(state, who, which) {
+  function basicAction(state, who, which, free) {
     const b = BASIC[which];
     if (!b) return { ok: false, error: '没有这个动作：' + which };
 
     const p = state.players[who];
-    if (p.focus < 1) return { ok: false, error: '集中力不足（基本动作要花 1 点）' };
+    if (!free && p.focus < 1) return { ok: false, error: '集中力不足（基本动作要花 1 点）' };
     if (!b.need(state, p)) return { ok: false, error: b.name + '的条件不满足' };
 
-    p.focus -= 1;          // 付 1 点集中力
+    if (!free) p.focus -= 1;          // 付 1 点集中力（盖牌给的这一次免费）
     b.apply(state, p);
-    log(state, 'P' + (who + 1) + ' ' + b.name + '（集中力 -1）');
+    log(state, 'P' + (who + 1) + ' ' + b.name + (free ? '（盖牌免费）' : '（集中力 -1）'));
     return { ok: true };
   }
 
@@ -485,17 +506,38 @@
 
     if (cardId) {
       const p = state.players[who];
-      const idx = handIndexOf(p, cardId);
-      if (idx < 0) return { ok: false, error: '手上没有这张牌' };
 
-      const card = p.hand[idx];
+      // 对应牌可能来自手牌，也可能是还没用过的王牌
+      let card = null, fromSpecial = false;
+      const idx = handIndexOf(p, cardId);
+      if (idx >= 0) {
+        card = p.hand[idx];
+      } else {
+        const sp = p.specials.find(s => s.id === cardId && !s.used);
+        if (sp) { card = sp; fromSpecial = true; }
+      }
+      if (!card) return { ok: false, error: '没有这张牌' };
+
       const canReact = (card.types || []).indexOf('reaction') >= 0;
       if (!canReact) return { ok: false, error: '这张牌没有《对应》' };
 
-      p.hand.splice(idx, 1);
-      p.discard.push(card);       // 暂存：阶段 5 会让"对应牌"走它自己的结算
+      // 王牌当对应用，一样要付气，付掉的气进虚
+      if (fromSpecial) {
+        const cost = card.cost || 0;
+        if (p.flare < cost) return { ok: false, error: '气不够（需要 ' + cost + '）' };
+        p.flare -= cost;
+        state.dust += cost;
+        const sp = p.specials.find(s => s.id === card.id);
+        if (sp) sp.used = true;
+        log(state, '支付 ' + cost + ' 点气 → 虚 +' + cost);
+      } else {
+        p.hand.splice(idx, 1);
+        p.discard.push(card);
+      }
+
       pd.responded = true;
       pd.responseCardId = card.id;
+      pd.responseCard = card;
       log(state, 'P' + (who + 1) + ' 用「' + card.name + '」对应');
     } else {
       log(state, 'P' + (who + 1) + ' 不对应');
@@ -559,7 +601,7 @@
     // 回合
     startTurn, endTurn, tickAttachments,
     // 基本动作
-    BASIC, canBasic, basicAction,
+    BASIC, canBasic, basicAction, hideCard,
     // 出牌与攻防
     inRange, playCard, respond, resolveDamage,
     // 胜负

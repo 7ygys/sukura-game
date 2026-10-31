@@ -69,7 +69,18 @@
       case 'basic': {
         if (action.player !== next.active)
           return { ok: false, state, error: '不是你的回合' };
-        const r = R.basicAction(next, action.player, action.which);
+        const r = R.basicAction(next, action.player, action.which, action.free);
+        if (!r.ok) return { ok: false, state, error: r.error };
+        return { ok: true, state: next };
+      }
+
+      /* ---------------------------------------------------------------
+       * 盖牌（伏札）：盖完可以免费做一次基本动作
+       * ------------------------------------------------------------- */
+      case 'hideCard': {
+        if (action.player !== next.active)
+          return { ok: false, state, error: '不是你的回合' };
+        const r = R.hideCard(next, action.player, action.cardId);
         if (!r.ok) return { ok: false, state, error: r.error };
         return { ok: true, state: next };
       }
