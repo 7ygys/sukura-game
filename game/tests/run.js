@@ -220,6 +220,7 @@ group('伤害分配');
   const c = E.actions.applyAction(a.state, { type: 'damage', who: 0, aura: 2, life: 1, choice: 'life' });
   ok('选命成功', c.ok);
   eq('命 10-1', c.state.players[0].life, 9);
+  eq('命伤转成气（0+1）', c.state.players[0].flare, 1);
 
   const t = E.state.clone(s);
   t.players[0].life = 1;

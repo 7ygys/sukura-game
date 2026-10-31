@@ -166,8 +166,10 @@
       p.aura -= auraDmg;
       log(state, 'P' + (who + 1) + ' 装 -' + auraDmg + '（余 ' + p.aura + '）');
     } else {
+      // 命里的结晶被打掉后**不会消失**，它飞到气里去
       p.life -= lifeDmg;
-      log(state, 'P' + (who + 1) + ' 命 -' + lifeDmg + '（余 ' + p.life + '）');
+      p.flare += lifeDmg;
+      log(state, 'P' + (who + 1) + ' 命 -' + lifeDmg + '（余 ' + p.life + '）→ 气 +' + lifeDmg);
     }
 
     checkWin(state);
