@@ -209,6 +209,7 @@
       draw(state, who, I.TURN_DRAW);
     }
 
+    tryRevive(state, who);       // 回合开始时检查「再起」
     state.phase = 'main';
     log(state, '—— 第 ' + state.turn + ' 回合 · P' + (who + 1) + ' ——');
     return state;
@@ -565,7 +566,39 @@
     if (!ok) return { ok: false, error: '装不够，不能选装' };
 
     state.pending = null;         // 攻防结束
+    tryRevive(state, 1 - who);    // 伤害之后检查「即再起」
+    tryRevive(state, who);
     return { ok: true };
+  }
+
+  /* ==========================================================================
+   * 五·五、再起 / 即再起
+   * ==========================================================================
+   *
+   * 王牌用掉之后不是就永远没了。
+   *
+   *   【再起】   在自己的回合，满足条件时可以把这张王牌恢复成未使用
+   *   【即再起】 条件一满足就立刻恢复（不用等回合）
+   *
+   * 这里只管"检查条件 → 恢复"。
+   * 每张王牌的条件写在 Engine.effects.revive[cardId] 里（阶段 5 填），
+   * 现在表是空的，所以暂时没有王牌会自动恢复。
+   */
+  function tryRevive(state, who) {
+    const p = state.players[who];
+    const table = (Engine.effects && Engine.effects.revive) || {};
+    let revived = 0;
+    p.specials.forEach(function (sp) {
+      if (!sp.used || !sp.revive) return;
+      const cond = table[sp.id];
+      if (typeof cond !== 'function') return;
+      if (cond(state, who, sp)) {
+        sp.used = false;
+        revived++;
+        log(state, '「' + sp.name + '」再起');
+      }
+    });
+    return revived;
   }
 
   /* ==========================================================================
@@ -604,6 +637,8 @@
     startTurn, endTurn, tickAttachments,
     // 基本动作
     BASIC, canBasic, basicAction, hideCard,
+    // 再起
+    tryRevive,
     // 出牌与攻防
     inRange, playCard, respond, resolveDamage,
     // 胜负
