@@ -48,6 +48,18 @@ function autoNabu(r) {
   });
   return r2.ok ? r2 : r;
 }
+/** 结束回合；如果要求选盖牌，就自动选前 N 张 */
+function endTurnAuto(s) {
+  let r = E.actions.applyAction(s, { type: 'endTurn', player: s.active });
+  if (!r.ok) return r;
+  let st = r.state;
+  if (st.endTurnPending) {
+    const who = st.endTurnPending.who, need = st.endTurnPending.need;
+    const ids = st.players[who].hand.slice(0, need).map(c => c.id);
+    r = E.actions.applyAction(st, { type: 'confirmEndTurn', player: who, cardIds: ids });
+  }
+  return r;
+}
 /** 回合开始会问重组，测试里默认回答「否」 */
 function answerNo(s) {
   if (!s.choice) return s;
@@ -104,7 +116,7 @@ group('回合流程');
   eq('第一个回合开始时手牌不增加', s.players[first].hand.length, 3);
   eq('第一个回合集中力不增加', s.players[first].focus, 0);
 
-  let r = E.actions.applyAction(s, { type: 'endTurn', player: first });
+  let r = endTurnAuto(s);
   ok('结束回合成功', r.ok);
   s = r.state;
   eq('结束时手牌弃到 2', s.players[first].hand.length, 2);
@@ -113,7 +125,7 @@ group('回合流程');
   eq('换人', s.active, 1 - first);
   eq('回合数 +1', s.turn, 2);
 
-  r = E.actions.applyAction(s, { type: 'endTurn', player: s.active });
+  r = endTurnAuto(s);
   s = answerNo(r.state);
   eq('第二个回合集中力 +1', s.players[first].focus, 1);
   eq('第二个回合抽 2 张 → 手牌 4', s.players[first].hand.length, 4);
@@ -220,11 +232,33 @@ group('焦燥与重组');
   const auraBefore = s.players[who].aura;
   const lifeBefore = s.players[who].life;
 
-  E.rules.draw(s, who, 1);                 // 空牌库再抽 → 焦燥
-  eq('焦燥扣了 1 点装', s.players[who].aura, auraBefore - 1);
-  eq('焦燥没有扣命', s.players[who].life, lifeBefore);
-  eq('焦燥不会自动重组', s.players[who].deck.length, 0);
-  eq('弃牌区还在', s.players[who].discard.length, 3);
+  E.rules.draw(s, who, 1);                 // 空牌库再抽 → 记 1 点焦燥
+  ok('记录了 1 点焦燥，没有自动扣血', s.exhaust && s.exhaust.remaining === 1);
+  eq('装还没变', s.players[who].aura, auraBefore);
+
+  let r = E.actions.applyAction(s, { type: 'resolveExhaust', player: who, choice: 'aura' });
+  ok('选装结算焦燥', r.ok, r.error);
+  eq('焦燥扣了 1 点装', r.state.players[who].aura, auraBefore - 1);
+  eq('焦燥没有扣命', r.state.players[who].life, lifeBefore);
+  ok('结算完焦燥清空', !r.state.exhaust);
+  eq('焦燥不会自动重组', r.state.players[who].deck.length, 0);
+  eq('弃牌区还在', r.state.players[who].discard.length, 3);
+}
+
+{
+  // 空牌库抽 2 张 → 2 点焦燥，可以一点点分开扛
+  const s2 = fresh();
+  const who2 = 0;
+  E.rules.draw(s2, who2, 4);
+  E.rules.draw(s2, who2, 2);
+  ok('抽 2 张记 2 点焦燥', s2.exhaust && s2.exhaust.remaining === 2);
+
+  const a0 = s2.players[who2].aura, l0 = s2.players[who2].life;
+  let r1 = E.actions.applyAction(s2, { type: 'resolveExhaust', player: who2, choice: 'aura' });
+  eq('第一点扣装', r1.state.players[who2].aura, a0 - 1);
+  let r2 = E.actions.applyAction(r1.state, { type: 'resolveExhaust', player: who2, choice: 'life' });
+  eq('第二点扣命', r2.state.players[who2].life, l0 - 1);
+  ok('两点结算完', !r2.state.exhaust);
 }
 
 {

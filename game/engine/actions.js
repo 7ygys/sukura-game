@@ -49,10 +49,16 @@
     if (next.nabu && ['confirmNabu', 'cancelNabu'].indexOf(action.type) < 0) {
       return { ok: false, state, error: '先把付与的结晶分配完' };
     }
+    // 回合结束要选盖哪几张时，只能做这个
+    if (next.endTurnPending && ['confirmEndTurn'].indexOf(action.type) < 0) {
+      return { ok: false, state, error: '先把要盖的牌选完' };
+    }
 
+    // 攻击没结算时，只能做"处理这次攻击"相关的动作；
+    // 「选择」「纳分配」这些是子步骤，不算打断
     const pending = next.pending;
-    const pendingTypes = ['respond', 'resolveDamage'];
-    if (pending && pendingTypes.indexOf(action.type) < 0) {
+    const allowedDuringPending = ['respond', 'resolveDamage', 'choose', 'confirmNabu', 'cancelNabu', 'damage', 'resolveExhaust'];
+    if (pending && allowedDuringPending.indexOf(action.type) < 0) {
       return { ok: false, state, error: '有一张攻击还没结算' };
     }
 
@@ -74,7 +80,8 @@
       case 'basic': {
         if (action.player !== next.active)
           return { ok: false, state, error: '不是你的回合' };
-        const r = R.basicAction(next, action.player, action.which, action.free);
+        const r = R.basicAction(next, action.player, action.which,
+          { free: !!action.free, pay: action.pay, cardId: action.cardId });
         if (!r.ok) return { ok: false, state, error: r.error };
         return { ok: true, state: next };
       }
@@ -97,6 +104,25 @@
       /* ---------------------------------------------------------------
        * 做出选择（弹窗里的选项）
        * ------------------------------------------------------------- */
+      case 'resolveExhaust': {
+        const ex = next.exhaust;
+        if (!ex || ex.remaining <= 0) return { ok: false, state, error: '没有要结算的焦燥' };
+        if (ex.who !== action.player) return { ok: false, state, error: '不该由你结算焦燥' };
+        const choice = action.choice === 'aura' ? 'aura' : 'life';
+        if (choice === 'aura' && next.players[ex.who].aura < 1)
+          return { ok: false, state, error: '装不够，只能扣命' };
+        R.applyDamage(next, ex.who, 1, 1, choice);
+        ex.remaining -= 1;
+        if (ex.remaining <= 0) next.exhaust = null;
+        return { ok: true, state: next };
+      }
+
+      case 'confirmEndTurn': {
+        const r = R.confirmEndTurn(next, action.player, action.cardIds);
+        if (!r.ok) return { ok: false, state, error: r.error };
+        return { ok: true, state: next };
+      }
+
       case 'choose': {
         const r = Engine.effects.resolveChoice(next, action.player, action.option);
         if (!r.ok) return { ok: false, state, error: r.error };

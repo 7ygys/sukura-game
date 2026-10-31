@@ -58,14 +58,15 @@
   function draw(state, who, n) {
     const p = state.players[who];
     let got = 0;
+    let exhaustCount = 0;
 
     for (let i = 0; i < n; i++) {
       // 牌库空了 → 焦燥（1/1 伤害）。注意：焦燥**不会**自动帮你重组牌库，
       // 重组是回合开始时另外选的，而且要付 1 点命（规则 9-7）。
       if (!p.deck.length) {
-        sufferExhaustion(state, who);
-        if (state.winner !== null) break;
-        if (!p.deck.length) break;
+        // 抽不到 → 记 1 点焦燥（之后由玩家逐点选扣装还是扣命）
+        exhaustCount++;
+        continue;          // 继续处理后面要抽的张数
       }
       if (!p.deck.length) break;
 
@@ -74,6 +75,11 @@
     }
 
     if (got) log(state, 'P' + (who + 1) + ' 抽 ' + got + ' 张');
+    if (exhaustCount > 0) {
+      log(state, 'P' + (who + 1) + ' 焦燥 ' + exhaustCount + ' 点（待结算）');
+      state.exhaust = { who: who, remaining: exhaustCount };
+      Engine.state.emit(state, 'exhaust', { who: who, n: exhaustCount });
+    }
     return got;
   }
 
@@ -120,6 +126,36 @@
   }
 
   /* ==========================================================================
+   * 一·三、回合结束时选盖牌
+   * ==========================================================================
+   *
+   * 规则 8-3-2：手牌超过上限（2 张）时，要一张一张盖成伏札。
+   * 盖哪几张由玩家自己挑。
+   */
+  function confirmEndTurn(state, who, cardIds) {
+    const pend = state.endTurnPending;
+    if (!pend || pend.who !== who) return { ok: false, error: '现在不用选盖牌' };
+    const ids = cardIds || [];
+    if (ids.length !== pend.need) return { ok: false, error: '要正好选 ' + pend.need + ' 张' };
+
+    const p = state.players[who];
+    for (const id of ids) {
+      const i = p.hand.findIndex(c => c.id === id);
+      if (i < 0) return { ok: false, error: '手牌里没有这张：' + id };
+      const card = p.hand.splice(i, 1)[0];
+      p.hidden.push(card);
+      log(state, '盖上伏札 ' + card.name);
+    }
+
+    state.endTurnPending = null;
+    state.phase = 'end';
+    state.active = 1 - state.active;
+    state.turn++;
+    startTurn(state);
+    return { ok: true };
+  }
+
+  /* ==========================================================================
    * 一·四、付与的「纳」分配
    * ========================================================================== */
 
@@ -150,6 +186,7 @@
 
     state.turnUsed[who] = (state.turnUsed[who] || 0) + 1;
     if ((card.types || []).indexOf('fullpower') >= 0) p.fullpowerUsed = true;
+    state.quietSpark = true;      // 别把这次减装画成"飞向虚"
 
     log(state, '付与「' + card.name + '」展开，纳 ' + nb.cap +
       '（虚 -' + fromDust + '，装 -' + fromAura + '）');
@@ -386,16 +423,16 @@
     const limit = Engine.state.INIT.END_HAND;   // 结束时手牌最多留几张
 
     if (p.hand.length > limit) {
-      const need = p.hand.length - limit;       // 要弃几张
+      const need = p.hand.length - limit;       // 要盖几张
 
-      let picked;
-      if (discardIdx && discardIdx.length) {
-        picked = discardIdx.slice(0, need);
-      } else {
-        // 没指定就弃最后几张（界面接上后会先弹窗让玩家选）
-        picked = [];
-        for (let i = 0; i < need; i++) picked.push(p.hand.length - 1 - i);
+      // 没指定 → 先把"要选几张"挂起来，等玩家自己挑
+      if (!discardIdx || !discardIdx.length) {
+        state.endTurnPending = { who: who, need: need };
+        log(state, 'P' + (who + 1) + ' 需要盖掉 ' + need + ' 张手牌');
+        return state;
       }
+
+      const picked = discardIdx.slice(0, need);
 
       // 规则 8-3-2：超出的手牌是**盖成伏札**，不是丢进弃牌区
       picked.sort((a, b) => b - a).forEach(i => {
@@ -920,7 +957,7 @@
     // 回合
     startTurn, endTurn, tickAttachments,
     // 基本动作
-    BASIC, canBasic, basicAction, hideCard, taijinOf, shadowAura, confirmNabu, cancelNabu,
+    BASIC, canBasic, basicAction, hideCard, taijinOf, shadowAura, confirmNabu, cancelNabu, confirmEndTurn,
     // 再起
     tryRevive, stagger,
     // 出牌与攻防
