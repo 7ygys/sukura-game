@@ -37,6 +37,17 @@ function deckOf(key) {
 function fresh() {
   return E.state.create({ myCards: deckOf('yurina'), oppCards: deckOf('saine') });
 }
+/** 付与展开后会自动进入「纳」分配，这里默认「先虚后装」 */
+function autoNabu(r) {
+  if (!r || !r.ok || !r.state || !r.state.nabu) return r;
+  const nb = r.state.nabu;
+  const fromDust = Math.min(r.state.dust, nb.cap);
+  const fromAura = nb.cap - fromDust;
+  const r2 = E.actions.applyAction(r.state, {
+    type: 'confirmNabu', player: nb.who, fromDust: fromDust, fromAura: fromAura
+  });
+  return r2.ok ? r2 : r;
+}
 /** 回合开始会问重组，测试里默认回答「否」 */
 function answerNo(s) {
   if (!s.choice) return s;
@@ -416,7 +427,7 @@ group('付与（展开 / 纳 / 破弃）');
   // 虚足够时，全部从虚取
   let s = withHand(0, [ENH]);
   s.dust = 8; s.players[0].aura = 3;
-  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: ENH });
+  let r = autoNabu(E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: ENH }));
   ok('付与可以展开', r.ok, r.error);
   s = r.state;
   eq('付与区 1 张', s.players[0].attachments.length, 1);
@@ -428,7 +439,7 @@ group('付与（展开 / 纳 / 破弃）');
   // 虚不够时，差额从装补
   s = withHand(0, [ENH]);
   s.dust = 0; s.players[0].aura = 3;
-  r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: ENH });
+  r = autoNabu(E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: ENH }));
   ok('虚 0 时从装补足结晶', r.ok, r.error);
   eq('装 3→1', r.state.players[0].aura, 1);
   eq('虚还是 0', r.state.dust, 0);
@@ -437,7 +448,7 @@ group('付与（展开 / 纳 / 破弃）');
   // 虚和装都不够
   s = withHand(0, [ENH]);
   s.dust = 0; s.players[0].aura = 1;
-  r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: ENH });
+  r = autoNabu(E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: ENH }));
   ok('虚+装都不够时不能展开', !r.ok);
 }
 
@@ -445,7 +456,7 @@ group('付与（展开 / 纳 / 破弃）');
   const ENH = '01-yurina-o-n-6';
   let s = withHand(0, [ENH]);
   s.dust = 8; s.players[0].aura = 3;
-  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: ENH });
+  let r = autoNabu(E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: ENH }));
   s = r.state;
 
   // 每回合开始：付与札各送 1 颗结晶到虚
@@ -468,9 +479,9 @@ group('付与（展开 / 纳 / 破弃）');
   const B = '01-yurina-o-n-7';   // 纳 4
   let s = withHand(0, [A, B]);
   s.dust = 10; s.players[0].aura = 5;
-  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: A });
+  let r = autoNabu(E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: A }));
   ok('展开第一张付与', r.ok, r.error);
-  r = E.actions.applyAction(r.state, { type: 'playCard', player: 0, cardId: B });
+  r = autoNabu(E.actions.applyAction(r.state, { type: 'playCard', player: 0, cardId: B }));
   ok('展开第二张付与', r.ok, r.error);
   eq('付与区 2 张', r.state.players[0].attachments.length, 2);
   eq('虚 10-2-4=4', r.state.dust, 4);
@@ -526,7 +537,7 @@ group('卡牌效果');
   // 圧気：破弃时打一发 1-4、3/-
   let s = withHand(0, ['01-yurina-o-n-6']);
   s.dust = 8;
-  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-6' });
+  let r = autoNabu(E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-6' }));
   ok('展开圧気', r.ok, r.error);
   s = r.state;
   eq('付与区 1 张', s.players[0].attachments.length, 1);
@@ -665,7 +676,7 @@ group('细音的效果');
   // 圏域：达人距离 +1；付与札的结晶改为进间合
   let s = withHand(0, ['02-saine-o-n-5']);
   s.distance = 6; s.dust = 4; s.players[0].aura = 3;
-  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '02-saine-o-n-5' });
+  let r = autoNabu(E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '02-saine-o-n-5' }));
   ok('展开圏域', r.ok, r.error);
   s = r.state;
   eq('达人距离 2→3', E.rules.taijinOf(s), 3);
@@ -694,7 +705,7 @@ group('细音的效果');
   // 無音壁：付与札上的结晶可以当装用
   let s = withHand(0, ['02-saine-o-n-7']);
   s.distance = 7; s.dust = 6; s.players[0].aura = 3;
-  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '02-saine-o-n-7' });
+  let r = autoNabu(E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '02-saine-o-n-7' }));
   ok('展开無音壁', r.ok, r.error);
   s = r.state;
   eq('纳 5 颗', s.players[0].attachments[0].crystals, 5);
@@ -758,7 +769,59 @@ group('细音的效果');
   ok('对通常札攻击不能用氷雨', !r.ok);
 }
 
-/* ---------- 13. 不可变性 ---------- */
+/* ---------- 13. 纳的分配 & 两种伤害 ---------- */
+group('付与的「纳」分配');
+{
+  let s = withHand(0, ['01-yurina-o-n-6']);     // 圧気 纳2
+  s.dust = 3; s.players[0].aura = 3;
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-6' });
+  ok('先进入分配状态，还没展开', r.ok && !!r.state.nabu);
+  eq('付与区还是空的', r.state.players[0].attachments.length, 0);
+
+  // 分配错总数
+  let bad = E.actions.applyAction(r.state, { type: 'confirmNabu', player: 0, fromDust: 1, fromAura: 0 });
+  ok('总数不对会被拒绝', !bad.ok);
+
+  let good = E.actions.applyAction(r.state, { type: 'confirmNabu', player: 0, fromDust: 1, fromAura: 1 });
+  ok('分配 1+1 成功', good.ok, good.error);
+  eq('虚 3→2', good.state.dust, 2);
+  eq('装 3→2', good.state.players[0].aura, 2);
+  eq('付与区 1 张，纳 2', good.state.players[0].attachments[0].crystals, 2);
+
+  // 取消
+  const c = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-6' });
+  const cc = E.actions.applyAction(c.state, { type: 'cancelNabu', player: 0 });
+  ok('可以取消展开', cc.ok);
+  eq('取消后牌还在手里', cc.state.players[0].hand.length, 1);
+}
+
+group('两种伤害都要吃');
+{
+  let s = withHand(0, ['03-himika-o-n-4']);   // フルバースト 5-9 3/1 both
+  s.distance = 6;
+  s.players[1].aura = 4; s.players[1].life = 10;
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '03-himika-o-n-4' });
+  ok('打出フルバースト', r.ok, r.error);
+  ok('标记为两种都吃', r.state.pending.both === true);
+
+  r = E.actions.applyAction(r.state, { type: 'respond', player: 1, cardId: null });
+  r = E.actions.applyAction(r.state, { type: 'resolveDamage', player: 1, choice: 'life' });
+  ok('结算成功', r.ok, r.error);
+  eq('装 4→1', r.state.players[1].aura, 1);
+  eq('命 10→9', r.state.players[1].life, 9);
+
+  // 装不够时只扣现有的，多的溢出
+  let s2 = withHand(0, ['03-himika-o-n-4']);
+  s2.distance = 6;
+  s2.players[1].aura = 2; s2.players[1].life = 10;
+  let r2 = E.actions.applyAction(s2, { type: 'playCard', player: 0, cardId: '03-himika-o-n-4' });
+  r2 = E.actions.applyAction(r2.state, { type: 'respond', player: 1, cardId: null });
+  r2 = E.actions.applyAction(r2.state, { type: 'resolveDamage', player: 1, choice: 'life' });
+  eq('装只有 2 → 扣到 0，不会变负', r2.state.players[1].aura, 0);
+  eq('命仍然 -1', r2.state.players[1].life, 9);
+}
+
+/* ---------- 14. 不可变性 ---------- */
 group('不可变性');
 {
   const s = freshP0();

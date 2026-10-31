@@ -45,6 +45,11 @@
 
     // 通用检查：有攻击正在等待处理时，只能先处理这次攻击
     // （不然会出现"对方攻击还没结算，我又打出一张牌"这种漏洞）
+    // 有付与正在分配结晶时，只能确认/取消
+    if (next.nabu && ['confirmNabu', 'cancelNabu'].indexOf(action.type) < 0) {
+      return { ok: false, state, error: '先把付与的结晶分配完' };
+    }
+
     const pending = next.pending;
     const pendingTypes = ['respond', 'resolveDamage'];
     if (pending && pendingTypes.indexOf(action.type) < 0) {
@@ -70,6 +75,21 @@
         if (action.player !== next.active)
           return { ok: false, state, error: '不是你的回合' };
         const r = R.basicAction(next, action.player, action.which, action.free);
+        if (!r.ok) return { ok: false, state, error: r.error };
+        return { ok: true, state: next };
+      }
+
+      /* ---------------------------------------------------------------
+       * 付与的「纳」分配 / 取消
+       * ------------------------------------------------------------- */
+      case 'confirmNabu': {
+        const r = R.confirmNabu(next, action.player, action.fromDust, action.fromAura);
+        if (!r.ok) return { ok: false, state, error: r.error };
+        return { ok: true, state: next };
+      }
+
+      case 'cancelNabu': {
+        const r = R.cancelNabu(next, action.player);
         if (!r.ok) return { ok: false, state, error: r.error };
         return { ok: true, state: next };
       }

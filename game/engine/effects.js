@@ -389,6 +389,21 @@
         if (!atkCard || atkCard.kind !== 'special') return '这张牌只能用于对王牌的对应';
         return true;
       }
+    },
+
+    /* ===== 绯弥香 ===== */
+
+    // フルバースト（全力）：两种伤害都要吃
+    "03-himika-o-n-4": {
+      onAttack(state, who, ctx) { ctx.both = true; }
+    },
+
+    // クリムゾンゼロ：两种伤害都吃；间合 0 时不可被对应
+    "03-himika-o-s-2": {
+      onAttack(state, who, ctx) {
+        ctx.both = true;
+        if (state.distance === 0) ctx.noRespond = true;
+      }
     }
 
   };

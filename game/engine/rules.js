@@ -120,6 +120,54 @@
   }
 
   /* ==========================================================================
+   * 一·四、付与的「纳」分配
+   * ========================================================================== */
+
+  /**
+   * 展开付与札时，「纳」的结晶可以**从虚和装两处取**，由玩家自己分配。
+   * 这里负责：检查分配是否合法 → 扣结晶 → 把牌放进付与区。
+   */
+  function confirmNabu(state, who, fromDust, fromAura) {
+    const nb = state.nabu;
+    if (!nb || nb.who !== who) return { ok: false, error: '现在没有要分配的付与' };
+
+    fromDust = Math.max(0, fromDust | 0);
+    fromAura = Math.max(0, fromAura | 0);
+    if (fromDust + fromAura !== nb.cap)
+      return { ok: false, error: '分配的结晶数必须正好是 ' + nb.cap };
+    if (fromDust > state.dust) return { ok: false, error: '虚里的结晶不够' };
+    if (fromAura > state.players[who].aura) return { ok: false, error: '装里的结晶不够' };
+
+    const p = state.players[who];
+    const idx = handIndexOf(p, nb.cardId);
+    if (idx < 0) return { ok: false, error: '手上没有这张牌' };
+    const card = p.hand[idx];
+
+    p.hand.splice(idx, 1);
+    state.dust -= fromDust;
+    p.aura -= fromAura;
+    p.attachments.push(Object.assign({}, card, { crystals: nb.cap }));
+
+    state.turnUsed[who] = (state.turnUsed[who] || 0) + 1;
+    if ((card.types || []).indexOf('fullpower') >= 0) p.fullpowerUsed = true;
+
+    log(state, '付与「' + card.name + '」展开，纳 ' + nb.cap +
+      '（虚 -' + fromDust + '，装 -' + fromAura + '）');
+    Engine.state.emit(state, 'enhance', { who: who });
+
+    state.nabu = null;
+    return { ok: true };
+  }
+
+  /** 反悔：这次展开取消，牌回到手里 */
+  function cancelNabu(state, who) {
+    if (!state.nabu || state.nabu.who !== who) return { ok: false, error: '没有要取消的付与' };
+    state.nabu = null;
+    log(state, '取消展开');
+    return { ok: true };
+  }
+
+  /* ==========================================================================
    * 一·五、盖牌（伏札）
    * ========================================================================== */
 
@@ -166,6 +214,16 @@
    */
   function applyDamage(state, who, auraDmg, lifeDmg, choice) {
     const p = state.players[who];
+
+    // 规则 10-26「両方のダメージを受ける」：两种都要吃，不由玩家二选一。
+    // 装不够时只扣现有的（多出来的算溢出），命伤照常扣。
+    if (choice === 'both') {
+      const available = p.aura + shadowAura(state, who);
+      const realAura = Math.min(available, auraDmg);
+      if (realAura > 0) applyDamage(state, who, realAura, 0, 'aura');
+      if (lifeDmg > 0) applyDamage(state, who, 0, lifeDmg, 'life');
+      return true;
+    }
 
     if (choice === 'aura') {
       // 装不够就不能选装——这是规则里明确的"不合法选择"
@@ -541,17 +599,22 @@
       return { ok: false, error: '距离 ' + state.distance + ' 不在适正距离内' };
     }
 
-    // ---- 付与要检查「纳」的结晶够不够 ----
-    // 付与札上的结晶叫「纳」，从虚里取，虚不够就补着从装里取。
-    // 注意这里只是**检查**，还没真的扣，避免出错时把状态改坏了。
-    let capDust = 0, capAura = 0;
+    // ---- 付与：先检查总量，再让玩家自己决定「虚取几颗、装取几颗」 ----
     if (isEnhance) {
       const cap = card.capacity || 0;
-      capDust = Math.min(state.dust, cap);
-      capAura = cap - capDust;
-      if (p.aura < capAura) {
-        return { ok: false, error: '虚和装都不够放「纳 ' + cap + '」的结晶' };
+      if (state.dust + p.aura < cap) {
+        return { ok: false, error: '虚和装的结晶不够放「纳 ' + cap + '」' };
       }
+      // 把牌暂时留在手里，等玩家分配完再真正展开
+      state.nabu = {
+        who: who,
+        cardId: card.id,
+        cap: cap,
+        maxDust: Math.min(state.dust, cap),
+        maxAura: Math.min(p.aura, cap)
+      };
+      log(state, 'P' + (who + 1) + ' 准备展开「' + card.name + '」，请分配 ' + cap + ' 颗结晶');
+      return { ok: true, needNabu: true };
     }
 
     // ============================================================
@@ -574,17 +637,6 @@
     if ((card.types || []).indexOf('terminal') >= 0) p.terminated = true;
     log(state, 'P' + (who + 1) + ' 打出「' + card.name + '」');
 
-    // ---- 付与：放进付与区，身上带「纳」颗结晶 ----
-    if (isEnhance) {
-      const cap = card.capacity || 0;
-      state.dust -= capDust;
-      p.aura -= capAura;
-      p.attachments.push(Object.assign({}, card, { crystals: cap }));
-      log(state, '付与「' + card.name + '」展开，纳 ' + cap +
-        '（虚 -' + capDust + (capAura ? '，装 -' + capAura : '') + '）');
-      return { ok: true };
-    }
-
     // ---- 王牌用掉后进"已使用"，通常札进弃牌区 ----
     if (card.kind === 'special') {
       const sp = p.specials.find(s => s.id === card.id);
@@ -604,6 +656,7 @@
         life: (dmg.life || 0) + (buff.life || 0),
         range: (card.range || []).slice(),
         chokoku: false,
+        both: false,
         tags: {}
       };
       p.buff = { aura: 0, life: 0 };
@@ -638,7 +691,8 @@
         cardId: card.id,
         cardName: card.name,
         damage: { aura: ctx.aura, life: ctx.life },
-        noRespond: ctx.noRespondNormal ? 'normal' : false,
+        both: !!ctx.both,
+        noRespond: ctx.noRespond ? true : (ctx.noRespondNormal ? 'normal' : false),
         range: ctx.range,
         chokoku: ctx.chokoku,
         card: card,
@@ -747,7 +801,7 @@
     if (pd.stage !== 'damage') return { ok: false, error: '还没到选伤害的时候' };
 
     const dmg = pd.damage;
-    const ok = applyDamage(state, who, dmg.aura, dmg.life, choice);
+    const ok = applyDamage(state, who, dmg.aura, dmg.life, pd.both ? 'both' : choice);
     if (!ok) return { ok: false, error: '装不够，不能选装' };
 
     // 【攻击后】效果（规则 9-4-ⅶ）
@@ -849,7 +903,7 @@
     // 回合
     startTurn, endTurn, tickAttachments,
     // 基本动作
-    BASIC, canBasic, basicAction, hideCard, taijinOf, shadowAura,
+    BASIC, canBasic, basicAction, hideCard, taijinOf, shadowAura, confirmNabu, cancelNabu,
     // 再起
     tryRevive, stagger,
     // 出牌与攻防
