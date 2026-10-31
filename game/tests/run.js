@@ -11,6 +11,7 @@ const fs = require('fs');
 require('../engine/rng.js');
 require('../engine/state.js');
 require('../engine/rules.js');
+require('../engine/effects.js');
 require('../engine/actions.js');
 const E = globalThis.Engine;
 
@@ -90,7 +91,8 @@ group('回合流程');
   ok('结束回合成功', r.ok);
   s = r.state;
   eq('结束时手牌弃到 2', s.players[first].hand.length, 2);
-  eq('弃牌区 1 张', s.players[first].discard.length, 1);
+  eq('多出的手牌进伏札区（不是弃牌区）', s.players[first].hidden.length, 1);
+  eq('弃牌区仍是 0', s.players[first].discard.length, 0);
   eq('换人', s.active, 1 - first);
   eq('回合数 +1', s.turn, 2);
 
@@ -414,7 +416,65 @@ group('付与（展开 / 纳 / 破弃）');
   eq('第二张纳 4→3', r.state.players[0].attachments[1].crystals, 3);
 }
 
-/* ---------- 9. 不可变性 ---------- */
+/* ---------- 9. 卡牌效果（阶段 11） ---------- */
+group('卡牌效果');
+{
+  // 一閃：决死（自命 ≤3）时 +1/+0
+  let s = withHand(0, ['01-yurina-o-n-2']);
+  s.distance = 3;
+  s.players[0].life = 5;
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-2' });
+  eq('非决死时一閃 = 2/2', r.state.pending.damage, { aura: 2, life: 2 });
+
+  s = withHand(0, ['01-yurina-o-n-2']);
+  s.distance = 3;
+  s.players[0].life = 3;
+  r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-2' });
+  eq('决死时一閃 = 3/2', r.state.pending.damage, { aura: 3, life: 2 });
+}
+
+{
+  // 柄打ち：攻击后若决死 → 下一次攻击 +1/+0
+  let s = withHand(0, ['01-yurina-o-n-3']);
+  s.distance = 2;
+  s.players[0].life = 3;
+  s.players[1].aura = 3;
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-3' });
+  s = r.state;
+  eq('柄打ち伤害 2/1', s.pending.damage, { aura: 2, life: 1 });
+  r = E.actions.applyAction(s, { type: 'respond', player: 1, cardId: null });
+  r = E.actions.applyAction(r.state, { type: 'resolveDamage', player: 1, choice: 'aura' });
+  ok('结算成功', r.ok, r.error);
+  eq('攻击后获得 +1 加成', r.state.players[0].buff.aura, 1);
+
+  // 下一次攻击吃到加成
+  let s2 = E.state.clone(r.state);
+  s2.players[0].hand = [cardById('01-yurina-o-n-1')];   // 斬 3/1
+  s2.distance = 3;
+  const r2 = E.actions.applyAction(s2, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-1' });
+  eq('斬吃到加成 → 4/1', r2.state.pending.damage, { aura: 4, life: 1 });
+  eq('加成用掉了', r2.state.players[0].buff.aura, 0);
+}
+
+{
+  // 圧気：破弃时打一发 1-4、3/-
+  let s = withHand(0, ['01-yurina-o-n-6']);
+  s.dust = 8;
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-6' });
+  ok('展开圧気', r.ok, r.error);
+  s = r.state;
+  eq('付与区 1 张', s.players[0].attachments.length, 1);
+
+  // 手动把结晶耗光
+  s.players[0].attachments[0].crystals = 1;
+  s.distance = 3;
+  E.rules.tickAttachments(s, 0);
+  eq('破弃后付与区清空', s.players[0].attachments.length, 0);
+  ok('破弃时生成了攻击', !!s.pending);
+  eq('生成攻击的伤害 3/0', s.pending.damage, { aura: 3, life: 0 });
+}
+
+/* ---------- 10. 不可变性 ---------- */
 group('不可变性');
 {
   const s = freshP0();

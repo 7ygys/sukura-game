@@ -199,13 +199,22 @@
     const who = state.active;
     const p = state.players[who];
     state.phase = 'start';
+    state.turnUsed[who] = 0;
+    p.buff = { aura: 0, life: 0 };
+    p.terminated = false;
 
     if (!p.firstTurnDone) {
       p.firstTurnDone = true;
       log(state, 'P' + (who + 1) + ' 的第一个回合（跳过默认处理）');
     } else {
       const I = Engine.state.INIT;
-      if (p.focus < I.FOCUS_MAX) p.focus++;
+      if (p.staggered) {
+        // 规则 5-1-4：畏缩中「获得集中力」会被替换成「解除畏缩」
+        p.staggered = false;
+        log(state, 'P' + (who + 1) + ' 解除畏缩');
+      } else if (p.focus < I.FOCUS_MAX) {
+        p.focus++;
+      }
       tickAttachments(state, who);
       draw(state, who, I.TURN_DRAW);
     }
@@ -230,8 +239,9 @@
       if (a.crystals > 0) {
         keep.push(a);
       } else {
-        // 结晶耗尽 → 破弃：这张付与札进弃牌区
-        // （阶段 5 会在这里触发它的「破弃时」效果）
+        // 结晶耗尽 → 破弃：先触发【破弃时】，再进弃牌区
+        const eff = (Engine.effects && Engine.effects.cards && Engine.effects.cards[a.id]);
+        if (eff && eff.onBreak) eff.onBreak(state, who, a);
         p.discard.push(Object.assign({}, a, { crystals: 0 }));
         log(state, '付与「' + a.name + '」结晶耗尽，破弃');
       }
@@ -264,10 +274,10 @@
         for (let i = 0; i < need; i++) picked.push(p.hand.length - 1 - i);
       }
 
-      // 从后往前删，否则下标会错位
+      // 规则 8-3-2：超出的手牌是**盖成伏札**，不是丢进弃牌区
       picked.sort((a, b) => b - a).forEach(i => {
         const c = p.hand.splice(i, 1)[0];
-        if (c) { p.discard.push(c); log(state, '弃掉 ' + c.name); }
+        if (c) { p.hidden.push(c); log(state, '盖上伏札 ' + c.name); }
       });
     }
 
@@ -293,10 +303,11 @@
    *   加新动作只要往上加一行，别处不用改。
    */
   const BASIC = {
-    // 前进：把一颗结晶从"距"搬到"装" → 拉近距离
+    // 前进：距 → 装。
+    // 规则 9-6-1：间合 ≤ 达人距离（默认 2）时**什么都不会发生**，即不能前进。
     advance: {
       name: '前进',
-      need: (st, p) => st.distance >= 1 && p.aura < Engine.state.INIT.AURA_MAX,
+      need: (st, p) => st.distance > (st.taijin || 2) && p.aura < Engine.state.INIT.AURA_MAX,
       apply: (st, p) => { st.distance -= 1; p.aura += 1; }
     },
 
@@ -321,10 +332,10 @@
       apply: (st, p) => { p.aura -= 1; p.flare += 1; }
     },
 
-    // 离脱：虚 → 距 → 只有在贴脸（间合 ≤ 2）时才用得上，用来脱身
+    // 离脱：虚 → 距。规则 9-6-5：间合 > 达人距离时什么都不会发生
     disengage: {
       name: '离脱',
-      need: (st, p) => st.distance <= 2 && st.distance < 10 && st.dust >= 1,
+      need: (st, p) => st.distance <= (st.taijin || 2) && st.distance < 10 && st.dust >= 1,
       apply: (st, p) => { st.dust -= 1; st.distance += 1; }
     }
   };
@@ -343,18 +354,40 @@
   }
 
   /** 执行一个基本动作 */
-  function basicAction(state, who, which, free) {
+  /**
+   * 执行基本动作。
+   *
+   * 规则 9-6-ⅱ：标准行动里做基本动作，代价**二选一**：
+   *   ⅱ-A 花 1 点集中力
+   *   ⅱ-B 把 1 张手牌盖成伏札
+   * （卡牌效果送的基本动作不用付）
+   */
+  function basicAction(state, who, which, opts) {
+    opts = opts || {};
+    const free = !!opts.free;
     const b = BASIC[which];
     if (!b) return { ok: false, error: '没有这个动作：' + which };
 
     const p = state.players[who];
-    if (!free && p.focus < 1) return { ok: false, error: '集中力不足（基本动作要花 1 点）' };
+    if (p.terminated) return { ok: false, error: '终端：本回合不能再使用牌或做基本动作' };
     if (!b.need(state, p)) return { ok: false, error: b.name + '的条件不满足' };
 
-    if (!free) p.focus -= 1;          // 付 1 点集中力（盖牌给的这一次免费）
+    if (!free) {
+      const pay = opts.pay || 'focus';
+      if (pay === 'hand') {
+        const idx = handIndexOf(p, opts.cardId);
+        if (idx < 0) return { ok: false, error: '要付的手牌不在手上' };
+        const card = p.hand.splice(idx, 1)[0];
+        p.hidden.push(card);
+      } else {
+        if (p.focus < 1) return { ok: false, error: '集中力不足（也可以改用手牌付）' };
+        p.focus -= 1;
+      }
+    }
+
     b.apply(state, p);
     Engine.state.emit(state, 'basic', { who: who, which: which });
-    log(state, 'P' + (who + 1) + ' ' + b.name + (free ? '（盖牌免费）' : '（集中力 -1）'));
+    log(state, 'P' + (who + 1) + ' ' + b.name + (free ? '（免费）' : ''));
     return { ok: true };
   }
 
@@ -450,6 +483,8 @@
     }
 
     if (!fromSpecial) p.hand.splice(idx, 1);
+    state.turnUsed[who] = (state.turnUsed[who] || 0) + 1;
+    if ((card.types || []).indexOf('terminal') >= 0) p.terminated = true;
     log(state, 'P' + (who + 1) + ' 打出「' + card.name + '」');
 
     // ---- 付与：放进付与区，身上带「纳」颗结晶 ----
@@ -474,13 +509,31 @@
     // ---- 攻击 → 进入待处理，等对方决定要不要对应 ----
     if (isAttack) {
       const dmg = card.damage || { aura: 0, life: 0 };
+      // 规则 6-4-1-4：装伤上限 5；规则 10-21：带「超克」时上限取消
+      // 「本回合下一次攻击 +X/+Y」这类加成先叠上去，然后清空
+      const buff = p.buff || { aura: 0, life: 0 };
+      const ctx = {
+        aura: (dmg.aura || 0) + (buff.aura || 0),
+        life: (dmg.life || 0) + (buff.life || 0),
+        range: (card.range || []).slice(),
+        chokoku: false,
+        tags: {}
+      };
+      p.buff = { aura: 0, life: 0 };
+      // 常时效果（例如决死加伤）在这里算
+      const eff = (Engine.effects && Engine.effects.cards && Engine.effects.cards[card.id]);
+      if (eff && eff.onAttack) eff.onAttack(state, who, ctx, card);
+      if (!ctx.chokoku && ctx.aura > 5) ctx.aura = 5;
       state.pending = {
         kind: 'attack',
         attacker: who,
         defender: 1 - who,
         cardId: card.id,
         cardName: card.name,
-        damage: { aura: dmg.aura || 0, life: dmg.life || 0 },
+        damage: { aura: ctx.aura, life: ctx.life },
+        range: ctx.range,
+        chokoku: ctx.chokoku,
+        card: card,
         stage: 'respond',
         responded: false
       };
@@ -566,6 +619,15 @@
     const dmg = pd.damage;
     const ok = applyDamage(state, who, dmg.aura, dmg.life, choice);
     if (!ok) return { ok: false, error: '装不够，不能选装' };
+
+    // 【攻击后】效果（规则 9-4-ⅶ）
+    const table = (Engine.effects && Engine.effects.cards) || {};
+    if (pd.cardId && table[pd.cardId] && table[pd.cardId].onAfterAttack)
+      table[pd.cardId].onAfterAttack(state, pd.attacker, pd);
+    // 对应牌自己的【攻击后】也要走（例如石突き）
+    if (pd.responseCardId && table[pd.responseCardId] && table[pd.responseCardId].onAfterAttack) {
+      table[pd.responseCardId].onAfterAttack(state, pd.defender, Object.assign({}, pd, { usedAsResponse: true }));
+    }
 
     state.pending = null;         // 攻防结束
     tryRevive(state, 1 - who);    // 伤害之后检查「即再起」

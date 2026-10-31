@@ -1039,7 +1039,8 @@
      "namejp": "晴舞台",
      "kind": "normal",
      "types": [
-      "enhance"
+      "enhance",
+      "terminal"
      ],
      "rangeRaw": null,
      "range": null,

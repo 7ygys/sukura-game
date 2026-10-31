@@ -41,6 +41,8 @@
       discard: [],        // 弃牌区（双方可见）
       hidden: [],         // 伏札区（盖牌，双方只见牌背）
       attachments: [],    // 付与区
+      buff: { aura: 0, life: 0 },   // 「本回合下一次攻击 +X/+Y」这类加成
+      terminated: false,  // 终端：本回合不能再使用牌/基本动作
       specials: [],       // 王牌（各自带 used 标记）
       firstTurnDone: false
     };
@@ -59,6 +61,8 @@
       phase: 'start',        // start | main | end
       distance: INIT.DISTANCE,
       dust: INIT.DUST,
+      taijin: 2,                 // 达人距离（规则 5-2-2，默认 2）
+      turnUsed: [0, 0],          // 本回合各自使用了几张牌（连火判定用）
       players: [makePlayer(opts.myName), makePlayer(opts.oppName)],
       winner: null,
       log: [],
