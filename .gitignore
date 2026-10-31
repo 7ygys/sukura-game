@@ -38,8 +38,14 @@ assets/
 !docs/**
 
 # ---------- 调查/临时工作目录（解包产物、导出表）----------
-_work/
+# 注意：要排除目录内容用 _work/*，不能用 _work/ ——
+# 整个目录被排除时，里面的文件没法再单独"捞"回来
+_work/*
 _output/
+
+# ---------- 例外：游戏本体（纯代码，不含素材）----------
+!_work/scene_v17.html
+!_work/prep.html
 
 Thumbs.db
 desktop.ini

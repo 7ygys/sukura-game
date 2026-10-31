@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>散樱乱武 · 主界面 / 选人 / 组卡</title>
+<style>
+  :root{
+    --ink:#eef1f8; --dim:#9aa4bd; --gold:#e2b978; --pink:#e8a9c0;
+    --glass:rgba(10,13,20,.72); --line:rgba(200,214,240,.18);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;background:#05070c;color:var(--ink);
+    font-family:"Songti SC","Noto Serif SC",serif;overflow:hidden;}
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;
+    background:
+      radial-gradient(1200px 700px at 50% -10%, rgba(90,110,160,.28), transparent 60%),
+      radial-gradient(900px 600px at 80% 110%, rgba(160,80,120,.18), transparent 60%),
+      linear-gradient(180deg,#05070c,#0b0f18 45%,#121722);
+  }
+  #app{position:relative;height:100%;}
+  .screen{position:absolute;inset:0;display:none;flex-direction:column;
+    padding:28px 34px;opacity:0;transition:opacity .35s;}
+  .screen.on{display:flex;opacity:1;}
+
+  /* ---------- 标题 ---------- */
+  #title{align-items:center;justify-content:center;gap:10px;}
+  #title h1{
+    font-size:72px;letter-spacing:.18em;margin:0;
+    background:linear-gradient(180deg,#fff,#e7c6d6 60%,#b98aa4);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    text-shadow:0 0 40px rgba(230,180,200,.25);
+  }
+  #title .sub{color:var(--dim);letter-spacing:.5em;font-size:13px;margin-bottom:26px;}
+  .menu{display:flex;flex-direction:column;gap:14px;margin-top:10px;}
+  .btn{
+    min-width:260px;padding:16px 26px;border-radius:12px;cursor:pointer;
+    background:linear-gradient(180deg,rgba(30,36,52,.9),rgba(16,20,30,.9));
+    border:1px solid var(--line);color:var(--ink);font-size:19px;letter-spacing:.3em;
+    transition:.18s;text-align:center;
+  }
+  .btn:hover{border-color:rgba(226,185,120,.65);transform:translateY(-2px);
+    box-shadow:0 8px 26px rgba(0,0,0,.45),0 0 0 1px rgba(226,185,120,.2) inset;}
+  .btn.ghost{opacity:.45;pointer-events:none;}
+  .foot{position:absolute;left:34px;bottom:20px;color:#6d7690;font-size:11px;line-height:1.7;}
+
+  /* ---------- 通用头 ---------- */
+  .head{display:flex;align-items:center;gap:18px;margin-bottom:14px;}
+  .head h2{margin:0;font-size:24px;letter-spacing:.2em;font-weight:600;}
+  .head .hint{color:var(--dim);font-size:13px;}
+  .head .spacer{flex:1;}
+  .back{cursor:pointer;color:var(--dim);font-size:13px;letter-spacing:.1em;}
+  .back:hover{color:var(--ink);}
+
+  /* ---------- 选人 ---------- */
+  #select{flex-direction:column;}
+  .selwrap{flex:1;display:grid;grid-template-columns:1fr 420px;gap:26px;min-height:0;}
+  .panel{background:var(--glass);border:1px solid var(--line);border-radius:16px;
+    padding:16px 18px;min-height:0;display:flex;flex-direction:column;}
+  .panel h3{margin:0 0 12px;font-size:14px;letter-spacing:.24em;color:var(--dim);font-weight:600;}
+  .hexgrid{display:flex;flex-wrap:wrap;gap:14px;overflow:auto;align-content:flex-start;}
+  .hex{
+    width:112px;height:126px;cursor:pointer;position:relative;
+    clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);
+    background:rgba(20,26,38,.9);transition:.18s;display:flex;align-items:flex-end;justify-content:center;
+  }
+  .hex img{width:100%;height:100%;object-fit:cover;opacity:.92;}
+  .hex .nm{position:absolute;bottom:6px;left:0;right:0;text-align:center;font-size:12px;
+    text-shadow:0 1px 3px #000;letter-spacing:.08em;}
+  .hex:hover{transform:translateY(-4px);}
+  .hex.picked{box-shadow:0 0 0 3px var(--gold) inset;filter:brightness(1.12);}
+  .hex.dis{opacity:.35;pointer-events:none;filter:grayscale(.8);}
+  .slots{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;}
+  .slot{aspect-ratio:1/1.15;border:1px dashed var(--line);border-radius:12px;
+    display:flex;align-items:center;justify-content:center;color:#4e5870;font-size:13px;
+    background:rgba(10,14,22,.5);overflow:hidden;position:relative;}
+  .slot.filled{border-style:solid;border-color:rgba(226,185,120,.5);}
+  .slot img{width:100%;height:100%;object-fit:cover;}
+  .slot .cap{position:absolute;bottom:6px;left:0;right:0;text-align:center;font-size:12px;
+    text-shadow:0 1px 3px #000;}
+  .tip{font-size:12px;color:#7d88a3;line-height:1.7;}
+  .bar{display:flex;justify-content:flex-end;gap:12px;margin-top:12px;}
+  .go{padding:12px 34px;border-radius:10px;border:1px solid rgba(226,185,120,.55);
+    background:linear-gradient(180deg,rgba(70,54,30,.9),rgba(36,28,16,.9));
+    cursor:pointer;letter-spacing:.3em;font-size:16px;color:#ffe2b0;}
+  .go.dis{opacity:.35;pointer-events:none;}
+
+  /* ---------- 组卡 ---------- */
+  #deck{flex-direction:column;}
+  .deckwrap{flex:1;display:grid;grid-template-columns:190px 1fr 150px;gap:18px;min-height:0;}
+  .collist{display:flex;flex-direction:column;gap:6px;overflow:auto;padding-right:4px;}
+  .rowlet{display:flex;align-items:center;gap:8px;font-size:12.5px;color:#cfd6e8;
+    background:rgba(16,20,30,.7);border:1px solid rgba(200,214,240,.12);border-radius:7px;padding:5px 8px;}
+  .rowlet b{color:var(--gold);font-weight:600;font-size:10.5px;letter-spacing:.1em;}
+  .pool{overflow:auto;}
+  .pool h4{margin:2px 0 8px;font-size:12.5px;letter-spacing:.24em;color:var(--dim);}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:10px;}
+  .card{position:relative;border-radius:9px;overflow:hidden;cursor:pointer;
+    border:1px solid rgba(200,214,240,.16);background:rgba(14,18,26,.9);
+    transition:.16s;aspect-ratio:617/859;}
+  .card img{width:100%;height:100%;object-fit:cover;display:block;opacity:.55;filter:grayscale(.35);}
+  .card:hover{transform:translateY(-3px);}
+  .card.on{border-color:rgba(226,185,120,.75);box-shadow:0 0 16px rgba(226,185,120,.22);}
+  .card.on img{opacity:1;filter:none;}
+  .card .tick{position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:50%;
+    background:rgba(226,185,120,.95);color:#231a0c;font-size:13px;line-height:20px;text-align:center;
+    opacity:0;transition:.16s;}
+  .card.on .tick{opacity:1;}
+  .card .nm{position:absolute;left:0;right:0;bottom:0;padding:3px 4px;font-size:11px;
+    background:linear-gradient(0deg,rgba(0,0,0,.85),transparent);text-align:center;}
+  .sideinfo{display:flex;flex-direction:column;gap:12px;align-items:center;padding-top:4px;}
+  .sideinfo .g{width:96px;text-align:center;color:#c9d2e6;font-size:12px;}
+  .sideinfo .g .hex{width:96px;height:108px;cursor:default;}
+  #detailBar{flex:none;height:116px;margin-top:12px;background:var(--glass);border:1px solid var(--line);
+    border-radius:12px;padding:12px 18px;display:grid;grid-template-columns:190px 1fr 170px;gap:16px;overflow:hidden;}
+  #detailBar .dn{font-size:17px;letter-spacing:.08em;color:var(--ink);}
+  #detailBar .dt{font-size:11.5px;color:#8b95ad;margin-top:6px;line-height:1.7;}
+  #detailBar .dd{font-size:13px;line-height:1.75;color:#dbe2f0;white-space:pre-wrap;overflow:auto;}
+  #detailBar .ds{font-size:12px;color:var(--dim);line-height:1.9;text-align:right;}
+  #detailBar .empty{color:#5c667e;font-size:12.5px;align-self:center;grid-column:1/4;text-align:center;letter-spacing:.14em;}
+  .counts{display:flex;gap:16px;font-size:14px;color:var(--dim);letter-spacing:.1em;}
+  .counts b{color:var(--ink);}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ========== 标题 ========== -->
+  <section id="title" class="screen on">
+    <h1>散樱乱武</h1>
+    <div class="sub">SAKURA&nbsp;ARMS</div>
+    <div class="menu">
+      <div class="btn" id="btnOnline">联 机 对 战</div>
+      <div class="btn ghost">人 机 对 战</div>
+      <div class="btn ghost">同 屏 双 人</div>
+    </div>
+    <div class="foot">非官方同人作品，仅供学习交流<br>素材版权归原权利方，禁止商用与再分发</div>
+  </section>
+
+  <!-- ========== 选人 ========== -->
+  <section id="select" class="screen">
+    <div class="head">
+      <span class="back" id="back1">← 返回</span>
+      <h2>选择女神</h2>
+      <span class="hint" id="selHint">从分到你的候选里选 2 柱</span>
+      <span class="spacer"></span>
+      <span class="hint" id="selCount">已选 0 / 2</span>
+    </div>
+    <div class="selwrap">
+      <div class="panel">
+        <h3>你的候选</h3>
+        <div class="hexgrid" id="myPool"></div>
+        <div class="tip" id="selTip"></div>
+      </div>
+      <div class="panel">
+        <h3>我的选择</h3>
+        <div class="slots">
+          <div class="slot" data-i="0">空</div>
+          <div class="slot" data-i="1">空</div>
+        </div>
+        <h3 style="margin-top:16px">对手候选（已分给他的一半）</h3>
+        <div class="hexgrid" id="oppPool"></div>
+      </div>
+    </div>
+    <div class="bar"><div class="go dis" id="toDeck">确认，去组卡 →</div></div>
+  </section>
+
+  <!-- ========== 组卡 ========== -->
+  <section id="deck" class="screen">
+    <div class="head">
+      <span class="back" id="back2">← 返回</span>
+      <h2>组卡组</h2>
+      <span class="hint">通常札 7 张 + 王牌 3 张</span>
+      <span class="spacer"></span>
+      <div class="counts">通常 <b id="cNormal">0/7</b>　王牌 <b id="cSpecial">0/3</b></div>
+    </div>
+    <div class="deckwrap">
+      <div class="panel collist" id="myList"></div>
+      <div class="panel pool">
+        <h4>通常札</h4>
+        <div class="cards" id="poolNormal"></div>
+        <h4 style="margin-top:16px">王牌</h4>
+        <div class="cards" id="poolSpecial"></div>
+      </div>
+      <div class="sideinfo" id="sideInfo"></div>
+    </div>
+    <div id="detailBar"><div class="empty">把鼠标放到卡上，这里显示效果</div></div>
+    <div class="bar"><div class="go dis" id="toBattle">决 斗</div></div>
+  </section>
+
+</div>
+
+<script src="assets.js"></script>
+<script src="gamedata.js"></script>
+<script>
+(function(){
+'use strict';
+const $=s=>document.querySelector(s);
+const G = window.GAME_DATA.goddesses;
+const AVATAR = {yurina:'01',saine:'02',himika:'03',tokoyo:'04'};
+const AV='../素材/Sprite/';
+const state = { myHalf:[], oppHalf:[], picks:[], deck:{normal:[],special:[]}, screen:'title' };
+
+function show(id){
+  document.querySelectorAll('.screen').forEach(el=>el.classList.remove('on'));
+  $('#'+id).classList.add('on');
+  state.screen=id;
+}
+function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
+function gByKey(k){ return G.find(g=>g.key===k); }
+
+/* ---------- 随机分半 ---------- */
+function splitRoster(){
+  const all = shuffle(G.map(g=>g.key));
+  const mid = Math.ceil(all.length/2);
+  state.myHalf = all.slice(0,mid);
+  state.oppHalf = all.slice(mid);
+  state.picks = [];
+}
+
+/* ---------- 选人界面 ---------- */
+function renderSelect(){
+  const my=$('#myPool'); my.innerHTML='';
+  state.myHalf.forEach(key=>{
+    const g=gByKey(key);
+    const d=document.createElement('div');
+    d.className='hex'+(state.picks.includes(key)?' picked':'');
+    d.innerHTML='<img src="'+AV+AVATAR[key]+'.png" alt=""><div class="nm">'+g.name+'</div>';
+    d.onclick=()=>{
+      const i=state.picks.indexOf(key);
+      if(i>=0) state.picks.splice(i,1);
+      else if(state.picks.length<2) state.picks.push(key);
+      renderSelect();
+    };
+    my.appendChild(d);
+  });
+
+  // 对手那半不公开：只显示数量
+  const op=$('#oppPool'); op.innerHTML='';
+  state.oppHalf.forEach(()=>{
+    const d=document.createElement('div');
+    d.className='hex dis';
+    d.innerHTML='<div style="font-size:34px;color:#3b465c">?</div>';
+    op.appendChild(d);
+  });
+
+  document.querySelectorAll('#select .slot').forEach((s,i)=>{
+    const key=state.picks[i];
+    if(key){
+      const g=gByKey(key);
+      s.classList.add('filled');
+      s.innerHTML='<img src="'+AV+AVATAR[key]+'.png"><div class="cap">'+g.name+'</div>';
+    } else { s.classList.remove('filled'); s.textContent='空'; }
+  });
+
+  $('#selCount').textContent='已选 '+state.picks.length+' / 2';
+  $('#toDeck').classList.toggle('dis', state.picks.length!==2);
+  $('#selTip').textContent = state.myHalf.length===2
+    ? '（当前只有 '+G.length+' 位女神，分到每人 '+state.myHalf.length+' 位，所以是必选）'
+    : '候选共 '+state.myHalf.length+' 位，选 2 位进入组卡';
+}
+
+/* ---------- 组卡界面 ---------- */
+function poolCards(){
+  // 两位女神的卡都可用；同 id 去重
+  const list=[];
+  state.picks.forEach(k=>{
+    gByKey(k).cards.forEach(c=>{
+      if(!list.find(x=>x.id===c.id)) list.push({...c, goddess:k});
+    });
+  });
+  return list;
+}
+function renderDeck(){
+  const all=poolCards();
+  const normal=all.filter(c=>c.kind==='normal');
+  const special=all.filter(c=>c.kind==='special');
+
+  const mk=(c,on)=>{
+    const d=document.createElement('div');
+    d.className='card'+(on?' on':'');
+    const src=(window.ASSET_CARDS||{})[c.id];
+    d.innerHTML=(src?'<img src="'+src+'">':'')+
+      '<div class="tick">✓</div><div class="nm">'+c.name+'</div>';
+    d.onclick=()=>{
+      const arr = c.kind==='normal'?state.deck.normal:state.deck.special;
+      const i=arr.indexOf(c.id);
+      if(i>=0) arr.splice(i,1);
+      else if(arr.length < (c.kind==='normal'?7:3)) arr.push(c.id);
+      renderDeck();
+      showDetail(c);
+    };
+    d.onmouseenter=()=>showDetail(c);
+    d.onmouseleave=()=>clearDetail();
+    return d;
+  };
+  const pn=$('#poolNormal'), ps=$('#poolSpecial');
+  pn.innerHTML=''; ps.innerHTML='';
+  normal.forEach(c=>pn.appendChild(mk(c, state.deck.normal.includes(c.id))));
+  special.forEach(c=>ps.appendChild(mk(c, state.deck.special.includes(c.id))));
+
+  const list=$('#myList'); list.innerHTML='';
+  const chosen=[...state.deck.normal, ...state.deck.special];
+  chosen.forEach(id=>{
+    const c=all.find(x=>x.id===id); if(!c) return;
+    const d=document.createElement('div');
+    d.className='rowlet';
+    d.innerHTML='<b>'+(c.kind==='normal'?'通':'王')+'</b>'+c.name;
+    list.appendChild(d);
+  });
+  if(!chosen.length){ const d=document.createElement('div'); d.className='rowlet';
+    d.style.color='#6b7591'; d.textContent='还没选牌'; list.appendChild(d); }
+
+  $('#cNormal').textContent=state.deck.normal.length+'/7';
+  $('#cSpecial').textContent=state.deck.special.length+'/3';
+  const ok = state.deck.normal.length===7 && state.deck.special.length===3;
+  $('#toBattle').classList.toggle('dis', !ok);
+
+  const si=$('#sideInfo'); si.innerHTML='';
+  state.picks.forEach(k=>{
+    const g=gByKey(k);
+    const d=document.createElement('div');
+    d.className='g';
+    d.innerHTML='<div class="hex"><img src="'+AV+AVATAR[k]+'.png"></div><div>'+g.name+'</div>';
+    si.appendChild(d);
+  });
+}
+
+/* ---------- 卡牌说明条 ---------- */
+const TYPE_CN={attack:'攻击',action:'行动',enhance:'付与'};
+const SUB_CN={reaction:'对应',fullpower:'全力'};
+function cardMeta(c){
+  const types=(c.types||[]).map(t=>TYPE_CN[t]).filter(Boolean);
+  const subs=(c.types||[]).map(t=>SUB_CN[t]).filter(Boolean);
+  const parts=[];
+  parts.push(c.kind==='normal'?'通常札':'王牌');
+  if(types.length) parts.push(types.join('·'));
+  if(subs.length) parts.push(subs.join('·'));
+  return parts.join('　');
+}
+function showDetail(c){
+  const bar=$('#detailBar');
+  const desc = c.text ? c.text : '（没有附加效果，纯粹的攻击/行动）';
+  const nums=[];
+  if(c.rangeRaw) nums.push('距　'+c.rangeRaw);
+  if(c.damageRaw) nums.push('伤害　'+c.damageRaw);
+  if(c.cost!==null&&c.cost!==undefined) nums.push('消费　'+c.cost);
+  if(c.capacity!==null&&c.capacity!==undefined) nums.push('纳　'+c.capacity);
+  bar.innerHTML =
+    '<div><div class="dn">'+c.name+'</div><div class="dt">'+cardMeta(c)+'</div></div>'+
+    '<div class="dd">'+esc(desc)+'</div>'+
+    '<div class="ds">'+(nums.length?nums.join('<br>'):'—')+'</div>';
+}
+function clearDetail(){
+  $('#detailBar').innerHTML='<div class="empty">把鼠标放到卡上，这里显示效果</div>';
+}
+function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* ---------- 事件 ---------- */
+$('#btnOnline').onclick=()=>{
+  splitRoster(); state.picks=[]; state.deck={normal:[],special:[]};
+  renderSelect(); show('select');
+};
+$('#back1').onclick=()=>show('title');
+$('#back2').onclick=()=>{ renderSelect(); show('select'); };
+$('#toDeck').onclick=()=>{
+  if(state.picks.length!==2) return;
+  renderDeck(); show('deck');
+};
+$('#toBattle').onclick=()=>{
+  const q='?deck='+encodeURIComponent(state.deck.normal.concat(state.deck.special).join(','));
+  location.href='scene_v17.html'+q;
+};
+
+renderSelect();
+
+// 截图/调试用：?screen=select / ?screen=deck
+(function(){
+  const m=location.search.match(/[?&]screen=(select|deck)/);
+  if(!m) return;
+  splitRoster(); state.picks=[];
+  if(m[1]==='select'){ renderSelect(); show('select'); return; }
+  state.picks = state.myHalf.slice(0,2);
+  renderSelect();
+  state.deck={normal:[],special:[]};
+  const all=poolCards();
+  all.filter(c=>c.kind==='normal').slice(0,7).forEach(c=>state.deck.normal.push(c.id));
+  all.filter(c=>c.kind==='special').slice(0,3).forEach(c=>state.deck.special.push(c.id));
+  renderDeck(); show('deck');
+  const hm=location.search.match(/[?&]hover=(\d+)/);
+  if(hm){
+    const arr=all.filter(c=>c.kind==='normal');
+    const c=arr[Math.min(parseInt(hm[1],10), arr.length-1)];
+    if(c) showDetail(c);
+  }
+})();
+})();
+</script>
+</body>
+</html>
