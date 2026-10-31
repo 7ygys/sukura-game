@@ -61,7 +61,8 @@
       dust: INIT.DUST,
       players: [makePlayer(opts.myName), makePlayer(opts.oppName)],
       winner: null,
-      log: []
+      log: [],
+      events: []
     };
 
     // 分牌：通常札进牌库（洗过），王牌单放（不进牌库）
@@ -94,6 +95,15 @@
     return JSON.parse(JSON.stringify(s));
   }
 
+  /**
+   * 事件：给界面看的"刚刚发生了什么"。
+   * 规则层只负责记，怎么表现是界面的事（比如中央弹一个大图标）。
+   */
+  function emit(state, type, data) {
+    state.events.push(Object.assign({ type: type, turn: state.turn }, data || {}));
+    if (state.events.length > 50) state.events.shift();
+  }
+
   function log(state, msg) {
     state.log.push({ turn: state.turn, msg });
     if (state.log.length > 200) state.log.shift();
@@ -109,5 +119,5 @@
     return card;
   }
 
-  Engine.state = { INIT, create, clone, makePlayer, drawOne, log };
+  Engine.state = { INIT, create, clone, makePlayer, drawOne, log, emit };
 })(typeof window !== 'undefined' ? window : globalThis);

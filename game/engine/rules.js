@@ -86,6 +86,7 @@
     const p = state.players[who];
     const useAura = p.aura > 0;
     log(state, 'P' + (who + 1) + ' 焦燥 1/1 → ' + (useAura ? '装' : '命'));
+    Engine.state.emit(state, 'exhaust', { who: who });
     applyDamage(state, who, 1, 1, useAura ? 'aura' : 'life');
   }
 
@@ -352,6 +353,7 @@
 
     if (!free) p.focus -= 1;          // 付 1 点集中力（盖牌给的这一次免费）
     b.apply(state, p);
+    Engine.state.emit(state, 'basic', { who: who, which: which });
     log(state, 'P' + (who + 1) + ' ' + b.name + (free ? '（盖牌免费）' : '（集中力 -1）'));
     return { ok: true };
   }
@@ -572,6 +574,19 @@
   }
 
   /* ==========================================================================
+   * 五·四、畏缩
+   * ==========================================================================
+   *
+   * 畏缩是状态，不是伤害。中了之后直到被清除前，某些效果会触发。
+   * 这里只负责"挂上 + 发事件"，具体影响由卡牌效果判断。
+   */
+  function stagger(state, who) {
+    state.players[who].staggered = true;
+    Engine.state.emit(state, 'stagger', { who: who });
+    log(state, 'P' + (who + 1) + ' 畏缩');
+  }
+
+  /* ==========================================================================
    * 五·五、再起 / 即再起
    * ==========================================================================
    *
@@ -638,7 +653,7 @@
     // 基本动作
     BASIC, canBasic, basicAction, hideCard,
     // 再起
-    tryRevive,
+    tryRevive, stagger,
     // 出牌与攻防
     inRange, playCard, respond, resolveDamage,
     // 胜负
