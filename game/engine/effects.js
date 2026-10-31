@@ -168,6 +168,12 @@
    */
   const choices = {};
 
+  // 見切り：间合(1) ⇔ 虚
+  choices.mikiri = {
+    dist_to_dust(state, who) { Engine.effects.fx.moveCrystal(state, who, 'distance', 'dust', 1); },
+    dust_to_dist(state, who) { Engine.effects.fx.moveCrystal(state, who, 'dust', 'distance', 1); }
+  };
+
   // 回合开始时的「要不要重组牌库」
   choices.reshuffle = {
     yes(state, who) {
@@ -288,7 +294,7 @@
 
     /* ===== 细音 ===== */
 
-    // 八方振り：【攻击后】八相 → 再打一次 4-5、2/1
+    // 八方振り：八相（自装≤1）→ 再打一发 4-5、2/1
     "02-saine-o-n-1": {
       onAfterAttack(state, who) {
         if (hassou(state, who)) {
@@ -297,14 +303,94 @@
       }
     },
 
-    // 石突き：【攻击后】若这张牌是以《对应》使用的 → 攻击 3-5、2/1、不可被对应
+    // 薙斬り：只是带《对应》的攻击，没有别的效果
+
+    // 石突き：以《对应》使用时，攻击后打一发 3-5、2/1、不可被对应
     "02-saine-o-n-3": {
       onAfterAttack(state, who, pd) {
         if (pd && pd.usedAsResponse) {
-          generateAttack(state, who, { name: '石突き（对应后）', range: [3, 4, 5], aura: 2, life: 1, noRespond: true });
+          generateAttack(state, who, {
+            name: '石突き（对应后）', range: [3, 4, 5], aura: 2, life: 1, noRespond: true
+          });
         }
       }
+    },
+
+    // 見切り：间合(1) ⇔ 虚（双向箭头，由使用者选方向）
+    // 另：【常时】八相时可以当《对应》用（types 里已经带 reaction，这里只做条件判断）
+    "02-saine-o-n-4": {
+      onUse(state, who) {
+        Engine.effects.fx.ask(state, who, 'mikiri', '间合(1) ⇔ 虚：选方向', ['dist_to_dust', 'dust_to_dist']);
+      }
+    },
+
+    // 圏域（付与・纳2）：达人距离 +1；这张牌上的结晶本该进虚时改为进间合
+    "02-saine-o-n-5": {
+      taijinPlus: 1,
+      redirectTo: 'distance'      // 供 tickAttachments / 破弃时判断
+    },
+
+    // 衝音晶（付与・纳1・可对应）：
+    //   对应时被对应攻击 -1/+0；破弃时打一发 0-10、1/-、不可被对应，并 虚→间合
+    "02-saine-o-n-6": {
+      onRespond(state, who, pd) {
+        pd.damage.aura = Math.max(0, pd.damage.aura - 1);
+        Engine.state.log(state, '衝音晶：被对应的攻击 -1/+0');
+      },
+      onBreak(state, who) {
+        Engine.effects.fx.moveCrystal(state, who, 'dust', 'distance', 1);
+        generateAttack(state, who, {
+          name: '衝音晶（破弃）', range: [0,1,2,3,4,5,6,7,8,9,10], aura: 1, life: 0, noRespond: true
+        });
+      }
+    },
+
+    // 無音壁（付与・纳5）：受伤害时，这张牌上的结晶视为在你的装中
+    "02-saine-o-n-7": {
+      auraShield: true
+    },
+
+    // 律動弧戟（王牌・费5·行动）：连续三发攻击
+    "02-saine-o-s-1": {
+      onUse(state, who) {
+        state.attackQueue = [
+          { name: '律動弧戟②', range: [4, 5], aura: 1, life: 1 },
+          { name: '律動弧戟③', range: [3, 4, 5], aura: 2, life: 2 }
+        ];
+        generateAttack(state, who, { name: '律動弧戟①', range: [3, 4], aura: 1, life: 1 });
+      }
+    },
+
+    // 響鳴共振（王牌・行动）：费用 = 8 - 敌装；敌装(2) → 间合
+    "02-saine-o-s-2": {
+      cost(state, who) {
+        return 8 - state.players[1 - who].aura;
+      },
+      onUse(state, who) {
+        Engine.effects.fx.moveCrystal(state, 1 - who, 'aura', 'distance', 2);
+      }
+    },
+
+    // 音無砕氷（王牌攻击・对应）：被对应的攻击 -1/-1
+    "02-saine-o-s-3": {
+      onRespond(state, who, pd) {
+        pd.damage.aura = Math.max(0, pd.damage.aura - 1);
+        pd.damage.life = Math.max(0, pd.damage.life - 1);
+        Engine.state.log(state, '音無砕氷：被对应的攻击 -1/-1');
+      }
+    },
+
+    // 氷雨細音の果ての果て（王牌攻击・对应）：只能用来对应王牌
+    "02-saine-o-s-4": {
+      canUse(state, who, card) {
+        const pd = state.pending;
+        if (!pd || pd.defender !== who) return '这张牌只能用于对应';
+        const atkCard = pd.card;
+        if (!atkCard || atkCard.kind !== 'special') return '这张牌只能用于对王牌的对应';
+        return true;
+      }
     }
+
   };
 
   /* ---------- 效果生成的攻击 ---------- */

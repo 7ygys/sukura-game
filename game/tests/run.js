@@ -640,7 +640,125 @@ group('樱花结晶总数守恒');
   eq('失去 3 点装后仍是 36', total(d2), 36);
 }
 
-/* ---------- 12. 不可变性 ---------- */
+/* ---------- 12. 细音 11 张 ---------- */
+group('细音的效果');
+{
+  // 見切り：间合 ⇔ 虚（双向）
+  let s = withHand(0, ['02-saine-o-n-4']);
+  s.distance = 5; s.dust = 3;
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '02-saine-o-n-4' });
+  ok('打出見切り', r.ok, r.error);
+  ok('弹出了方向选择', !!r.state.choice);
+  r = E.actions.applyAction(r.state, { type: 'choose', player: 0, option: 'dist_to_dust' });
+  eq('间合 5→4', r.state.distance, 4);
+  eq('虚 3→4', r.state.dust, 4);
+
+  s = withHand(0, ['02-saine-o-n-4']);
+  s.distance = 5; s.dust = 3;
+  r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '02-saine-o-n-4' });
+  r = E.actions.applyAction(r.state, { type: 'choose', player: 0, option: 'dust_to_dist' });
+  eq('虚 3→2', r.state.dust, 2);
+  eq('间合 5→6', r.state.distance, 6);
+}
+
+{
+  // 圏域：达人距离 +1；付与札的结晶改为进间合
+  let s = withHand(0, ['02-saine-o-n-5']);
+  s.distance = 6; s.dust = 4; s.players[0].aura = 3;
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '02-saine-o-n-5' });
+  ok('展开圏域', r.ok, r.error);
+  s = r.state;
+  eq('达人距离 2→3', E.rules.taijinOf(s), 3);
+  ok('间合 2 已不能前进', !E.actions.applyAction(Object.assign(E.state.clone(s), { distance: 2 }), { type: 'basic', player: 0, which: 'advance' }).ok);
+
+  const before = { dust: s.dust, dist: s.distance };
+  E.rules.tickAttachments(s, 0);
+  eq('结晶进间合而不是虚', s.distance, before.dist + 1);
+  eq('虚没增加', s.dust, before.dust);
+}
+
+{
+  // 衝音晶：对应时 -1/+0
+  let s = withHand(0, ['02-saine-o-n-2']);      // 薙斬り 4-5 3/1
+  s.distance = 4;
+  s.players[1].hand = [cardById('02-saine-o-n-6')];
+  s.dust = 3;
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '02-saine-o-n-2' });
+  s = r.state;
+  r = E.actions.applyAction(s, { type: 'respond', player: 1, cardId: '02-saine-o-n-6' });
+  ok('用衝音晶对应', r.ok, r.error);
+  eq('对应后 2/1', r.state.pending.damage, { aura: 2, life: 1 });
+}
+
+{
+  // 無音壁：付与札上的结晶可以当装用
+  let s = withHand(0, ['02-saine-o-n-7']);
+  s.distance = 7; s.dust = 6; s.players[0].aura = 3;
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '02-saine-o-n-7' });
+  ok('展开無音壁', r.ok, r.error);
+  s = r.state;
+  eq('纳 5 颗', s.players[0].attachments[0].crystals, 5);
+
+  // 装只剩 0，但付与札上有 5 颗 → 仍可选装
+  s.players[0].aura = 0;
+  eq('视为装的总数 = 5', E.rules.shadowAura(s, 0), 5);
+  ok('装 0 但可以选装', E.rules.canTakeAura(s, 0, 3));
+  E.rules.applyDamage(s, 0, 3, 0, 'aura');
+  eq('付与札结晶 5→2', s.players[0].attachments[0].crystals, 2);
+  eq('真装没有变负', s.players[0].aura, 0);
+}
+
+{
+  // 律動弧戟：三连击
+  let s = withHand(0, ['02-saine-o-s-1']);
+  s.players[0].flare = 5;
+  s.distance = 4;
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '02-saine-o-s-1' });
+  ok('打出律動弧戟', r.ok, r.error);
+  eq('第一发 3-4 / 1-1', r.state.pending.damage, { aura: 1, life: 1 });
+  ok('排队里还有 2 发', r.state.attackQueue.length === 2);
+
+  s = r.state;
+  r = E.actions.applyAction(s, { type: 'respond', player: 1, cardId: null });
+  r = E.actions.applyAction(r.state, { type: 'resolveDamage', player: 1, choice: 'aura' });
+  ok('第二发自动接上', r.ok && !!r.state.pending);
+  eq('第二发 4-5 / 1-1', r.state.pending.damage, { aura: 1, life: 1 });
+}
+
+{
+  // 響鳴共振：费用 = 8 - 敌装
+  let s = withHand(0, ['02-saine-o-s-2']);
+  s.players[0].flare = 8;
+  s.players[1].aura = 3;
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '02-saine-o-s-2' });
+  ok('敌装 3 → 费用 5，气 8 够', r.ok, r.error);
+  eq('付了 5 点气', r.state.players[0].flare, 3);
+}
+
+{
+  // 音無砕氷：对应时 -1/-1
+  let s = withHand(0, ['02-saine-o-n-2']);   // 薙斬り 3/1
+  s.distance = 4;
+  s.players[1].hand = [cardById('02-saine-o-s-3')];
+  s.players[1].flare = 2;
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '02-saine-o-n-2' });
+  r = E.actions.applyAction(r.state, { type: 'respond', player: 1, cardId: '02-saine-o-s-3' });
+  ok('用音無砕氷对应', r.ok, r.error);
+  eq('对应后 2/0', r.state.pending.damage, { aura: 2, life: 0 });
+}
+
+{
+  // 氷雨：只能用于对应王牌
+  let s = withHand(0, ['01-yurina-o-n-1']);  // 斬（通常札）
+  s.distance = 3;
+  s.players[1].hand = [cardById('02-saine-o-s-4')];
+  s.players[1].flare = 5;
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-1' });
+  r = E.actions.applyAction(r.state, { type: 'respond', player: 1, cardId: '02-saine-o-s-4' });
+  ok('对通常札攻击不能用氷雨', !r.ok);
+}
+
+/* ---------- 13. 不可变性 ---------- */
 group('不可变性');
 {
   const s = freshP0();

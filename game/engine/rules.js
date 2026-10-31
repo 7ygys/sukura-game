@@ -169,10 +169,28 @@
 
     if (choice === 'aura') {
       // 装不够就不能选装——这是规则里明确的"不合法选择"
-      if (p.aura < auraDmg) return false;
-      // 规则 5-8-3-1：装里的结晶被打掉后**移动到虚**，不是消失
-      p.aura -= auraDmg;
-      state.dust += auraDmg;
+      if (p.aura + shadowAura(state, who) < auraDmg) return false;
+      // 先用"视为在装中"的付与札结晶，再扣真正的装
+      let rest = auraDmg;
+      const shieldFromAttach = Math.min(shadowAura(state, who), rest);
+      if (shieldFromAttach > 0) {
+        let left = shieldFromAttach;
+        const keep = [];
+        (p.attachments || []).forEach(function (a) {
+          const e = (Engine.effects && Engine.effects.cards && Engine.effects.cards[a.id]);
+          if (left > 0 && e && e.auraShield) {
+            const take = Math.min(a.crystals, left);
+            a.crystals -= take; left -= take;
+            state.dust += take;
+          }
+          if (a.crystals > 0) keep.push(a);
+          else p.discard.push(Object.assign({}, a, { crystals: 0 }));
+        });
+        p.attachments = keep;
+        rest -= shieldFromAttach;
+      }
+      p.aura -= rest;
+      state.dust += rest;
       log(state, 'P' + (who + 1) + ' 装 -' + auraDmg + '（余 ' + p.aura + '）→ 虚 +' + auraDmg);
     } else {
       // 命里的结晶被打掉后**不会消失**，它飞到气里去
@@ -185,9 +203,19 @@
     return true;
   }
 
+  /** 「这张牌上的结晶视为在装中」的附加装（無音壁） */
+  function shadowAura(state, who) {
+    let n = 0;
+    (state.players[who].attachments || []).forEach(function (a) {
+      const e = (Engine.effects && Engine.effects.cards && Engine.effects.cards[a.id]);
+      if (e && e.auraShield) n += (a.crystals || 0);
+    });
+    return n;
+  }
+
   /** 这次伤害能不能选"装"（界面用它决定按钮亮不亮） */
   function canTakeAura(state, who, auraDmg) {
-    return state.players[who].aura >= auraDmg;
+    return state.players[who].aura + shadowAura(state, who) >= auraDmg;
   }
 
   /* ==========================================================================
@@ -255,8 +283,19 @@
     if (!p.attachments.length) return;
 
     const keep = [];
+    const table = (Engine.effects && Engine.effects.cards) || {};
     p.attachments.forEach(a => {
-      if (a.crystals > 0) { a.crystals--; state.dust++; }
+      if (a.crystals > 0) {
+        a.crystals--;
+        // 圏域：本该进虚的结晶改为进间合
+        const e = table[a.id];
+        if (e && e.redirectTo === 'distance' && state.distance < 10) {
+          state.distance++;
+          log(state, '「' + a.name + '」：结晶改为送至间合');
+        } else {
+          state.dust++;
+        }
+      }
       if (a.crystals > 0) {
         keep.push(a);
       } else {
@@ -328,7 +367,7 @@
     // 规则 9-6-1：间合 ≤ 达人距离（默认 2）时**什么都不会发生**，即不能前进。
     advance: {
       name: '前进',
-      need: (st, p) => st.distance > (st.taijin || 2) && p.aura < Engine.state.INIT.AURA_MAX,
+      need: (st, p) => st.distance > taijinOf(st) && p.aura < Engine.state.INIT.AURA_MAX,
       apply: (st, p) => { st.distance -= 1; p.aura += 1; }
     },
 
@@ -356,7 +395,7 @@
     // 离脱：虚 → 距。规则 9-6-5：间合 > 达人距离时什么都不会发生
     disengage: {
       name: '离脱',
-      need: (st, p) => st.distance <= (st.taijin || 2) && st.distance < 10 && st.dust >= 1,
+      need: (st, p) => st.distance <= taijinOf(st) && st.distance < 10 && st.dust >= 1,
       apply: (st, p) => { st.dust -= 1; st.distance += 1; }
     }
   };
@@ -366,6 +405,18 @@
    * 除了动作本身的条件，还要**有 1 点集中力**——基本动作不是免费的。
    * 集中力每回合最多涨到 2，所以一回合最多做两次基本动作。
    */
+  /** 达人距离：默认 2，付与札可以加（例如圏域 +1） */
+  function taijinOf(state) {
+    let base = 2;
+    state.players.forEach(function (p) {
+      (p.attachments || []).forEach(function (a) {
+        const e = (Engine.effects && Engine.effects.cards && Engine.effects.cards[a.id]);
+        if (e && e.taijinPlus) base += e.taijinPlus;
+      });
+    });
+    return base;
+  }
+
   function canBasic(state, who, which) {
     const b = BASIC[which];
     if (!b) return false;
@@ -478,9 +529,10 @@
       if (r0 !== true) return { ok: false, error: r0 || '这张牌现在不能使用' };
     }
 
-    // ---- 王牌要付费用（气） ----
+    // ---- 王牌要付费用（气）；有些牌的费用是动态的 ----
+    let cost = card.cost || 0;
     if (card.kind === 'special') {
-      const cost = card.cost || 0;
+      if (c0 && c0.cost) cost = Math.max(0, c0.cost(state, who, card));
       if (p.flare < cost) return { ok: false, error: '气不够（需要 ' + cost + '）' };
     }
 
@@ -507,7 +559,7 @@
     // ============================================================
 
     if (card.kind === 'special') {
-      const cost = card.cost || 0;
+      // 用上面算好的 cost（可能是动态费用）
       p.flare -= cost;
       state.dust += cost;        // 付出去的气变成虚里的结晶
       log(state, '支付 ' + cost + ' 点气 → 虚 +' + cost);
@@ -640,6 +692,14 @@
 
       const canReact = (card.types || []).indexOf('reaction') >= 0;
       if (!canReact) return { ok: false, error: '这张牌没有《对应》' };
+
+      // 对应牌自己的使用条件（例如氷雨只能对应王牌）
+      const etable = (Engine.effects && Engine.effects.cards) || {};
+      const ecard = etable[card.id];
+      if (ecard && ecard.canUse) {
+        const cr = ecard.canUse(state, who, card);
+        if (cr !== true) return { ok: false, error: cr || '这张牌现在不能使用' };
+      }
       if (pd.noRespond === 'normal' && card.kind === 'normal')
         return { ok: false, error: '这次攻击不可被通常札对应' };
 
@@ -699,7 +759,13 @@
       table[pd.responseCardId].onAfterAttack(state, pd.defender, Object.assign({}, pd, { usedAsResponse: true }));
     }
 
-    state.pending = null;         // 攻防结束
+    // 还有排队中的攻击就接着打（律動弧戟那种三段攻击）
+    state.pending = null;
+    if (state.attackQueue && state.attackQueue.length) {
+      const nextSpec = state.attackQueue.shift();
+      Engine.effects.generateAttack(state, pd.attacker, nextSpec);
+      return { ok: true };
+    }
     tryRevive(state, 1 - who);    // 伤害之后检查「即再起」
     tryRevive(state, who);
     return { ok: true };
@@ -783,7 +849,7 @@
     // 回合
     startTurn, endTurn, tickAttachments,
     // 基本动作
-    BASIC, canBasic, basicAction, hideCard,
+    BASIC, canBasic, basicAction, hideCard, taijinOf, shadowAura,
     // 再起
     tryRevive, stagger,
     // 出牌与攻防
