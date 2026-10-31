@@ -1,1164 +1,1164 @@
 {
-  "meta": {
-    "source": "sdrice.name/random/assets/sakura-carddata-na",
-    "edition": "新幕 (na)",
-    "collectedAt": "2026-10-27",
-    "scope": "仅 4 位基础女神的主武器卡，共 7 通常 + 4 王牌；不含异格与修订印次",
-    "typeMap": {
-      "attack": "《攻击》",
-      "action": "《行动》",
-      "enhance": "《付与》",
-      "reaction": "副类型《对应》",
-      "fullpower": "副类型《全力》"
-    },
-    "note": "数值取自 sdrice na（与 APK 库中带 _sX 后缀的修订版一致）；altNames 为 APK 库中的另译名",
-    "terms": {
-      "aura": "装",
-      "life": "命",
-      "flare": "气",
-      "dust": "尘",
-      "distance": "间合",
-      "focus": "集中力",
-      "capacity": "纳",
-      "cost": "消费",
-      "note": "中文名采用社区通用叫法；卡面 damage X/Y 中 X 为装伤害、Y 为命伤害"
-    },
-    "damage": {
-      "aura": "装伤害（X）",
-      "life": "命伤害（Y）"
-    }
+ "meta": {
+  "source": "sdrice.name/random/assets/sakura-carddata-na",
+  "edition": "新幕 (na)",
+  "collectedAt": "2026-10-27",
+  "scope": "仅 4 位基础女神的主武器卡，共 7 通常 + 4 王牌；不含异格与修订印次",
+  "typeMap": {
+   "attack": "《攻击》",
+   "action": "《行动》",
+   "enhance": "《付与》",
+   "reaction": "副类型《对应》",
+   "fullpower": "副类型《全力》"
   },
-  "goddesses": [
+  "note": "数值取自 sdrice na（与 APK 库中带 _sX 后缀的修订版一致）；altNames 为 APK 库中的另译名",
+  "terms": {
+   "aura": "装",
+   "life": "命",
+   "flare": "气",
+   "dust": "尘",
+   "distance": "间合",
+   "focus": "集中力",
+   "capacity": "纳",
+   "cost": "消费",
+   "note": "中文名采用社区通用叫法；卡面 damage X/Y 中 X 为装伤害、Y 为命伤害"
+  },
+  "damage": {
+   "aura": "装伤害（X）",
+   "life": "命伤害（Y）"
+  }
+ },
+ "goddesses": [
+  {
+   "key": "yurina",
+   "name": "摇波",
+   "namejp": "ユリナ",
+   "weapon": "刀",
+   "weaponjp": "刀",
+   "keyword": "决死",
+   "keywordDesc": "决死～若自命中的樱花结晶的数目小于等于3，则你的一部分牌会获得强化。",
+   "cards": [
     {
-      "key": "yurina",
-      "name": "摇波",
-      "namejp": "ユリナ",
-      "weapon": "刀",
-      "weaponjp": "刀",
-      "keyword": "决死",
-      "keywordDesc": "决死～若自命中的樱花结晶的数目小于等于3，则你的一部分牌会获得强化。",
-      "cards": [
-        {
-          "id": "01-yurina-o-n-1",
-          "name": "斩",
-          "namejp": "斬",
-          "kind": "normal",
-          "types": [
-            "attack"
-          ],
-          "rangeRaw": "3-4",
-          "range": [
-            3,
-            4
-          ],
-          "damageRaw": "3/1",
-          "damage": {
-            "aura": 3,
-            "life": 1
-          },
-          "cost": null,
-          "capacity": null,
-          "text": "",
-          "textjp": "",
-          "altNames": []
-        },
-        {
-          "id": "01-yurina-o-n-2",
-          "name": "一闪",
-          "namejp": "一閃",
-          "kind": "normal",
-          "types": [
-            "attack"
-          ],
-          "rangeRaw": "3",
-          "range": [
-            3
-          ],
-          "damageRaw": "2/2",
-          "damage": {
-            "aura": 2,
-            "life": 2
-          },
-          "cost": null,
-          "capacity": null,
-          "text": "【常时】决死～若自命中的樱花结晶的数目小于等于3，则此《攻击》获得+1/+0。",
-          "textjp": "【常時】決死-あなたのライフが3以下ならば、この《攻撃》は+1/+0となる。",
-          "altNames": []
-        },
-        {
-          "id": "01-yurina-o-n-3",
-          "name": "柄击",
-          "namejp": "柄打ち",
-          "kind": "normal",
-          "types": [
-            "attack"
-          ],
-          "rangeRaw": "1-2",
-          "range": [
-            1,
-            2
-          ],
-          "damageRaw": "2/1",
-          "damage": {
-            "aura": 2,
-            "life": 1
-          },
-          "cost": null,
-          "capacity": null,
-          "text": "【攻击后】决死～若自命中的樱花结晶的数目小于等于3，则本回合内你的下一次《攻击》获得+1/+0。",
-          "textjp": "【攻撃後】決死-あなたのライフが3以下ならば、このターンにあなたが次に行う《攻撃》は+1/+0となる。",
-          "altNames": []
-        },
-        {
-          "id": "01-yurina-o-n-4",
-          "name": "居合斩",
-          "namejp": "居合",
-          "kind": "normal",
-          "types": [
-            "attack",
-            "fullpower"
-          ],
-          "rangeRaw": "2-4",
-          "range": [
-            2,
-            3,
-            4
-          ],
-          "damageRaw": "4/3",
-          "damage": {
-            "aura": 4,
-            "life": 3
-          },
-          "cost": null,
-          "capacity": null,
-          "text": "【常时】若当前距离小于等于2，则此《攻击》获得-1/-1。",
-          "textjp": "【常時】現在の間合が2以下ならば、この《攻撃》は-1/-1となる。",
-          "altNames": [
-            "居合"
-          ]
-        },
-        {
-          "id": "01-yurina-o-n-5",
-          "name": "身法",
-          "namejp": "体捌き",
-          "kind": "normal",
-          "types": [
-            "action"
-          ],
-          "rangeRaw": null,
-          "range": null,
-          "damageRaw": null,
-          "damage": {
-            "aura": null,
-            "life": null
-          },
-          "cost": null,
-          "capacity": null,
-          "text": "本回合内你的下一次《攻击》获得距离扩大（远1）。\n若自命中樱花结晶的数量小于敌命中樱花结晶的数量，则执行至多2次基本动作。",
-          "textjp": "このターンにあなたが次に行う《攻撃》は距離拡大（遠1）を得る。\nあなたのライフが相手のライフよりも小さいならば、基本動作を2回まで行う。",
-          "altNames": [
-            "气魄",
-            "运足"
-          ]
-        },
-        {
-          "id": "01-yurina-o-n-6",
-          "name": "气合斩",
-          "namejp": "圧気",
-          "kind": "normal",
-          "types": [
-            "enhance"
-          ],
-          "rangeRaw": null,
-          "range": null,
-          "damageRaw": null,
-          "damage": {
-            "aura": null,
-            "life": null
-          },
-          "cost": null,
-          "capacity": 2,
-          "text": "破绽\n【破弃时】进行一次“攻击距离1-4 伤害3/-”的攻击。",
-          "textjp": "隙\n【破棄時】攻撃『適正距離1-4、3/-』を行う。",
-          "altNames": [
-            "威压"
-          ]
-        },
-        {
-          "id": "01-yurina-o-n-7",
-          "name": "气焰万丈",
-          "namejp": "気炎万丈",
-          "kind": "normal",
-          "types": [
-            "enhance",
-            "fullpower"
-          ],
-          "rangeRaw": null,
-          "range": null,
-          "damageRaw": null,
-          "damage": {
-            "aura": null,
-            "life": null
-          },
-          "cost": null,
-          "capacity": 4,
-          "text": "【展开中】决死～若自命中的樱花结晶的数目小于等于3，则你的其他女神的《攻击》获得+1/+1和超克。",
-          "textjp": "【展開中】決死-あなたのライフが3以下ならば、あなたの他のメガミによる《攻撃》は+1/+1となるとともに超克を得る。",
-          "altNames": []
-        },
-        {
-          "id": "01-yurina-o-s-1",
-          "name": "月影落",
-          "namejp": "月影落",
-          "kind": "special",
-          "types": [
-            "attack"
-          ],
-          "rangeRaw": "3-4",
-          "range": [
-            3,
-            4
-          ],
-          "damageRaw": "4/4",
-          "damage": {
-            "aura": 4,
-            "life": 4
-          },
-          "cost": 7,
-          "capacity": null,
-          "text": "",
-          "textjp": "",
-          "altNames": []
-        },
-        {
-          "id": "01-yurina-o-s-2",
-          "name": "浦波岚",
-          "namejp": "浦波嵐",
-          "kind": "special",
-          "types": [
-            "attack",
-            "reaction"
-          ],
-          "rangeRaw": "0-10",
-          "range": [
-            0,
-            1,
-            2,
-            3,
-            4,
-            5,
-            6,
-            7,
-            8,
-            9,
-            10
-          ],
-          "damageRaw": "2/-",
-          "damage": {
-            "aura": 2,
-            "life": null
-          },
-          "cost": 3,
-          "capacity": null,
-          "text": "终端\n【攻击后】被对应的《攻击》获得-2/+0。",
-          "textjp": "終端\n【攻撃後】対応した《攻撃》は-2/+0となる。",
-          "altNames": []
-        },
-        {
-          "id": "01-yurina-o-s-3",
-          "name": "浮舟宿",
-          "namejp": "浮舟宿",
-          "kind": "special",
-          "types": [
-            "action"
-          ],
-          "rangeRaw": null,
-          "range": null,
-          "damageRaw": null,
-          "damage": {
-            "aura": null,
-            "life": null
-          },
-          "cost": 2,
-          "capacity": null,
-          "text": "虚（5）→自装 \n----\n【即再起】决死～自命中的樱花结晶的数目降至3及以下。",
-          "textjp": "ダスト→自オーラ：5 \n----\n【即再起】決死-あなたのライフが3以下になる。",
-          "altNames": []
-        },
-        {
-          "id": "01-yurina-o-s-4",
-          "name": "天音摇波的底力",
-          "namejp": "天音揺波の底力",
-          "kind": "special",
-          "types": [
-            "attack",
-            "fullpower"
-          ],
-          "rangeRaw": "1-4",
-          "range": [
-            1,
-            2,
-            3,
-            4
-          ],
-          "damageRaw": "5/5",
-          "damage": {
-            "aura": 5,
-            "life": 5
-          },
-          "cost": 5,
-          "capacity": null,
-          "text": "【常时】决死～仅当自命中的樱花结晶的数目小于等于3时可以使用此牌。",
-          "textjp": "【常時】決死-あなたのライフが3以下でないと、このカードは使用できない。",
-          "altNames": []
-        }
-      ]
+     "id": "01-yurina-o-n-1",
+     "name": "斩",
+     "namejp": "斬",
+     "kind": "normal",
+     "types": [
+      "attack"
+     ],
+     "rangeRaw": "3-4",
+     "range": [
+      3,
+      4
+     ],
+     "damageRaw": "3/1",
+     "damage": {
+      "aura": 3,
+      "life": 1
+     },
+     "cost": null,
+     "capacity": null,
+     "text": "",
+     "textjp": "",
+     "altNames": []
     },
     {
-      "key": "saine",
-      "name": "细音",
-      "namejp": "サイネ",
-      "weapon": "薙刀",
-      "weaponjp": "薙刀",
-      "keyword": "八相",
-      "keywordDesc": "八相～若自装中的樱花结晶的数目小于等于1，则你的一部分牌会获得强化。",
-      "cards": [
-        {
-          "id": "02-saine-o-n-1",
-          "name": "八面斩",
-          "namejp": "八方振り",
-          "kind": "normal",
-          "types": [
-            "attack"
-          ],
-          "rangeRaw": "4-5",
-          "range": [
-            4,
-            5
-          ],
-          "damageRaw": "2/1",
-          "damage": {
-            "aura": 2,
-            "life": 1
-          },
-          "cost": null,
-          "capacity": null,
-          "text": "【攻击后】八相～若自装中的樱花结晶的数目小于等于1，则进行一次“攻击距离4-5 伤害2/1”的攻击。",
-          "textjp": "【攻撃後】八相-あなたのオーラが1以下ならば、攻撃『適正距離4-5、2/1』を行う。",
-          "altNames": [
-            "八方斩"
-          ]
-        },
-        {
-          "id": "02-saine-o-n-2",
-          "name": "薙刀斩",
-          "namejp": "薙斬り",
-          "kind": "normal",
-          "types": [
-            "attack",
-            "reaction"
-          ],
-          "rangeRaw": "4-5",
-          "range": [
-            4,
-            5
-          ],
-          "damageRaw": "3/1",
-          "damage": {
-            "aura": 3,
-            "life": 1
-          },
-          "cost": null,
-          "capacity": null,
-          "text": "",
-          "textjp": "",
-          "altNames": []
-        },
-        {
-          "id": "02-saine-o-n-3",
-          "name": "石突",
-          "namejp": "石突き",
-          "kind": "normal",
-          "types": [
-            "attack",
-            "reaction"
-          ],
-          "rangeRaw": "2-3",
-          "range": [
-            2,
-            3
-          ],
-          "damageRaw": "2/1",
-          "damage": {
-            "aura": 2,
-            "life": 1
-          },
-          "cost": null,
-          "capacity": null,
-          "text": "【攻击后】八相～若自装中的樱花结晶的数目小于等于1，则虚（1）→距",
-          "textjp": "【攻撃後】八相-あなたのオーラが1以下ならば、ダスト→間合：1",
-          "altNames": [
-            "回马斩"
-          ]
-        },
-        {
-          "id": "02-saine-o-n-4",
-          "name": "识破",
-          "namejp": "見切り",
-          "kind": "normal",
-          "types": [
-            "action"
-          ],
-          "rangeRaw": null,
-          "range": null,
-          "damageRaw": null,
-          "damage": {
-            "aura": null,
-            "life": null
-          },
-          "cost": null,
-          "capacity": null,
-          "text": "【常时】八相～若自装中的樱花结晶的数目小于等于1，则此牌可以如《对应》牌一样对应《攻击》使用。\n距（1） ⇔ 虚",
-          "textjp": "【常時】八相-あなたのオーラが1以下ならば、このカードを《対応》を持つかのように相手の《攻撃》に割り込んで使用できる。\n間合⇔ダスト：1",
-          "altNames": []
-        },
-        {
-          "id": "02-saine-o-n-5",
-          "name": "圈域",
-          "namejp": "圏域",
-          "kind": "normal",
-          "types": [
-            "enhance"
-          ],
-          "rangeRaw": null,
-          "range": null,
-          "damageRaw": null,
-          "damage": {
-            "aura": null,
-            "life": null
-          },
-          "cost": null,
-          "capacity": 2,
-          "text": "【展开中】若此牌上的樱花结晶将被移除，则不将其移至虚，而改为移至距。\n【展开中】达人距离增大1。",
-          "textjp": "【展開中】この付与札の上の桜花結晶がダストへと送られるならば、それは代わりに間合へと移動する。\n【展開中】達人の間合は1大きくなる。",
-          "altNames": []
-        },
-        {
-          "id": "02-saine-o-n-6",
-          "name": "冲音晶",
-          "namejp": "衝音晶",
-          "kind": "normal",
-          "types": [
-            "enhance",
-            "reaction"
-          ],
-          "rangeRaw": null,
-          "range": null,
-          "damageRaw": null,
-          "damage": {
-            "aura": null,
-            "life": null
-          },
-          "cost": null,
-          "capacity": 1,
-          "text": "【展开时】被对应的《攻击》获得-1/+0。\n【破弃时】进行一次“攻击距离0-10 伤害1/- 不可被对应”的攻击。虚（1）→距",
-          "textjp": "【展開時】対応した《攻撃》は-1/+0となる。\n【破棄時】攻撃『適正距離0-10、1/-、対応不可』を行い、ダスト→間合：1",
-          "altNames": []
-        },
-        {
-          "id": "02-saine-o-n-7",
-          "name": "无音壁",
-          "namejp": "無音壁",
-          "kind": "normal",
-          "types": [
-            "enhance",
-            "fullpower"
-          ],
-          "rangeRaw": null,
-          "range": null,
-          "damageRaw": null,
-          "damage": {
-            "aura": null,
-            "life": null
-          },
-          "cost": null,
-          "capacity": 5,
-          "text": "【展开中】当你结算伤害时，此牌上的樱花结晶视为在自装中。（此牌上的樱花结晶不会因此占据自装的空位）",
-          "textjp": "【展開中】あなたへのダメージを解決するに際し、このカードの上に\n置かれた桜花結晶をあなたのオーラにあるかのように扱う。",
-          "altNames": []
-        },
-        {
-          "id": "02-saine-o-s-1",
-          "name": "律动弧戟",
-          "namejp": "律動弧戟",
-          "kind": "special",
-          "types": [
-            "action"
-          ],
-          "rangeRaw": null,
-          "range": null,
-          "damageRaw": null,
-          "damage": {
-            "aura": null,
-            "life": null
-          },
-          "cost": 6,
-          "capacity": null,
-          "text": "进行一次“攻击距离3-4 伤害1/1”的攻击。\n进行一次“攻击距离4-5 伤害1/1”的攻击。\n进行一次“攻击距离3-5 伤害2/2”的攻击。",
-          "textjp": "攻撃『適正距離3-4、1/1』を行う。\n攻撃『適正距離4-5、1/1』を行う。\n攻撃『適正距離3-5、2/2』を行う。",
-          "altNames": []
-        },
-        {
-          "id": "02-saine-o-s-2",
-          "name": "响鸣共振",
-          "namejp": "響鳴共振",
-          "kind": "special",
-          "types": [
-            "action"
-          ],
-          "rangeRaw": null,
-          "range": null,
-          "damageRaw": null,
-          "damage": {
-            "aura": null,
-            "life": null
-          },
-          "cost": 8,
-          "capacity": null,
-          "text": "【常时】此牌的牌面费用减小X，X等于敌装中的樱花结晶的数目。 \n敌装（2）→距",
-          "textjp": "【常時】このカードの消費は相手のオーラの数だけ少なくなる。\n相オーラ→間合：2",
-          "altNames": []
-        },
-        {
-          "id": "02-saine-o-s-3",
-          "name": "音无碎冰",
-          "namejp": "音無砕氷",
-          "kind": "special",
-          "types": [
-            "attack",
-            "reaction"
-          ],
-          "rangeRaw": "0-10",
-          "range": [
-            0,
-            1,
-            2,
-            3,
-            4,
-            5,
-            6,
-            7,
-            8,
-            9,
-            10
-          ],
-          "damageRaw": "1/1",
-          "damage": {
-            "aura": 1,
-            "life": 1
-          },
-          "cost": 2,
-          "capacity": null,
-          "text": "【攻击后】被对应的《攻击》获得-1/-1。\n----\n【再起】八相～自装中的樱花结晶的数目小于等于1。",
-          "textjp": "【攻撃後】対応した《攻撃》は-1/-1となる。\n----\n【再起】八相-あなたのオーラが1以下である。",
-          "altNames": []
-        },
-        {
-          "id": "02-saine-o-s-4",
-          "name": "冰雨细音的终焉",
-          "namejp": "氷雨細音の果ての果て",
-          "kind": "special",
-          "types": [
-            "attack",
-            "reaction"
-          ],
-          "rangeRaw": "1-5",
-          "range": [
-            1,
-            2,
-            3,
-            4,
-            5
-          ],
-          "damageRaw": "5/5",
-          "damage": {
-            "aura": 5,
-            "life": 5
-          },
-          "cost": 5,
-          "capacity": null,
-          "text": "【常时】仅当你对应王牌时可以使用此牌。",
-          "textjp": "【常時】このカードは切札に対する対応でしか使用できない。",
-          "altNames": [
-            "冰雨细音的终焉之末"
-          ]
-        }
-      ]
+     "id": "01-yurina-o-n-2",
+     "name": "一闪",
+     "namejp": "一閃",
+     "kind": "normal",
+     "types": [
+      "attack"
+     ],
+     "rangeRaw": "3",
+     "range": [
+      3
+     ],
+     "damageRaw": "2/2",
+     "damage": {
+      "aura": 2,
+      "life": 2
+     },
+     "cost": null,
+     "capacity": null,
+     "text": "【常时】决死～若自命中的樱花结晶的数目小于等于3，则此《攻击》获得+1/+0。",
+     "textjp": "【常時】決死-あなたのライフが3以下ならば、この《攻撃》は+1/+0となる。",
+     "altNames": []
     },
     {
-      "key": "himika",
-      "name": "绯弥香",
-      "namejp": "ヒミカ",
-      "weapon": "铳",
-      "weaponjp": "銃",
-      "keyword": "连火",
-      "keywordDesc": "连火～若此牌为本回合内你使用的第3张或之后的牌，则你的一部分牌会获得强化。",
-      "cards": [
-        {
-          "id": "03-himika-o-n-1",
-          "name": "射击",
-          "namejp": "シュート",
-          "kind": "normal",
-          "types": [
-            "attack"
-          ],
-          "rangeRaw": "4-10",
-          "range": [
-            4,
-            5,
-            6,
-            7,
-            8,
-            9,
-            10
-          ],
-          "damageRaw": "2/1",
-          "damage": {
-            "aura": 2,
-            "life": 1
-          },
-          "cost": null,
-          "capacity": null,
-          "text": "",
-          "textjp": "",
-          "altNames": []
-        },
-        {
-          "id": "03-himika-o-n-2",
-          "name": "速射",
-          "namejp": "ラピッドファイア",
-          "kind": "normal",
-          "types": [
-            "attack"
-          ],
-          "rangeRaw": "6-8",
-          "range": [
-            6,
-            7,
-            8
-          ],
-          "damageRaw": "2/1",
-          "damage": {
-            "aura": 2,
-            "life": 1
-          },
-          "cost": null,
-          "capacity": null,
-          "text": "【常时】连火～若此牌为本回合内你使用的第3张或之后的牌，则此《攻击》获得+1/+1。",
-          "textjp": "【常時】連火-このカードがこのターンに使用した3枚目以降のカードならば、この《攻撃》は+1/+1となる。",
-          "altNames": []
-        },
-        {
-          "id": "03-himika-o-n-3",
-          "name": "麦林加农炮",
-          "namejp": "マグナムカノン",
-          "kind": "normal",
-          "types": [
-            "attack"
-          ],
-          "rangeRaw": "5-8",
-          "range": [
-            5,
-            6,
-            7,
-            8
-          ],
-          "damageRaw": "3/2",
-          "damage": {
-            "aura": 3,
-            "life": 2
-          },
-          "cost": null,
-          "capacity": null,
-          "text": "【攻击后】自命（1）→虚",
-          "textjp": "【攻撃後】自ライフ→ダスト：1",
-          "altNames": []
-        },
-        {
-          "id": "03-himika-o-n-4",
-          "name": "完全爆破",
-          "namejp": "フルバースト",
-          "kind": "normal",
-          "types": [
-            "attack",
-            "fullpower"
-          ],
-          "rangeRaw": "5-9",
-          "range": [
-            5,
-            6,
-            7,
-            8,
-            9
-          ],
-          "damageRaw": "3/1",
-          "damage": {
-            "aura": 3,
-            "life": 1
-          },
-          "cost": null,
-          "capacity": null,
-          "text": "【常时】此《攻击》对敌装和敌命均造成伤害。",
-          "textjp": "【常時】この《攻撃》がダメージを与えるならば、相手は片方を選ぶのではなく両方のダメージを受ける。",
-          "altNames": [
-            "全弹发射"
-          ]
-        },
-        {
-          "id": "03-himika-o-n-5",
-          "name": "后跳",
-          "namejp": "バックステップ",
-          "kind": "normal",
-          "types": [
-            "action"
-          ],
-          "rangeRaw": null,
-          "range": null,
-          "damageRaw": null,
-          "damage": {
-            "aura": null,
-            "life": null
-          },
-          "cost": null,
-          "capacity": null,
-          "text": "抓一张牌。 \n虚（1）→距",
-          "textjp": "カードを1枚引く。 \nダスト→間合：1",
-          "altNames": [
-            "后撤"
-          ]
-        },
-        {
-          "id": "03-himika-o-n-6",
-          "name": "回燃",
-          "namejp": "バックドラフト",
-          "kind": "normal",
-          "types": [
-            "action"
-          ],
-          "rangeRaw": null,
-          "range": null,
-          "damageRaw": null,
-          "damage": {
-            "aura": null,
-            "life": null
-          },
-          "cost": null,
-          "capacity": null,
-          "text": "对手畏缩。\n连火～若此牌为本回合内你使用的第3张或之后的牌，则本回合内你的其他女神的下一次对装伤害小于等于3的《攻击》获得+1/+1。",
-          "textjp": "相手を畏縮させる。\n連火-このカードがこのターンに使用した3枚目以降のカードならば、このターンにあなたが次に行う他のメガミによるオーラへのダメージが3以下の《攻撃》を+1/+1する。",
-          "altNames": []
-        },
-        {
-          "id": "03-himika-o-n-7",
-          "name": "迷烟",
-          "namejp": "スモーク",
-          "kind": "normal",
-          "types": [
-            "enhance"
-          ],
-          "rangeRaw": null,
-          "range": null,
-          "damageRaw": null,
-          "damage": {
-            "aura": null,
-            "life": null
-          },
-          "cost": null,
-          "capacity": 3,
-          "text": "【展开中】距中的樱花结晶不能被卡牌上的箭头效果移出距。",
-          "textjp": "【展開中】カードの矢印(→)により間合にある桜花結晶は移動しない。",
-          "altNames": [
-            "烟幕"
-          ]
-        },
-        {
-          "id": "03-himika-o-s-1",
-          "name": "真红凶弹",
-          "namejp": "レッドバレット",
-          "kind": "special",
-          "types": [
-            "attack"
-          ],
-          "rangeRaw": "5-10",
-          "range": [
-            5,
-            6,
-            7,
-            8,
-            9,
-            10
-          ],
-          "damageRaw": "3/1",
-          "damage": {
-            "aura": 3,
-            "life": 1
-          },
-          "cost": 0,
-          "capacity": null,
-          "text": "",
-          "textjp": "",
-          "altNames": []
-        },
-        {
-          "id": "03-himika-o-s-2",
-          "name": "绯红零时",
-          "namejp": "クリムゾンゼロ",
-          "kind": "special",
-          "types": [
-            "attack"
-          ],
-          "rangeRaw": "0-2",
-          "range": [
-            0,
-            1,
-            2
-          ],
-          "damageRaw": "2/2",
-          "damage": {
-            "aura": 2,
-            "life": 2
-          },
-          "cost": 5,
-          "capacity": null,
-          "text": "【常时】此《攻击》对敌装和敌命均造成伤害。\n【常时】若当前距离等于0，则此《攻击》获得不可被对应。",
-          "textjp": "【常時】この《攻撃》がダメージを与えるならば、相手は片方を選ぶのではなく両方のダメージを受ける。\n【常時】現在の間合が0ならば、この《攻撃》は対応不可を得る。",
-          "altNames": []
-        },
-        {
-          "id": "03-himika-o-s-3",
-          "name": "猩红狂想",
-          "namejp": "スカーレットイマジン",
-          "kind": "special",
-          "types": [
-            "action"
-          ],
-          "rangeRaw": null,
-          "range": null,
-          "damageRaw": null,
-          "damage": {
-            "aura": null,
-            "life": null
-          },
-          "cost": 3,
-          "capacity": null,
-          "text": "抓2张牌，然后盖伏1张牌。",
-          "textjp": "カードを2枚引く。その後、あなたは手札を1枚伏せ札にする。",
-          "altNames": []
-        },
-        {
-          "id": "03-himika-o-s-4",
-          "name": "真红领域",
-          "namejp": "ヴァーミリオンフィールド",
-          "kind": "special",
-          "types": [
-            "action"
-          ],
-          "rangeRaw": null,
-          "range": null,
-          "damageRaw": null,
-          "damage": {
-            "aura": null,
-            "life": null
-          },
-          "cost": 2,
-          "capacity": null,
-          "text": "连火～若此牌为本回合内你使用的第3张或之后的牌，则虚（2）→距\n----\n【再起】你的手牌张数等于0。",
-          "textjp": "連火-このカードがこのターンに使用した3枚目以降のカードならば、ダスト→間合：2\n----\n【再起】あなたの手札が0枚である。",
-          "altNames": []
-        }
-      ]
+     "id": "01-yurina-o-n-3",
+     "name": "柄击",
+     "namejp": "柄打ち",
+     "kind": "normal",
+     "types": [
+      "attack"
+     ],
+     "rangeRaw": "1-2",
+     "range": [
+      1,
+      2
+     ],
+     "damageRaw": "2/1",
+     "damage": {
+      "aura": 2,
+      "life": 1
+     },
+     "cost": null,
+     "capacity": null,
+     "text": "【攻击后】决死～若自命中的樱花结晶的数目小于等于3，则本回合内你的下一次《攻击》获得+1/+0。",
+     "textjp": "【攻撃後】決死-あなたのライフが3以下ならば、このターンにあなたが次に行う《攻撃》は+1/+0となる。",
+     "altNames": []
     },
     {
-      "key": "tokoyo",
-      "name": "常世",
-      "namejp": "トコヨ",
-      "weapon": "扇",
-      "weaponjp": "扇",
-      "keyword": "境地",
-      "keywordDesc": "境地～若你的集中力等于2，则你的一部分牌会获得强化。",
-      "cards": [
-        {
-          "id": "04-tokoyo-o-n-1",
-          "name": "梳流",
-          "namejp": "梳流し",
-          "kind": "normal",
-          "types": [
-            "attack"
-          ],
-          "rangeRaw": "4",
-          "range": [
-            4
-          ],
-          "damageRaw": "-/1",
-          "damage": {
-            "aura": null,
-            "life": 1
-          },
-          "cost": null,
-          "capacity": null,
-          "text": "【攻击后】境地～若你的集中力等于2，则将此牌置于你的牌库顶。",
-          "textjp": "【攻撃後】境地-あなたの集中力が2ならば、このカードを山札の上に戻す。",
-          "altNames": [
-            "梳流扇"
-          ]
-        },
-        {
-          "id": "04-tokoyo-o-n-2",
-          "name": "雅击",
-          "namejp": "雅打ち",
-          "kind": "normal",
-          "types": [
-            "attack",
-            "reaction"
-          ],
-          "rangeRaw": "2-4",
-          "range": [
-            2,
-            3,
-            4
-          ],
-          "damageRaw": "2/1",
-          "damage": {
-            "aura": 2,
-            "life": 1
-          },
-          "cost": null,
-          "capacity": null,
-          "text": "【攻击后】境地～若你的集中力等于2，则打消被对应的非王牌的《攻击》。",
-          "textjp": "【攻撃後】境地-あなたの集中力が2ならば、対応した切札でない《攻撃》を打ち消す。",
-          "altNames": [
-            "风雅击"
-          ]
-        },
-        {
-          "id": "04-tokoyo-o-n-3",
-          "name": "脱兔",
-          "namejp": "跳ね兎",
-          "kind": "normal",
-          "types": [
-            "action"
-          ],
-          "rangeRaw": null,
-          "range": null,
-          "damageRaw": null,
-          "damage": {
-            "aura": null,
-            "life": null
-          },
-          "cost": null,
-          "capacity": null,
-          "text": "若当前距离小于等于3，则虚（2）→距",
-          "textjp": "現在の間合が3以下ならば、ダスト→間合：2",
-          "altNames": [
-            "脱兔跃"
-          ]
-        },
-        {
-          "id": "04-tokoyo-o-n-4",
-          "name": "诗舞",
-          "namejp": "詩舞",
-          "kind": "normal",
-          "types": [
-            "action",
-            "reaction"
-          ],
-          "rangeRaw": null,
-          "range": null,
-          "damageRaw": null,
-          "damage": {
-            "aura": null,
-            "life": null
-          },
-          "cost": null,
-          "capacity": null,
-          "text": "获得1点集中力，选择1项：\n1.自气（1）→自装\n2.自装（1）→距",
-          "textjp": "集中力を1得て、以下から1つを選ぶ。\n・自フレア→自オーラ：1\n・自オーラ→間合：1",
-          "altNames": [
-            "吟诗舞"
-          ]
-        },
-        {
-          "id": "04-tokoyo-o-n-5",
-          "name": "扇回旋",
-          "namejp": "要返し",
-          "kind": "normal",
-          "types": [
-            "action",
-            "fullpower"
-          ],
-          "rangeRaw": null,
-          "range": null,
-          "damageRaw": null,
-          "damage": {
-            "aura": null,
-            "life": null
-          },
-          "cost": null,
-          "capacity": null,
-          "text": "从你的弃牌和/或盖牌中选择至多2张牌，将它们以任意顺序置于你的牌库底。 \n虚（2）→自装",
-          "textjp": "捨て札か伏せ札からカードを2枚まで選ぶ。それらのカードを好きな順で山札の底に置く。 \nダスト→自オーラ：2",
-          "altNames": []
-        },
-        {
-          "id": "04-tokoyo-o-n-6",
-          "name": "风舞台",
-          "namejp": "風舞台",
-          "kind": "normal",
-          "types": [
-            "enhance"
-          ],
-          "rangeRaw": null,
-          "range": null,
-          "damageRaw": null,
-          "damage": {
-            "aura": null,
-            "life": null
-          },
-          "cost": null,
-          "capacity": 2,
-          "text": "【展开时】距（2）→自装 \n【破弃时】自装（2）→距",
-          "textjp": "【展開時】間合→自オーラ：2 \n【破棄時】自オーラ→間合：2",
-          "altNames": []
-        },
-        {
-          "id": "04-tokoyo-o-n-7",
-          "name": "晴舞台",
-          "namejp": "晴舞台",
-          "kind": "normal",
-          "types": [
-            "enhance"
-          ],
-          "rangeRaw": null,
-          "range": null,
-          "damageRaw": null,
-          "damage": {
-            "aura": null,
-            "life": null
-          },
-          "cost": null,
-          "capacity": 2,
-          "text": "终端\n【展开时】你的集中力变为2。\n【破弃时】进行一次“攻击距离3-6 伤害-/1”的攻击。",
-          "textjp": "終端\n【展開時】あなたの集中力は2になる。\n【破棄時】攻撃『適正距離3-6、-/1』を行う。",
-          "altNames": []
-        },
-        {
-          "id": "04-tokoyo-o-s-1",
-          "name": "久远之花",
-          "namejp": "久遠ノ花",
-          "kind": "special",
-          "types": [
-            "attack",
-            "reaction"
-          ],
-          "rangeRaw": "0-10",
-          "range": [
-            0,
-            1,
-            2,
-            3,
-            4,
-            5,
-            6,
-            7,
-            8,
-            9,
-            10
-          ],
-          "damageRaw": "-/1",
-          "damage": {
-            "aura": null,
-            "life": 1
-          },
-          "cost": 5,
-          "capacity": null,
-          "text": "【攻击后】打消被对应的《攻击》。",
-          "textjp": "【攻撃後】対応した《攻撃》を打ち消す。",
-          "altNames": []
-        },
-        {
-          "id": "04-tokoyo-o-s-2",
-          "name": "千岁之鸟",
-          "namejp": "千歳ノ鳥",
-          "kind": "special",
-          "types": [
-            "attack"
-          ],
-          "rangeRaw": "3-4",
-          "range": [
-            3,
-            4
-          ],
-          "damageRaw": "2/2",
-          "damage": {
-            "aura": 2,
-            "life": 2
-          },
-          "cost": 2,
-          "capacity": null,
-          "text": "【攻击后】重铸牌库（你不会因此受到伤害）。",
-          "textjp": "【攻撃後】山札を再構成する。 \n(その際にダメージは受けない)",
-          "altNames": []
-        },
-        {
-          "id": "04-tokoyo-o-s-3",
-          "name": "无穷之风",
-          "namejp": "無窮ノ風",
-          "kind": "special",
-          "types": [
-            "attack"
-          ],
-          "rangeRaw": "3-8",
-          "range": [
-            3,
-            4,
-            5,
-            6,
-            7,
-            8
-          ],
-          "damageRaw": "1/1",
-          "damage": {
-            "aura": 1,
-            "life": 1
-          },
-          "cost": 1,
-          "capacity": null,
-          "text": "不可被对应\n【攻击后】对手从手牌中弃置1张非《攻击》的牌。若不能如此做，对手须展示其手牌。\n----\n【再起】境地～你的集中力等于2。",
-          "textjp": "対応不可 \n【攻撃後】相手は手札から《攻撃》でないカード1枚を捨て札にする。それが行えない場合、相手は手札を公開する。 \n----\n【再起】境地-あなたの集中力が2である。",
-          "altNames": []
-        },
-        {
-          "id": "04-tokoyo-o-s-4",
-          "name": "常世之月",
-          "namejp": "常世ノ月",
-          "kind": "special",
-          "types": [
-            "action"
-          ],
-          "rangeRaw": null,
-          "range": null,
-          "damageRaw": null,
-          "damage": {
-            "aura": null,
-            "life": null
-          },
-          "cost": 2,
-          "capacity": null,
-          "text": "你的集中力变为2，对手的集中力变为0，对手畏缩。",
-          "textjp": "あなたの集中力は2になり、相手の集中力は0になり、相手を畏縮させる。",
-          "altNames": []
-        }
-      ]
+     "id": "01-yurina-o-n-4",
+     "name": "居合斩",
+     "namejp": "居合",
+     "kind": "normal",
+     "types": [
+      "attack",
+      "fullpower"
+     ],
+     "rangeRaw": "2-4",
+     "range": [
+      2,
+      3,
+      4
+     ],
+     "damageRaw": "4/3",
+     "damage": {
+      "aura": 4,
+      "life": 3
+     },
+     "cost": null,
+     "capacity": null,
+     "text": "【常时】若当前距离小于等于2，则此《攻击》获得-1/-1。",
+     "textjp": "【常時】現在の間合が2以下ならば、この《攻撃》は-1/-1となる。",
+     "altNames": [
+      "居合"
+     ]
+    },
+    {
+     "id": "01-yurina-o-n-5",
+     "name": "身法",
+     "namejp": "体捌き",
+     "kind": "normal",
+     "types": [
+      "action"
+     ],
+     "rangeRaw": null,
+     "range": null,
+     "damageRaw": null,
+     "damage": {
+      "aura": null,
+      "life": null
+     },
+     "cost": null,
+     "capacity": null,
+     "text": "本回合内你的下一次《攻击》获得距离扩大（远1）。\n若自命中樱花结晶的数量小于敌命中樱花结晶的数量，则执行至多2次基本动作。",
+     "textjp": "このターンにあなたが次に行う《攻撃》は距離拡大（遠1）を得る。\nあなたのライフが相手のライフよりも小さいならば、基本動作を2回まで行う。",
+     "altNames": [
+      "气魄",
+      "运足"
+     ]
+    },
+    {
+     "id": "01-yurina-o-n-6",
+     "name": "气合斩",
+     "namejp": "圧気",
+     "kind": "normal",
+     "types": [
+      "enhance"
+     ],
+     "rangeRaw": null,
+     "range": null,
+     "damageRaw": null,
+     "damage": {
+      "aura": null,
+      "life": null
+     },
+     "cost": null,
+     "capacity": 2,
+     "text": "破绽\n【破弃时】进行一次“攻击距离1-4 伤害3/-”的攻击。",
+     "textjp": "隙\n【破棄時】攻撃『適正距離1-4、3/-』を行う。",
+     "altNames": [
+      "威压"
+     ]
+    },
+    {
+     "id": "01-yurina-o-n-7",
+     "name": "气焰万丈",
+     "namejp": "気炎万丈",
+     "kind": "normal",
+     "types": [
+      "enhance",
+      "fullpower"
+     ],
+     "rangeRaw": null,
+     "range": null,
+     "damageRaw": null,
+     "damage": {
+      "aura": null,
+      "life": null
+     },
+     "cost": null,
+     "capacity": 4,
+     "text": "【展开中】决死～若自命中的樱花结晶的数目小于等于3，则你的其他女神的《攻击》获得+1/+1和超克。",
+     "textjp": "【展開中】決死-あなたのライフが3以下ならば、あなたの他のメガミによる《攻撃》は+1/+1となるとともに超克を得る。",
+     "altNames": []
+    },
+    {
+     "id": "01-yurina-o-s-1",
+     "name": "月影落",
+     "namejp": "月影落",
+     "kind": "special",
+     "types": [
+      "attack"
+     ],
+     "rangeRaw": "3-4",
+     "range": [
+      3,
+      4
+     ],
+     "damageRaw": "4/4",
+     "damage": {
+      "aura": 4,
+      "life": 4
+     },
+     "cost": 7,
+     "capacity": null,
+     "text": "",
+     "textjp": "",
+     "altNames": []
+    },
+    {
+     "id": "01-yurina-o-s-2",
+     "name": "浦波岚",
+     "namejp": "浦波嵐",
+     "kind": "special",
+     "types": [
+      "attack",
+      "reaction"
+     ],
+     "rangeRaw": "0-10",
+     "range": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+     ],
+     "damageRaw": "2/-",
+     "damage": {
+      "aura": 2,
+      "life": null
+     },
+     "cost": 3,
+     "capacity": null,
+     "text": "终端\n【攻击后】被对应的《攻击》获得-2/+0。",
+     "textjp": "終端\n【攻撃後】対応した《攻撃》は-2/+0となる。",
+     "altNames": []
+    },
+    {
+     "id": "01-yurina-o-s-3",
+     "name": "浮舟宿",
+     "namejp": "浮舟宿",
+     "kind": "special",
+     "types": [
+      "action"
+     ],
+     "rangeRaw": null,
+     "range": null,
+     "damageRaw": null,
+     "damage": {
+      "aura": null,
+      "life": null
+     },
+     "cost": 2,
+     "capacity": null,
+     "text": "虚（5）→自装 \n----\n【即再起】决死～自命中的樱花结晶的数目降至3及以下。",
+     "textjp": "ダスト→自オーラ：5 \n----\n【即再起】決死-あなたのライフが3以下になる。",
+     "altNames": []
+    },
+    {
+     "id": "01-yurina-o-s-4",
+     "name": "天音摇波的底力",
+     "namejp": "天音揺波の底力",
+     "kind": "special",
+     "types": [
+      "attack",
+      "fullpower"
+     ],
+     "rangeRaw": "1-4",
+     "range": [
+      1,
+      2,
+      3,
+      4
+     ],
+     "damageRaw": "5/5",
+     "damage": {
+      "aura": 5,
+      "life": 5
+     },
+     "cost": 5,
+     "capacity": null,
+     "text": "【常时】决死～仅当自命中的樱花结晶的数目小于等于3时可以使用此牌。",
+     "textjp": "【常時】決死-あなたのライフが3以下でないと、このカードは使用できない。",
+     "altNames": []
     }
-  ]
+   ]
+  },
+  {
+   "key": "saine",
+   "name": "细音",
+   "namejp": "サイネ",
+   "weapon": "薙刀",
+   "weaponjp": "薙刀",
+   "keyword": "八相",
+   "keywordDesc": "八相～若自装中的樱花结晶的数目小于等于1，则你的一部分牌会获得强化。",
+   "cards": [
+    {
+     "id": "02-saine-o-n-1",
+     "name": "八面斩",
+     "namejp": "八方振り",
+     "kind": "normal",
+     "types": [
+      "attack"
+     ],
+     "rangeRaw": "4-5",
+     "range": [
+      4,
+      5
+     ],
+     "damageRaw": "2/1",
+     "damage": {
+      "aura": 2,
+      "life": 1
+     },
+     "cost": null,
+     "capacity": null,
+     "text": "【攻击后】八相～若自装中的樱花结晶的数目小于等于1，则进行一次“攻击距离4-5 伤害2/1”的攻击。",
+     "textjp": "【攻撃後】八相-あなたのオーラが1以下ならば、攻撃『適正距離4-5、2/1』を行う。",
+     "altNames": [
+      "八方斩"
+     ]
+    },
+    {
+     "id": "02-saine-o-n-2",
+     "name": "薙刀斩",
+     "namejp": "薙斬り",
+     "kind": "normal",
+     "types": [
+      "attack",
+      "reaction"
+     ],
+     "rangeRaw": "4-5",
+     "range": [
+      4,
+      5
+     ],
+     "damageRaw": "3/1",
+     "damage": {
+      "aura": 3,
+      "life": 1
+     },
+     "cost": null,
+     "capacity": null,
+     "text": "",
+     "textjp": "",
+     "altNames": []
+    },
+    {
+     "id": "02-saine-o-n-3",
+     "name": "石突",
+     "namejp": "石突き",
+     "kind": "normal",
+     "types": [
+      "attack",
+      "reaction"
+     ],
+     "rangeRaw": "2-3",
+     "range": [
+      2,
+      3
+     ],
+     "damageRaw": "2/1",
+     "damage": {
+      "aura": 2,
+      "life": 1
+     },
+     "cost": null,
+     "capacity": null,
+     "text": "【攻击后】八相～若自装中的樱花结晶的数目小于等于1，则虚（1）→距",
+     "textjp": "【攻撃後】八相-あなたのオーラが1以下ならば、ダスト→間合：1",
+     "altNames": [
+      "回马斩"
+     ]
+    },
+    {
+     "id": "02-saine-o-n-4",
+     "name": "识破",
+     "namejp": "見切り",
+     "kind": "normal",
+     "types": [
+      "action"
+     ],
+     "rangeRaw": null,
+     "range": null,
+     "damageRaw": null,
+     "damage": {
+      "aura": null,
+      "life": null
+     },
+     "cost": null,
+     "capacity": null,
+     "text": "【常时】八相～若自装中的樱花结晶的数目小于等于1，则此牌可以如《对应》牌一样对应《攻击》使用。\n距（1） ⇔ 虚",
+     "textjp": "【常時】八相-あなたのオーラが1以下ならば、このカードを《対応》を持つかのように相手の《攻撃》に割り込んで使用できる。\n間合⇔ダスト：1",
+     "altNames": []
+    },
+    {
+     "id": "02-saine-o-n-5",
+     "name": "圈域",
+     "namejp": "圏域",
+     "kind": "normal",
+     "types": [
+      "enhance"
+     ],
+     "rangeRaw": null,
+     "range": null,
+     "damageRaw": null,
+     "damage": {
+      "aura": null,
+      "life": null
+     },
+     "cost": null,
+     "capacity": 2,
+     "text": "【展开中】若此牌上的樱花结晶将被移除，则不将其移至虚，而改为移至距。\n【展开中】达人距离增大1。",
+     "textjp": "【展開中】この付与札の上の桜花結晶がダストへと送られるならば、それは代わりに間合へと移動する。\n【展開中】達人の間合は1大きくなる。",
+     "altNames": []
+    },
+    {
+     "id": "02-saine-o-n-6",
+     "name": "冲音晶",
+     "namejp": "衝音晶",
+     "kind": "normal",
+     "types": [
+      "enhance",
+      "reaction"
+     ],
+     "rangeRaw": null,
+     "range": null,
+     "damageRaw": null,
+     "damage": {
+      "aura": null,
+      "life": null
+     },
+     "cost": null,
+     "capacity": 1,
+     "text": "【展开时】被对应的《攻击》获得-1/+0。\n【破弃时】进行一次“攻击距离0-10 伤害1/- 不可被对应”的攻击。虚（1）→距",
+     "textjp": "【展開時】対応した《攻撃》は-1/+0となる。\n【破棄時】攻撃『適正距離0-10、1/-、対応不可』を行い、ダスト→間合：1",
+     "altNames": []
+    },
+    {
+     "id": "02-saine-o-n-7",
+     "name": "无音壁",
+     "namejp": "無音壁",
+     "kind": "normal",
+     "types": [
+      "enhance",
+      "fullpower"
+     ],
+     "rangeRaw": null,
+     "range": null,
+     "damageRaw": null,
+     "damage": {
+      "aura": null,
+      "life": null
+     },
+     "cost": null,
+     "capacity": 5,
+     "text": "【展开中】当你结算伤害时，此牌上的樱花结晶视为在自装中。（此牌上的樱花结晶不会因此占据自装的空位）",
+     "textjp": "【展開中】あなたへのダメージを解決するに際し、このカードの上に\n置かれた桜花結晶をあなたのオーラにあるかのように扱う。",
+     "altNames": []
+    },
+    {
+     "id": "02-saine-o-s-1",
+     "name": "律动弧戟",
+     "namejp": "律動弧戟",
+     "kind": "special",
+     "types": [
+      "action"
+     ],
+     "rangeRaw": null,
+     "range": null,
+     "damageRaw": null,
+     "damage": {
+      "aura": null,
+      "life": null
+     },
+     "cost": 5,
+     "capacity": null,
+     "text": "进行一次“攻击距离3-4 伤害1/1”的攻击。\n进行一次“攻击距离4-5 伤害1/1”的攻击。\n进行一次“攻击距离3-5 伤害2/2”的攻击。",
+     "textjp": "攻撃『適正距離3-4、1/1』を行う。\n攻撃『適正距離4-5、1/1』を行う。\n攻撃『適正距離3-5、2/2』を行う。",
+     "altNames": []
+    },
+    {
+     "id": "02-saine-o-s-2",
+     "name": "响鸣共振",
+     "namejp": "響鳴共振",
+     "kind": "special",
+     "types": [
+      "action"
+     ],
+     "rangeRaw": null,
+     "range": null,
+     "damageRaw": null,
+     "damage": {
+      "aura": null,
+      "life": null
+     },
+     "cost": 8,
+     "capacity": null,
+     "text": "【常时】此牌的牌面费用减小X，X等于敌装中的樱花结晶的数目。 \n敌装（2）→距",
+     "textjp": "【常時】このカードの消費は相手のオーラの数だけ少なくなる。\n相オーラ→間合：2",
+     "altNames": []
+    },
+    {
+     "id": "02-saine-o-s-3",
+     "name": "音无碎冰",
+     "namejp": "音無砕氷",
+     "kind": "special",
+     "types": [
+      "attack",
+      "reaction"
+     ],
+     "rangeRaw": "0-10",
+     "range": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+     ],
+     "damageRaw": "1/1",
+     "damage": {
+      "aura": 1,
+      "life": 1
+     },
+     "cost": 2,
+     "capacity": null,
+     "text": "【攻击后】被对应的《攻击》获得-1/-1。\n----\n【再起】八相～自装中的樱花结晶的数目小于等于1。",
+     "textjp": "【攻撃後】対応した《攻撃》は-1/-1となる。\n----\n【再起】八相-あなたのオーラが1以下である。",
+     "altNames": []
+    },
+    {
+     "id": "02-saine-o-s-4",
+     "name": "冰雨细音的终焉",
+     "namejp": "氷雨細音の果ての果て",
+     "kind": "special",
+     "types": [
+      "attack",
+      "reaction"
+     ],
+     "rangeRaw": "1-5",
+     "range": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "damageRaw": "5/5",
+     "damage": {
+      "aura": 5,
+      "life": 5
+     },
+     "cost": 5,
+     "capacity": null,
+     "text": "【常时】仅当你对应王牌时可以使用此牌。",
+     "textjp": "【常時】このカードは切札に対する対応でしか使用できない。",
+     "altNames": [
+      "冰雨细音的终焉之末"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "himika",
+   "name": "绯弥香",
+   "namejp": "ヒミカ",
+   "weapon": "铳",
+   "weaponjp": "銃",
+   "keyword": "连火",
+   "keywordDesc": "连火～若此牌为本回合内你使用的第3张或之后的牌，则你的一部分牌会获得强化。",
+   "cards": [
+    {
+     "id": "03-himika-o-n-1",
+     "name": "射击",
+     "namejp": "シュート",
+     "kind": "normal",
+     "types": [
+      "attack"
+     ],
+     "rangeRaw": "4-10",
+     "range": [
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+     ],
+     "damageRaw": "2/1",
+     "damage": {
+      "aura": 2,
+      "life": 1
+     },
+     "cost": null,
+     "capacity": null,
+     "text": "",
+     "textjp": "",
+     "altNames": []
+    },
+    {
+     "id": "03-himika-o-n-2",
+     "name": "速射",
+     "namejp": "ラピッドファイア",
+     "kind": "normal",
+     "types": [
+      "attack"
+     ],
+     "rangeRaw": "6-8",
+     "range": [
+      6,
+      7,
+      8
+     ],
+     "damageRaw": "2/1",
+     "damage": {
+      "aura": 2,
+      "life": 1
+     },
+     "cost": null,
+     "capacity": null,
+     "text": "【常时】连火～若此牌为本回合内你使用的第3张或之后的牌，则此《攻击》获得+1/+1。",
+     "textjp": "【常時】連火-このカードがこのターンに使用した3枚目以降のカードならば、この《攻撃》は+1/+1となる。",
+     "altNames": []
+    },
+    {
+     "id": "03-himika-o-n-3",
+     "name": "麦林加农炮",
+     "namejp": "マグナムカノン",
+     "kind": "normal",
+     "types": [
+      "attack"
+     ],
+     "rangeRaw": "5-8",
+     "range": [
+      5,
+      6,
+      7,
+      8
+     ],
+     "damageRaw": "3/2",
+     "damage": {
+      "aura": 3,
+      "life": 2
+     },
+     "cost": null,
+     "capacity": null,
+     "text": "【攻击后】自命（1）→虚",
+     "textjp": "【攻撃後】自ライフ→ダスト：1",
+     "altNames": []
+    },
+    {
+     "id": "03-himika-o-n-4",
+     "name": "完全爆破",
+     "namejp": "フルバースト",
+     "kind": "normal",
+     "types": [
+      "attack",
+      "fullpower"
+     ],
+     "rangeRaw": "5-9",
+     "range": [
+      5,
+      6,
+      7,
+      8,
+      9
+     ],
+     "damageRaw": "3/1",
+     "damage": {
+      "aura": 3,
+      "life": 1
+     },
+     "cost": null,
+     "capacity": null,
+     "text": "【常时】此《攻击》对敌装和敌命均造成伤害。",
+     "textjp": "【常時】この《攻撃》がダメージを与えるならば、相手は片方を選ぶのではなく両方のダメージを受ける。",
+     "altNames": [
+      "全弹发射"
+     ]
+    },
+    {
+     "id": "03-himika-o-n-5",
+     "name": "后跳",
+     "namejp": "バックステップ",
+     "kind": "normal",
+     "types": [
+      "action"
+     ],
+     "rangeRaw": null,
+     "range": null,
+     "damageRaw": null,
+     "damage": {
+      "aura": null,
+      "life": null
+     },
+     "cost": null,
+     "capacity": null,
+     "text": "抓一张牌。 \n虚（1）→距",
+     "textjp": "カードを1枚引く。 \nダスト→間合：1",
+     "altNames": [
+      "后撤"
+     ]
+    },
+    {
+     "id": "03-himika-o-n-6",
+     "name": "回燃",
+     "namejp": "バックドラフト",
+     "kind": "normal",
+     "types": [
+      "action"
+     ],
+     "rangeRaw": null,
+     "range": null,
+     "damageRaw": null,
+     "damage": {
+      "aura": null,
+      "life": null
+     },
+     "cost": null,
+     "capacity": null,
+     "text": "对手畏缩。\n连火～若此牌为本回合内你使用的第3张或之后的牌，则本回合内你的其他女神的下一次对装伤害小于等于3的《攻击》获得+1/+1。",
+     "textjp": "相手を畏縮させる。\n連火-このカードがこのターンに使用した3枚目以降のカードならば、このターンにあなたが次に行う他のメガミによるオーラへのダメージが3以下の《攻撃》を+1/+1する。",
+     "altNames": []
+    },
+    {
+     "id": "03-himika-o-n-7",
+     "name": "迷烟",
+     "namejp": "スモーク",
+     "kind": "normal",
+     "types": [
+      "enhance"
+     ],
+     "rangeRaw": null,
+     "range": null,
+     "damageRaw": null,
+     "damage": {
+      "aura": null,
+      "life": null
+     },
+     "cost": null,
+     "capacity": 3,
+     "text": "【展开中】距中的樱花结晶不能被卡牌上的箭头效果移出距。",
+     "textjp": "【展開中】カードの矢印(→)により間合にある桜花結晶は移動しない。",
+     "altNames": [
+      "烟幕"
+     ]
+    },
+    {
+     "id": "03-himika-o-s-1",
+     "name": "真红凶弹",
+     "namejp": "レッドバレット",
+     "kind": "special",
+     "types": [
+      "attack"
+     ],
+     "rangeRaw": "5-10",
+     "range": [
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+     ],
+     "damageRaw": "3/1",
+     "damage": {
+      "aura": 3,
+      "life": 1
+     },
+     "cost": 0,
+     "capacity": null,
+     "text": "",
+     "textjp": "",
+     "altNames": []
+    },
+    {
+     "id": "03-himika-o-s-2",
+     "name": "绯红零时",
+     "namejp": "クリムゾンゼロ",
+     "kind": "special",
+     "types": [
+      "attack"
+     ],
+     "rangeRaw": "0-2",
+     "range": [
+      0,
+      1,
+      2
+     ],
+     "damageRaw": "2/2",
+     "damage": {
+      "aura": 2,
+      "life": 2
+     },
+     "cost": 5,
+     "capacity": null,
+     "text": "【常时】此《攻击》对敌装和敌命均造成伤害。\n【常时】若当前距离等于0，则此《攻击》获得不可被对应。",
+     "textjp": "【常時】この《攻撃》がダメージを与えるならば、相手は片方を選ぶのではなく両方のダメージを受ける。\n【常時】現在の間合が0ならば、この《攻撃》は対応不可を得る。",
+     "altNames": []
+    },
+    {
+     "id": "03-himika-o-s-3",
+     "name": "猩红狂想",
+     "namejp": "スカーレットイマジン",
+     "kind": "special",
+     "types": [
+      "action"
+     ],
+     "rangeRaw": null,
+     "range": null,
+     "damageRaw": null,
+     "damage": {
+      "aura": null,
+      "life": null
+     },
+     "cost": 3,
+     "capacity": null,
+     "text": "抓2张牌，然后盖伏1张牌。",
+     "textjp": "カードを2枚引く。その後、あなたは手札を1枚伏せ札にする。",
+     "altNames": []
+    },
+    {
+     "id": "03-himika-o-s-4",
+     "name": "真红领域",
+     "namejp": "ヴァーミリオンフィールド",
+     "kind": "special",
+     "types": [
+      "action"
+     ],
+     "rangeRaw": null,
+     "range": null,
+     "damageRaw": null,
+     "damage": {
+      "aura": null,
+      "life": null
+     },
+     "cost": 2,
+     "capacity": null,
+     "text": "连火～若此牌为本回合内你使用的第3张或之后的牌，则虚（2）→距\n----\n【再起】你的手牌张数等于0。",
+     "textjp": "連火-このカードがこのターンに使用した3枚目以降のカードならば、ダスト→間合：2\n----\n【再起】あなたの手札が0枚である。",
+     "altNames": []
+    }
+   ]
+  },
+  {
+   "key": "tokoyo",
+   "name": "常世",
+   "namejp": "トコヨ",
+   "weapon": "扇",
+   "weaponjp": "扇",
+   "keyword": "境地",
+   "keywordDesc": "境地～若你的集中力等于2，则你的一部分牌会获得强化。",
+   "cards": [
+    {
+     "id": "04-tokoyo-o-n-1",
+     "name": "梳流",
+     "namejp": "梳流し",
+     "kind": "normal",
+     "types": [
+      "attack"
+     ],
+     "rangeRaw": "4",
+     "range": [
+      4
+     ],
+     "damageRaw": "-/1",
+     "damage": {
+      "aura": null,
+      "life": 1
+     },
+     "cost": null,
+     "capacity": null,
+     "text": "【攻击后】境地～若你的集中力等于2，则将此牌置于你的牌库顶。",
+     "textjp": "【攻撃後】境地-あなたの集中力が2ならば、このカードを山札の上に戻す。",
+     "altNames": [
+      "梳流扇"
+     ]
+    },
+    {
+     "id": "04-tokoyo-o-n-2",
+     "name": "雅击",
+     "namejp": "雅打ち",
+     "kind": "normal",
+     "types": [
+      "attack",
+      "reaction"
+     ],
+     "rangeRaw": "2-4",
+     "range": [
+      2,
+      3,
+      4
+     ],
+     "damageRaw": "2/1",
+     "damage": {
+      "aura": 2,
+      "life": 1
+     },
+     "cost": null,
+     "capacity": null,
+     "text": "【攻击后】境地～若你的集中力等于2，则打消被对应的非王牌的《攻击》。",
+     "textjp": "【攻撃後】境地-あなたの集中力が2ならば、対応した切札でない《攻撃》を打ち消す。",
+     "altNames": [
+      "风雅击"
+     ]
+    },
+    {
+     "id": "04-tokoyo-o-n-3",
+     "name": "脱兔",
+     "namejp": "跳ね兎",
+     "kind": "normal",
+     "types": [
+      "action"
+     ],
+     "rangeRaw": null,
+     "range": null,
+     "damageRaw": null,
+     "damage": {
+      "aura": null,
+      "life": null
+     },
+     "cost": null,
+     "capacity": null,
+     "text": "若当前距离小于等于3，则虚（2）→距",
+     "textjp": "現在の間合が3以下ならば、ダスト→間合：2",
+     "altNames": [
+      "脱兔跃"
+     ]
+    },
+    {
+     "id": "04-tokoyo-o-n-4",
+     "name": "诗舞",
+     "namejp": "詩舞",
+     "kind": "normal",
+     "types": [
+      "action",
+      "reaction"
+     ],
+     "rangeRaw": null,
+     "range": null,
+     "damageRaw": null,
+     "damage": {
+      "aura": null,
+      "life": null
+     },
+     "cost": null,
+     "capacity": null,
+     "text": "获得1点集中力，选择1项：\n1.自气（1）→自装\n2.自装（1）→距",
+     "textjp": "集中力を1得て、以下から1つを選ぶ。\n・自フレア→自オーラ：1\n・自オーラ→間合：1",
+     "altNames": [
+      "吟诗舞"
+     ]
+    },
+    {
+     "id": "04-tokoyo-o-n-5",
+     "name": "扇回旋",
+     "namejp": "要返し",
+     "kind": "normal",
+     "types": [
+      "action",
+      "fullpower"
+     ],
+     "rangeRaw": null,
+     "range": null,
+     "damageRaw": null,
+     "damage": {
+      "aura": null,
+      "life": null
+     },
+     "cost": null,
+     "capacity": null,
+     "text": "从你的弃牌和/或盖牌中选择至多2张牌，将它们以任意顺序置于你的牌库底。 \n虚（2）→自装",
+     "textjp": "捨て札か伏せ札からカードを2枚まで選ぶ。それらのカードを好きな順で山札の底に置く。 \nダスト→自オーラ：2",
+     "altNames": []
+    },
+    {
+     "id": "04-tokoyo-o-n-6",
+     "name": "风舞台",
+     "namejp": "風舞台",
+     "kind": "normal",
+     "types": [
+      "enhance"
+     ],
+     "rangeRaw": null,
+     "range": null,
+     "damageRaw": null,
+     "damage": {
+      "aura": null,
+      "life": null
+     },
+     "cost": null,
+     "capacity": 2,
+     "text": "【展开时】距（2）→自装 \n【破弃时】自装（2）→距",
+     "textjp": "【展開時】間合→自オーラ：2 \n【破棄時】自オーラ→間合：2",
+     "altNames": []
+    },
+    {
+     "id": "04-tokoyo-o-n-7",
+     "name": "晴舞台",
+     "namejp": "晴舞台",
+     "kind": "normal",
+     "types": [
+      "enhance"
+     ],
+     "rangeRaw": null,
+     "range": null,
+     "damageRaw": null,
+     "damage": {
+      "aura": null,
+      "life": null
+     },
+     "cost": null,
+     "capacity": 2,
+     "text": "终端\n【展开时】你的集中力变为2。\n【破弃时】进行一次“攻击距离3-6 伤害-/1”的攻击。",
+     "textjp": "終端\n【展開時】あなたの集中力は2になる。\n【破棄時】攻撃『適正距離3-6、-/1』を行う。",
+     "altNames": []
+    },
+    {
+     "id": "04-tokoyo-o-s-1",
+     "name": "久远之花",
+     "namejp": "久遠ノ花",
+     "kind": "special",
+     "types": [
+      "attack",
+      "reaction"
+     ],
+     "rangeRaw": "0-10",
+     "range": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+     ],
+     "damageRaw": "-/1",
+     "damage": {
+      "aura": null,
+      "life": 1
+     },
+     "cost": 5,
+     "capacity": null,
+     "text": "【攻击后】打消被对应的《攻击》。",
+     "textjp": "【攻撃後】対応した《攻撃》を打ち消す。",
+     "altNames": []
+    },
+    {
+     "id": "04-tokoyo-o-s-2",
+     "name": "千岁之鸟",
+     "namejp": "千歳ノ鳥",
+     "kind": "special",
+     "types": [
+      "attack"
+     ],
+     "rangeRaw": "3-4",
+     "range": [
+      3,
+      4
+     ],
+     "damageRaw": "2/2",
+     "damage": {
+      "aura": 2,
+      "life": 2
+     },
+     "cost": 2,
+     "capacity": null,
+     "text": "【攻击后】重铸牌库（你不会因此受到伤害）。",
+     "textjp": "【攻撃後】山札を再構成する。 \n(その際にダメージは受けない)",
+     "altNames": []
+    },
+    {
+     "id": "04-tokoyo-o-s-3",
+     "name": "无穷之风",
+     "namejp": "無窮ノ風",
+     "kind": "special",
+     "types": [
+      "attack"
+     ],
+     "rangeRaw": "3-8",
+     "range": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "damageRaw": "1/1",
+     "damage": {
+      "aura": 1,
+      "life": 1
+     },
+     "cost": 1,
+     "capacity": null,
+     "text": "不可被对应\n【攻击后】对手从手牌中弃置1张非《攻击》的牌。若不能如此做，对手须展示其手牌。\n----\n【再起】境地～你的集中力等于2。",
+     "textjp": "対応不可 \n【攻撃後】相手は手札から《攻撃》でないカード1枚を捨て札にする。それが行えない場合、相手は手札を公開する。 \n----\n【再起】境地-あなたの集中力が2である。",
+     "altNames": []
+    },
+    {
+     "id": "04-tokoyo-o-s-4",
+     "name": "常世之月",
+     "namejp": "常世ノ月",
+     "kind": "special",
+     "types": [
+      "action"
+     ],
+     "rangeRaw": null,
+     "range": null,
+     "damageRaw": null,
+     "damage": {
+      "aura": null,
+      "life": null
+     },
+     "cost": 2,
+     "capacity": null,
+     "text": "你的集中力变为2，对手的集中力变为0，对手畏缩。",
+     "textjp": "あなたの集中力は2になり、相手の集中力は0になり、相手を畏縮させる。",
+     "altNames": []
+    }
+   ]
+  }
+ ]
 }
