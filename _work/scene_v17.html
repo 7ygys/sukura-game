@@ -317,6 +317,10 @@ function act(a){
       S.toast={msg:'现在不是你操作', t0:S.t};
       return false;
     }
+    if(NET.embed){
+      try { parent.postMessage({ type:'act', action:a }, '*'); } catch(err){}
+      return true;
+    }
     NET.session.act(a);
     return true;
   }
@@ -2110,6 +2114,24 @@ S.sweep={t0:2.2,dur:0.6,text:'第 1 回合'};
  * ============================================================ */
 (function(){
   const q = new URLSearchParams(location.search);
+
+  /* ---------- 嵌入式：被主界面用 iframe 套住，连接由主界面负责 ---------- */
+  if(q.get('embed')==='1'){
+    NET.active = true;
+    NET.embed = true;
+    NET.mode = 'embed';
+    NET.seat = parseInt(q.get('seat')||'0',10) || 0;
+    const bar = document.getElementById('netBar');
+    if(bar) bar.classList.remove('on');
+    window.addEventListener('message', function(e){
+      const d = e.data || {};
+      if(d.type === 'view'){ applyNetView(d.view); }
+    });
+    // 告诉主界面：我这边渲染好了
+    try { parent.postMessage({ type:'battleReady', seat:NET.seat }, '*'); } catch(err){}
+    return;
+  }
+
   const mode = q.get('net');
   if(mode !== 'host' && mode !== 'guest') return;
 

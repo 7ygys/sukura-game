@@ -121,9 +121,41 @@
   #detailBar .empty{color:#5c667e;font-size:12.5px;align-self:center;grid-column:1/4;text-align:center;letter-spacing:.14em;}
   .counts{display:flex;gap:16px;font-size:14px;color:var(--dim);letter-spacing:.1em;}
   .counts b{color:var(--ink);}
+  /* ---------- 联机大厅 ---------- */
+  #netBar{position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+    background:rgba(4,6,10,0.94);z-index:60;font:15px/1.7 "Microsoft YaHei",sans-serif;color:#e6e9f0}
+  #netBar.on{display:flex}
+  .nb-panel{width:min(680px,92vw);background:#12161f;border:1px solid rgba(255,255,255,.12);
+    border-radius:14px;padding:22px 24px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  .nb-title{font-size:19px;color:#ffd9a0;margin-bottom:6px}
+  .nb-status{color:#9fb3d1;font-size:13px;margin-bottom:12px;min-height:22px}
+  #netBar textarea{width:100%;height:74px;box-sizing:border-box;background:#0b0f16;color:#cfe0ff;
+    border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:8px 10px;font:12px/1.5 monospace;
+    resize:none;word-break:break-all;margin-bottom:6px}
+  .nb-row{display:flex;gap:10px;margin-bottom:14px}
+  #netBar button{flex:1;padding:9px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.16);
+    background:#1b2230;color:#e6e9f0;font:14px "Microsoft YaHei",sans-serif;cursor:pointer}
+  #netBar button:hover{background:#243044}
+  #netBar button:disabled{opacity:.45;cursor:default}
+  /* ---------- 战斗 iframe ---------- */
+  #battleWrap{position:fixed;inset:0;display:none;z-index:80;background:#05060a}
+  #battleWrap.on{display:block}
+  #battleFrame{width:100%;height:100%;border:0;display:block}
 </style>
 </head>
 <body>
+<div id="netBar">
+  <div class="nb-panel">
+    <div class="nb-title" id="nbTitle">联机对战</div>
+    <div class="nb-status" id="netStatus">准备中…</div>
+    <textarea id="netOut" readonly placeholder="（这里会出现要发给对方的码）"></textarea>
+    <div class="nb-row"><button id="netCopy">复制这段码</button></div>
+    <textarea id="netIn" placeholder="把对方发来的码粘到这里"></textarea>
+    <div class="nb-row"><button id="netOk">连接</button><button id="netCancel">返回</button></div>
+  </div>
+</div>
+<div id="battleWrap"><iframe id="battleFrame" allow="autoplay"></iframe></div>
+
 <div id="app">
 
   <!-- ========== 标题 ========== -->
@@ -134,9 +166,10 @@
       <div class="btn" id="btnOnline">联 机 对 战</div>
       <div id="netChoice" style="display:none">
         <div class="btn" id="btnHost" style="margin-top:8px">创 建 房 间（当主机）</div>
-        <div class="btn ghost" id="btnJoin" style="margin-top:8px">加 入 房 间（当客机）</div>
+        <div class="btn" id="btnJoin" style="margin-top:8px">加 入 房 间（当客机）</div>
       </div>
-      <div class="btn ghost" id="btnLocal">同 屏 双 人</div>
+      <div class="btn" id="btnLocal">同 屏 双 人</div>
+      <div class="btn ghost" id="btnAI">人 机 对 战（未开放）</div>
     </div>
     <div class="foot">非官方同人作品，仅供学习交流<br>素材版权归原权利方，禁止商用与再分发</div>
   </section>
@@ -196,6 +229,16 @@
 
 <script src="assets.js"></script>
 <script src="gamedata.js"></script>
+<script src="../game/engine/rng.js"></script>
+<script src="../game/engine/state.js"></script>
+<script src="../game/engine/rules.js"></script>
+<script src="../game/engine/effects.js"></script>
+<script src="../game/engine/actions.js"></script>
+<script src="../net/lz.js"></script>
+<script src="../net/redact.js"></script>
+<script src="../net/proto.js"></script>
+<script src="../net/webrtc.js"></script>
+<script src="../net/session.js"></script>
 <script>
 (function(){
 'use strict';
@@ -361,7 +404,165 @@ function clearDetail(){
 function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 /* ---------- 事件 ---------- */
-let netRole = null;          // null = 同屏双人；'host' / 'guest' = 联机
+
+/* ============================================================
+ * 联机大厅
+ *   创建/加入房间 → 连接 → 主机随机分配两位不同的女神 →
+ *   各自组卡 → 开始对战（战斗页用 iframe 嵌进来，连接留在这里）
+ * ============================================================ */
+let netRole = null;          // null = 同屏双人；'host' / 'guest'
+let netSession = null;
+let myGoddess = null;
+let battleFrameReady = false;
+
+const E = window.Engine;
+
+function nbShow(title, status){
+  $('#nbTitle').textContent = title;
+  if(status !== undefined) $('#netStatus').textContent = status;
+  $('#netBar').classList.add('on');
+}
+function nbHide(){ $('#netBar').classList.remove('on'); }
+function nbStatus(s){ $('#netStatus').textContent = s; }
+
+function makeDeckByIds(ids){
+  const all = [];
+  (window.GAME_DATA.goddesses||[]).forEach(g=>g.cards.forEach(c=>all.push(c)));
+  return ids.map(id=>all.find(c=>c.id===id)).filter(Boolean);
+}
+function heroPool(){ return (window.GAME_DATA.goddesses||[]).map(g=>g.key); }
+
+/** 主机：随机分两位不同的女神，自己一位、对方一位 */
+function assignRoles(){
+  const pool = heroPool().slice();
+  const i = Math.floor(Math.random()*pool.length);
+  const mine = pool.splice(i,1)[0];
+  const j = Math.floor(Math.random()*pool.length);
+  const theirs = pool.splice(j,1)[0];
+  myGoddess = mine;
+  netSession.sendCustom({ t:'assign', host:mine, guest:theirs });
+  afterAssign();
+}
+
+/** 双方都进入"只用一个女神的组卡" */
+function afterAssign(){
+  if(!myGoddess) return;
+  nbHide();
+  splitRoster();
+  state.picks = [myGoddess];           // 只用分到的那位女神
+  state.deck = { normal:[], special:[] };
+  renderDeck();
+  show('deck');
+  const g = gByKey(myGoddess);
+  $('#deckTip') && ($('#deckTip').textContent = '你的女神：'+(g?g.name:myGoddess));
+}
+
+/** 开始联机对局：把牌组交出去，等主机发第一份视图再打开战斗页 */
+let battleOpened = false;
+let pendingView = null;
+
+function startNetBattle(){
+  const ids = state.deck.normal.concat(state.deck.special);
+  if(ids.length !== 10){ alert('要选满 7 张通常札 + 3 张王牌'); return; }
+  netSession.setMyDeck(ids);
+  if(netRole === 'guest') netSession.hello();     // 报到，把自己的牌组带给主机
+  nbShow('准备开战', '已准备好，等对方也开始…');
+}
+
+function openBattleFrame(){
+  if(battleOpened) return;
+  battleOpened = true;
+  nbHide();
+  $('#battleWrap').classList.add('on');
+  const f = $('#battleFrame');
+  f.src = 'scene_v17.html?embed=1&seat=' + (netSession ? netSession.seat : 0);
+}
+
+/** 战斗页 ready 之后，把后续视图都转给它 */
+window.addEventListener('message', function(e){
+  const d = e.data || {};
+  if(d.type === 'battleReady'){
+    battleFrameReady = true;
+    if(pendingView) sendViewToBattle(pendingView);   // 战斗页起来了才补发
+    return;
+  }
+  if(d.type === 'act' && netSession){
+    netSession.act(d.action);
+  }
+});
+
+function sendViewToBattle(view){
+  if(!battleFrameReady) return;
+  const f = $('#battleFrame');
+  if(f.contentWindow) f.contentWindow.postMessage({ type:'view', view:view }, '*');
+}
+
+function openLobby(role){
+  netRole = role;
+  nbShow(role==='host' ? '创建房间' : '加入房间',
+         role==='host' ? '正在生成邀请码…' : '把主机的邀请码粘到下面，点连接');
+  $('#netOk').textContent = role==='host' ? '连接（粘好回答码再点）' : '解析邀请码';
+  $('#netOk').disabled = false;
+  $('#netOut').value = '';
+  $('#netIn').value = '';
+
+  netSession = NetSession.createSession({
+    mode: role,
+    engine: E,
+    fallbackDeck: ['01-yurina-o-n-1','01-yurina-o-n-2','01-yurina-o-n-3','01-yurina-o-n-4','01-yurina-o-n-5','01-yurina-o-n-6','01-yurina-o-n-7','01-yurina-o-s-1','01-yurina-o-s-2','01-yurina-o-s-3'],
+    makeDeck: makeDeckByIds,
+    onStatus: nbStatus,
+    onInvite: function(code){ $('#netOut').value = code; },
+    onConnected: function(){
+      if(role === 'host'){ nbStatus('已连接，等对方确认…'); }
+      else { nbStatus('已连接，正在通知主机…'); netSession.sendCustom({ t:'ready' }); }
+    },
+    onError: function(msg){ nbStatus('出错了：' + msg); },
+    onView: function(view){
+      pendingView = view;
+      openBattleFrame();
+      sendViewToBattle(view);
+    },
+    onCustom: function(msg){
+      if(msg && msg.t === 'ready' && role === 'host'){
+        nbStatus('对方已到齐，正在分配女神…');
+        assignRoles();
+        return;
+      }
+      if(msg && msg.t === 'assign'){
+        myGoddess = (role === 'host') ? msg.host : msg.guest;
+        afterAssign();
+      }
+    }
+  });
+}
+
+$('#netCopy').onclick = function(){
+  const out = $('#netOut');
+  out.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch(e){}
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(out.value).catch(function(){});
+    ok = true;
+  }
+  this.textContent = ok ? '已复制 ✓' : '全选后按 Ctrl+C';
+  const self = this;
+  setTimeout(function(){ self.textContent = '复制这段码'; }, 1500);
+};
+$('#netOk').onclick = function(){
+  const code = ($('#netIn').value || '').trim();
+  if(!code){ nbStatus('先把对方发来的码粘进来'); return; }
+  this.disabled = true;
+  if(netRole === 'host') netSession.acceptAnswer(code);
+  else netSession.join(code);
+};
+$('#netCancel').onclick = function(){
+  nbHide();
+  if(netSession){ try{ netSession.close(); }catch(e){} netSession = null; }
+  netRole = null; myGoddess = null;
+  show('title');
+};
 
 function startBuild(role){
   netRole = role;
@@ -372,9 +573,9 @@ function startBuild(role){
 $('#btnOnline').onclick=()=>{
   $('#netChoice').style.display = ($('#netChoice').style.display==='none') ? 'block' : 'none';
 };
-$('#btnHost').onclick=()=>startBuild('host');
-$('#btnJoin').onclick=()=>startBuild('guest');
-$('#btnLocal').onclick=()=>startBuild(null);
+$('#btnHost').onclick=()=>openLobby('host');
+$('#btnJoin').onclick=()=>openLobby('guest');
+$('#btnLocal').onclick=()=>{ netRole=null; netSession=null; myGoddess=null; startBuild(null); };
 $('#back1').onclick=()=>show('title');
 $('#back2').onclick=()=>{ renderSelect(); show('select'); };
 $('#toDeck').onclick=()=>{
@@ -382,12 +583,21 @@ $('#toDeck').onclick=()=>{
   renderDeck(); show('deck');
 };
 $('#toBattle').onclick=()=>{
-  let q='?deck='+encodeURIComponent(state.deck.normal.concat(state.deck.special).join(','));
-  if(netRole) q += '&net='+netRole;
+  if(netRole){
+    startNetBattle();
+    return;
+  }
+  const q='?deck='+encodeURIComponent(state.deck.normal.concat(state.deck.special).join(','));
   location.href='scene_v17.html'+q;
 };
 
 renderSelect();
+
+// 调试：?lobby=host / ?lobby=guest 直接打开大厅（截图和自测用）
+(function(){
+  const m = location.search.match(/[?&]lobby=(host|guest)/);
+  if(m) setTimeout(function(){ openLobby(m[1]); }, 200);
+})();
 
 // 截图/调试用：?screen=select / ?screen=deck
 (function(){

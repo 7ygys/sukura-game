@@ -23,6 +23,8 @@
   const Redact = (root.Redact) || (typeof require !== 'undefined' ? require('./redact.js') : null);
 
   const VERSION = 1;
+  // 协议自己处理的消息类型；其它类型交给上层（大厅分配女神之类的）
+  const KNOWN = ['hello', 'welcome', 'state', 'action', 'reject', 'ping', 'pong'];
 
   /* ============================================================
    * 主机侧
@@ -55,6 +57,7 @@
 
     transport.onMessage(function (msg) {
       if (!msg || !msg.t) return;
+      if (KNOWN.indexOf(msg.t) < 0) { if (opts.onCustom) opts.onCustom(msg); return; }
 
       if (msg.t === 'hello') {
         // 客机报到：认下座位；如果带了牌组，就据此建立初始局面
@@ -125,7 +128,9 @@
       get connected() { return connected; },
       get guestSeat() { return guestSeat; },
       /** 手动推一次视图（例如开局） */
-      push: function () { bump(); sendBoth(); }
+      push: function () { bump(); sendBoth(); },
+      /** 发自定义消息（大厅协议用，不走权威状态） */
+      sendCustom: function (obj) { transport.send(obj); }
     };
   }
 
@@ -142,6 +147,7 @@
 
     transport.onMessage(function (msg) {
       if (!msg || !msg.t) return;
+      if (KNOWN.indexOf(msg.t) < 0) { if (opts.onCustom) opts.onCustom(msg); return; }
 
       if (msg.t === 'welcome') {
         if (msg.seat !== undefined) seat = msg.seat;
@@ -182,6 +188,8 @@
       ping: function () {
         transport.send({ t: 'ping', at: Date.now() });
       },
+      /** 发自定义消息（大厅协议用） */
+      sendCustom: function (obj) { transport.send(obj); },
       get seat() { return seat; }
     };
   }

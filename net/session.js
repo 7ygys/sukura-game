@@ -1,65 +1,68 @@
 /* ============================================================
  * net/session.js —— 把「连接」和「对局」粘起来
  *
- * 主机：生成邀请码 → 等对方回答码 → 连上 → 等 hello（带对方牌组）→ 建局面
- * 客机：粘邀请码 → 生成回答码 → 连上 → 发 hello（带自己牌组）→ 收局面
+ * 现在的分工（大厅在 prep.html，战斗页用 iframe 嵌进去）：
+ *   1. 连接（WebRTC）
+ *   2. 大厅：主机随机分配两位不同的女神，发给客机
+ *   3. 各自组卡
+ *   4. 客机发 hello（带自己的牌组）→ 主机建局面 → 双方进战斗
  *
- * UI 只需要关心这几件事：
- *   session.onInvite(code)     把这段码显示给玩家复制
- *   session.acceptAnswer(code) 玩家粘回对方的回答码
- *   session.onView(view)       拿到新视图 → 重画
- *   session.act(action)        玩家做了个操作
+ * 因为战斗页是 iframe，DataChannel 由主界面持有，
+ * 战斗页只负责「显示视图 / 上报操作」（见 scene 的 embed 模式）。
  * ============================================================ */
 (function (root) {
   'use strict';
 
-  const Proto = (root.Net) || (typeof require !== 'undefined' ? require('./proto.js') : null);
-  const WebRTCNet = (root.WebRTCNet) || null;
+  const Proto = (root.Net) || null;
+  const WebRTCNet = root.WebRTCNet || null;
 
-  function parseDeck(str) {
-    if (!str) return null;
-    return String(str).split(',').map(function (s) { return s.trim(); }).filter(Boolean);
-  }
+  const SEAT_HOST = 0;
+  const SEAT_GUEST = 1;
 
   function createSession(opts) {
     const mode = opts.mode;                       // 'host' | 'guest'
-    const engine = opts.engine;                   // Engine
-    const myDeck = opts.myDeck || null;           // 我的 10 张牌 id
+    const engine = opts.engine;
+    const makeDeck = opts.makeDeck;               // ids => 卡牌对象数组
     const onStatus = opts.onStatus || function () {};
     const onView = opts.onView || function () {};
     const onError = opts.onError || function () {};
     const onInvite = opts.onInvite || function () {};
     const onConnected = opts.onConnected || function () {};
-    const makeDeck = opts.makeDeck;               // (ids) => 卡牌对象数组
+    const onCustom = opts.onCustom || function () {};   // 大厅消息（分配女神等）
 
-    let host = null, guest = null, transport = null;
-    let seat = (mode === 'host') ? 0 : 1;
+    let myDeckIds = null;
+    let transport = null;
+    let proto = null;
+    let conn = null;
 
     /* ---------------- 主机 ---------------- */
     if (mode === 'host') {
       let hostMsg = null, closeCb = null;
-      const h = WebRTCNet.createHost('sakura');
-      h.ready.then(function (r) {
+      conn = WebRTCNet.createHost('sakura');
+      conn.ready.then(function (r) {
         onInvite(r.code);
         onStatus('把邀请码发给对方，等他回传「回答码」');
       }).catch(function (e) { onError(e.message); });
 
-      host = Proto.createHost({
+      proto = Proto.createHost({
         transport: {
           send: function (m) { if (transport) transport.send(m); },
           onMessage: function (f) { hostMsg = f; },
           onClose: function (f) { closeCb = f; }
         },
-        // state 先给个占位，等客机 hello 带上牌组再建真的
-        state: engine.state.create({ myCards: makeDeck(opts.hostDeck), oppCards: makeDeck(opts.hostDeck) }),
+        // 先建个占位局面；等客机 hello 带上牌组，再用 makeState 换成真的
+        state: engine.state.create({
+          myCards: makeDeck(opts.fallbackDeck),
+          oppCards: makeDeck(opts.fallbackDeck)
+        }),
         applyAction: engine.actions.applyAction,
         engine: engine,
         onLocalView: onView,
-        onError: function (e) { onError(e); },
+        onError: onError,
+        onCustom: onCustom,
         makeState: function (guestDeckIds) {
-          // 先手随机由 state.create 决定；座位固定：主机 = 0，客机 = 1
           return engine.state.create({
-            myCards: makeDeck(opts.hostDeck),
+            myCards: makeDeck(myDeckIds || opts.fallbackDeck),
             oppCards: makeDeck(guestDeckIds),
             myName: '主机', oppName: '客机'
           });
@@ -68,12 +71,13 @@
 
       return {
         mode: mode,
-        get seat() { return seat; },
-        get state() { return host.state; },
-        /** 玩家粘回对方的回答码 */
+        seat: SEAT_HOST,
+        get state() { return proto.state; },
+        setMyDeck: function (ids) { myDeckIds = ids; },
+        sendCustom: function (o) { proto.sendCustom(o); },
         acceptAnswer: function (code) {
           onStatus('正在连接…');
-          return h.accept(code).then(function (tr) {
+          return conn.accept(code).then(function (tr) {
             transport = tr;
             tr.onMessage(hostMsg);
             tr.onClose(closeCb);
@@ -81,9 +85,8 @@
             onStatus('已连接，等对方准备…');
           }).catch(function (e) { onError(e.message); });
         },
-        /** 主机的操作 */
-        act: function (action) { return host.act(action); },
-        close: function () { h.close(); }
+        act: function (action) { return proto.act(action); },
+        close: function () { conn.close(); }
       };
     }
 
@@ -91,9 +94,10 @@
     let joinRes = null;
     return {
       mode: mode,
-      get seat() { return seat; },
+      seat: SEAT_GUEST,
       get state() { return null; },
-      /** 拿主机的邀请码 → 生成回答码 */
+      setMyDeck: function (ids) { myDeckIds = ids; },
+      sendCustom: function (o) { if (proto) proto.sendCustom(o); },
       join: function (codeA) {
         onStatus('正在解析邀请码…');
         return WebRTCNet.joinWithCode(codeA).then(function (r) {
@@ -102,23 +106,25 @@
           onStatus('把「回答码」发回给主机，然后等他连上');
           r.connected().then(function (tr) {
             transport = tr;
-            guest = Proto.createGuest({
+            proto = Proto.createGuest({
               transport: tr,
               onView: onView,
-              onError: function (e) { onError(e); }
+              onError: onError,
+              onCustom: onCustom
             });
-            guest.hello(1, myDeck);
             onConnected();
-            onStatus('已连接，等主机发牌…');
+            onStatus('已连接，等主机分配女神…');
           }).catch(function (e) { onError(e.message); });
         }).catch(function (e) { onError(e.message); });
       },
-      act: function (action) { if (guest) guest.act(action); },
+      /** 组好卡之后才报到（hello 里带着自己的牌组） */
+      hello: function () { if (proto) proto.hello(SEAT_GUEST, myDeckIds); },
+      act: function (action) { if (proto) proto.act(action); },
       close: function () { if (joinRes) joinRes.close(); }
     };
   }
 
-  const api = { createSession: createSession, parseDeck: parseDeck };
+  const api = { createSession: createSession, SEAT_HOST: SEAT_HOST, SEAT_GUEST: SEAT_GUEST };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.NetSession = api;
 })(typeof window !== 'undefined' ? window : globalThis);
