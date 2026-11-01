@@ -8,7 +8,15 @@
   html,body{margin:0;padding:0;height:100%;background:#05060a;overflow:hidden;}
   #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;}
   #bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;
-      filter:saturate(0.92) brightness(0.88);}
+      filter:saturate(0.92) brightness(0.88);
+  /* 缓慢推镜：一张静图也有"活着"的感觉 */
+  animation: bgdrift 28s ease-in-out infinite alternate;
+  transform-origin: 52% 48%;
+}
+@keyframes bgdrift {
+  from { transform: scale(1.00) translate3d(0,0,0); }
+  to   { transform: scale(1.06) translate3d(-1.2%, -0.8%, 0); }
+}
   #stage{position:relative;display:block;}
   #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
     color:#cfd6e2;font:14px system-ui,sans-serif;letter-spacing:2px;background:#07080d;transition:opacity .4s;}
@@ -16,7 +24,8 @@
 </head>
 <body>
 <div id="wrap">
-  <video id="bg" src="../背景-灵梦泡水/灵梦.mp4" autoplay muted playsinline preload="auto"></video>
+  <!-- 背景：静态图 + 缓慢推镜（原来的 986MB 视频不再需要） -->
+  <img id="bg" src="../素材/背景/灵梦.jpg" alt="">
   <canvas id="stage"></canvas>
 </div>
 <div id="loading">载入背景…</div>
@@ -31,7 +40,7 @@
 (function(){
 'use strict';
 const cvs=document.getElementById('stage'), ctx=cvs.getContext('2d');
-const vid=document.getElementById('bg'), loading=document.getElementById('loading');
+const bgEl=document.getElementById('bg'), loading=document.getElementById('loading');
 const W=1600,H=900;
 const dpr=Math.min(window.devicePixelRatio||1,2);
 function resize(){
@@ -178,7 +187,7 @@ const FORCE_HOVER=(function(){
   if(!m) return null;
   return /^\d+$/.test(m[1]) ? 'hand'+m[1] : m[1];
 })();
-const S={t:0,handMode:'hand',hover:null,videoReady:false,sweep:null,play:null,distance:5,drag:null,
+const S={t:0,handMode:'hand',hover:null,bgReady:false,sweep:null,play:null,distance:5,drag:null,
   myTurn:true, discard:[], hidden:[], openPile:null, staggered:false, dialog:null, banner:null, focusVal:0,
   handNormal:null, handSpecial:null, me:0};
 
@@ -1528,7 +1537,7 @@ function frameBody(ts){
   S.tip=null;
   if(FORCE_HOVER!==null) S.hover=FORCE_HOVER;
   ctx.clearRect(0,0,W,H);
-  if(!S.videoReady){
+  if(!S.bgReady){
     const g=ctx.createLinearGradient(0,0,0,H);
     g.addColorStop(0,'#0b0f16');g.addColorStop(1,'#1a1f2a');
     ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
@@ -1766,25 +1775,17 @@ window.addEventListener('keydown',function(e){
   if(e.key==='d'||e.key==='D'){ G.distance=(G.distance>=5?2:Math.min(10,G.distance+3)); }
 });
 
-const LOOP_START=0,LOOP_END=60,FADE=0.8;
-vid.addEventListener('loadeddata',function(){
-  S.videoReady=true;loading.style.opacity='0';
-  setTimeout(function(){loading.style.display='none';},420);
-  try{vid.currentTime=LOOP_START;}catch(e){}
-});
-let seeking=false;
-vid.addEventListener('timeupdate',function(){
-  if(seeking)return;
-  const t=vid.currentTime;
-  if(t>=LOOP_END){seeking=true;try{vid.currentTime=LOOP_START;}catch(e){}
-    setTimeout(function(){seeking=false;},260);return;}
-  let a=1;
-  if(LOOP_END-t<FADE)a=clamp((LOOP_END-t)/FADE,0,1);
-  if(t-LOOP_START<FADE)a=Math.min(a,clamp((t-LOOP_START)/FADE,0,1));
-  const b=vid.paused?0.88:(0.55+0.33*a);
-  vid.style.filter='saturate(0.92) brightness('+b.toFixed(3)+')';
-});
-vid.addEventListener('error',function(){loading.textContent='背景视频没读出来（检查路径/格式）';});
+// 静态背景：加载完就藏掉"载入中"
+function bgReadyCheck(){
+  if(bgEl.complete && bgEl.naturalWidth > 0 && !S.bgReady){
+    S.bgReady = true;
+    loading.style.opacity = '0';
+    setTimeout(function(){ loading.style.display = 'none'; }, 420);
+  }
+}
+bgEl.addEventListener('load', bgReadyCheck);
+bgEl.addEventListener('error', function(){ loading.style.display = 'none'; });  // 图没了也能玩
+bgReadyCheck();     // 可能在我们挂监听之前就已经加载完了
 
 loadSfx();
 resize();
