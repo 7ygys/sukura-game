@@ -10,12 +10,12 @@
   #bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;
       filter:saturate(0.92) brightness(0.88);
   /* 缓慢推镜：一张静图也有"活着"的感觉 */
-  animation: bgdrift 28s ease-in-out infinite alternate;
+  animation: bgdrift 40s ease-in-out infinite alternate;
   transform-origin: 52% 48%;
 }
 @keyframes bgdrift {
   from { transform: scale(1.00) translate3d(0,0,0); }
-  to   { transform: scale(1.06) translate3d(-1.2%, -0.8%, 0); }
+  to   { transform: scale(1.03) translate3d(-0.6%, -0.4%, 0); }
 }
   #stage{position:relative;display:block;}
   #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
@@ -25,7 +25,7 @@
 <body>
 <div id="wrap">
   <!-- 背景：静态图 + 缓慢推镜（原来的 986MB 视频不再需要） -->
-  <img id="bg" src="../素材/背景/灵梦.jpg" alt="">
+  <img id="bg" src="../素材/背景/灵梦-动.webp" alt="">
   <canvas id="stage"></canvas>
 </div>
 <div id="loading">载入背景…</div>
