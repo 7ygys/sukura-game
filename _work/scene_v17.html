@@ -259,6 +259,8 @@ function act(a){
 
 /** 根据引擎里的 pending 决定要不要弹窗 */
 function syncPending(){
+  // 回合刚开始：等黑条扫完再弹窗
+  if(S.holdDialogUntil && S.t < S.holdDialogUntil){ S.dialog=null; return; }
   // 子步骤优先：纳分配 > 焦燥 > 结束选牌 > 其他选择 > 攻击
   if(G.nabu){
     if(!S.nabuAlloc || S.nabuAlloc.cardId!==G.nabu.cardId){
@@ -929,6 +931,8 @@ function pumpEvents(){
       playSfx('react');
     } else if(ev.type==='turnStart'){
       S.sweep={t0:S.t, dur:1.1, text:'第 '+ev.turn+' 回合 · '+(ev.who===meIdx()?'你的回合':'对方回合')};
+      // 黑条扫完之前先别弹窗，让结晶飞行的动画能被看见
+      S.holdDialogUntil = S.t + 1.25;
     }
     if(!img){ S.evIdx=i+1; continue; }
     // 图片还没加载好就等下一帧再放，别把事件吞掉

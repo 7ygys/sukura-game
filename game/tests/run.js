@@ -1267,7 +1267,43 @@ group('伤害里的「-」');
   ok('装可以选', good.ok, good.error);
 }
 
-/* ---------- 21. 不可变性 ---------- */
+/* ---------- 21. 全力之后只能结束回合 ---------- */
+group('全力之后');
+{
+  let s = withHand(0, ['01-yurina-o-n-4']);   // 居合（全力）
+  s.distance = 4; s.players[0].flare = 10;
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-4' });
+  ok('打出居合', r.ok, r.error);
+  r = E.actions.applyAction(r.state, { type: 'respond', player: 1, cardId: null });
+  r = E.actions.applyAction(r.state, { type: 'resolveDamage', player: 1, choice: 'life' });
+  ok('居合结算完成', r.ok && !r.state.pending, r.error);
+
+  const s2 = r.state;
+  eq('标记为全力行动', s2.players[0].fullpowerUsed, true);
+
+  // 王牌也不能出
+  const sp = s2.players[0].specials.find(x => !x.used);
+  const r2 = E.actions.applyAction(s2, { type: 'playCard', player: 0, cardId: sp.id });
+  ok('全力之后不能出王牌', !r2.ok);
+
+  // 通常札也不能出
+  const s3 = E.state.clone(s2);
+  s3.players[0].hand = [cardById('01-yurina-o-n-1')];
+  const r3 = E.actions.applyAction(s3, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-1' });
+  ok('全力之后不能出通常札', !r3.ok);
+
+  // 基本动作也不能
+  const s4 = E.state.clone(s2);
+  s4.players[0].focus = 2;
+  const r4 = E.actions.applyAction(s4, { type: 'basic', player: 0, which: 'charge' });
+  ok('全力之后不能做基本动作', !r4.ok);
+
+  // 但可以结束回合
+  const r5 = E.actions.applyAction(s2, { type: 'endTurn', player: 0 });
+  ok('全力之后可以结束回合', r5.ok, r5.error);
+}
+
+/* ---------- 22. 不可变性 ---------- */
 group('不可变性');
 {
   const s = freshP0();

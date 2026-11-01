@@ -393,6 +393,8 @@
     const who = state.active;
     const p = state.players[who];
     state.phase = 'start';
+    // 先告诉界面「回合开始了」，让它先扫黑条
+    Engine.state.emit(state, 'turnStart', { who: who, turn: state.turn });
     state.turnUsed[who] = 0;
     p.buff = { aura: 0, life: 0 };
     p.terminated = false;
@@ -429,7 +431,6 @@
 
     state.phase = 'main';
     log(state, '—— 第 ' + state.turn + ' 回合 · P' + (who + 1) + ' ——');
-    Engine.state.emit(state, 'turnStart', { who: who, turn: state.turn });
     return state;
   }
 
@@ -717,9 +718,9 @@
 
     // 终端：本回合已经不能再用牌
     if (p.terminated) return { ok: false, error: '终端：本回合不能再使用牌或做基本动作' };
-    // 全力行动中，除了那一张切札之外不能再出牌
-    if (p.fullpowerUsed && !fromSpecial)
-      return { ok: false, error: '全力行动：本回合已经用过牌了' };
+    // 用过《全力》卡之后，本回合能做的只有「结束回合」
+    if (p.fullpowerUsed)
+      return { ok: false, error: '全力行动：本回合只能结束回合' };
     // 规则 8-2-2：《全力》卡只能在「全力行动」里用。
     // 简化判断：本回合已经出过牌或做过基本动作 → 就进不了全力行动
     if (types.indexOf('fullpower') >= 0 &&
