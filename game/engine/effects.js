@@ -198,8 +198,10 @@
 
   // 詩舞：选一项
   choices.shibu = {
-    aura_to_flare(state, who) { Engine.effects.fx.moveCrystal(state, who, 'aura', 'flare', 1); },
-    dust_to_dist(state, who) { Engine.effects.fx.moveCrystal(state, who, 'dust', 'distance', 1); }
+    // 自气 → 自装
+    flare_to_aura(state, who) { Engine.effects.fx.moveCrystal(state, who, 'flare', 'aura', 1); },
+    // 自装 → 间合
+    aura_to_dist(state, who) { Engine.effects.fx.moveCrystal(state, who, 'aura', 'distance', 1); }
   };
 
   // スカーレットイマジン：把选中的那张手牌盖成伏札
@@ -572,11 +574,13 @@
       }
     },
 
-    // 詩舞：获得 1 集中力，然后选一项
+    // 詩舞：获得 1 集中力，然后从两项里选一项
+    //   ・自气 → 自装（1 颗）
+    //   ・自装 → 间合（1 颗）
     "04-tokoyo-o-n-4": {
       onUse(state, who) {
         Engine.effects.fx.gainFocus(state, who, 1);
-        Engine.effects.fx.ask(state, who, 'shibu', '选一项', ['aura_to_flare', 'dust_to_dist']);
+        Engine.effects.fx.ask(state, who, 'shibu', '选一项', ['flare_to_aura', 'aura_to_dist']);
       }
     },
 
@@ -596,13 +600,15 @@
       }
     },
 
-    // 風舞台（付与・纳2）：展开时 自装→虚；破弃时 虚→间合
+    // 風舞台（付与・纳2）
+    //   【展开时】间合 → 自装（2 颗；间合不足就只移现有的）
+    //   【破弃时】自装 → 间合（2 颗；自装不足就只移现有的，绝不能凭空多出来）
     "04-tokoyo-o-n-6": {
       onExpanded(state, who) {
-        Engine.effects.fx.moveCrystal(state, who, 'aura', 'dust', 1);
+        Engine.effects.fx.moveCrystal(state, who, 'distance', 'aura', 2);
       },
       onBreak(state, who) {
-        Engine.effects.fx.moveCrystal(state, who, 'dust', 'distance', 1);
+        Engine.effects.fx.moveCrystal(state, who, 'aura', 'distance', 2);
       }
     },
 

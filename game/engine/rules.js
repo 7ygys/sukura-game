@@ -750,6 +750,10 @@
       return { ok: false, error: '距离 ' + effDistance(state) + ' 不在适正距离内' };
     }
 
+    // 《终端》：使用之后本回合不能再出牌、也不能做基本动作（规则 9-2）。
+    // 注意付与牌会在后面提前 return，所以这里就要记上，不能等到最后
+    if (types.indexOf('terminal') >= 0) p.terminated = true;
+
     // ---- 付与：先检查总量，再让玩家自己决定「虚取几颗、装取几颗」 ----
     if (isEnhance) {
       const cap = card.capacity || 0;
@@ -788,7 +792,6 @@
       p.fullpowerUsed = true;
       log(state, '全力行动：本回合不能再使用其他牌或基本动作');
     }
-    if ((card.types || []).indexOf('terminal') >= 0) p.terminated = true;
     log(state, 'P' + (who + 1) + ' 打出「' + card.name + '」');
     Engine.state.emit(state, 'play', { who: who, cardId: card.id, name: card.name });
 

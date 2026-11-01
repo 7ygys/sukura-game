@@ -9,13 +9,6 @@
   #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;}
   #bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;
       filter:saturate(0.92) brightness(0.88);
-  /* 缓慢推镜：一张静图也有"活着"的感觉 */
-  animation: bgdrift 40s ease-in-out infinite alternate;
-  transform-origin: 52% 48%;
-}
-@keyframes bgdrift {
-  from { transform: scale(1.00) translate3d(0,0,0); }
-  to   { transform: scale(1.03) translate3d(-0.6%, -0.4%, 0); }
 }
   #stage{position:relative;display:block;}
   #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
@@ -24,8 +17,8 @@
 </head>
 <body>
 <div id="wrap">
-  <!-- 背景：静态图 + 缓慢推镜（原来的 986MB 视频不再需要） -->
-  <img id="bg" src="../素材/背景/灵梦-动.webp" alt="">
+  <!-- 背景：循环视频（整段 240 秒，接缝四分钟才出现一次） -->
+  <video id="bg" src="../背景-灵梦泡水/灵梦.mp4" autoplay muted playsinline preload="auto"></video>
   <canvas id="stage"></canvas>
 </div>
 <div id="loading">载入背景…</div>
@@ -1775,17 +1768,50 @@ window.addEventListener('keydown',function(e){
   if(e.key==='d'||e.key==='D'){ G.distance=(G.distance>=5?2:Math.min(10,G.distance+3)); }
 });
 
-// 静态背景：加载完就藏掉"载入中"
-function bgReadyCheck(){
-  if(bgEl.complete && bgEl.naturalWidth > 0 && !S.bgReady){
-    S.bgReady = true;
-    loading.style.opacity = '0';
-    setTimeout(function(){ loading.style.display = 'none'; }, 420);
-  }
+// ---- 循环视频 ----
+// 视频本身 240 秒，整段循环：接缝四分钟才来一次，比原来每 60 秒切一刀自然得多
+let LOOP_START = 0;          // 从哪开始接
+let LOOP_END = 60;           // 到哪接（加载后改成整段）
+let FADE = 0.25;             // 接缝淡化时长（原来 0.8 秒，太慢就显得屏幕在暗下去）
+const BRIGHT_BASE = 0.88;    // 正常亮度
+const BRIGHT_DIM  = 0.78;    // 接缝最低亮度（原来 0.55，暗得太明显）
+
+let seeking = false;
+
+function bgReady(){
+  if(S.bgReady) return;
+  S.bgReady = true;
+  loading.style.opacity = '0';
+  setTimeout(function(){ loading.style.display = 'none'; }, 420);
 }
-bgEl.addEventListener('load', bgReadyCheck);
-bgEl.addEventListener('error', function(){ loading.style.display = 'none'; });  // 图没了也能玩
-bgReadyCheck();     // 可能在我们挂监听之前就已经加载完了
+
+bgEl.addEventListener('loadedmetadata', function(){
+  // 整段循环；末尾留一点点，避免正好卡在最后一帧
+  LOOP_END = Math.max(5, (bgEl.duration || 60) - 0.08);
+});
+bgEl.addEventListener('loadeddata', function(){
+  bgReady();
+  try { bgEl.currentTime = LOOP_START; } catch(e){}
+});
+// 用 requestAnimationFrame 驱动亮度：timeupdate 一秒才几次，
+// 0.25 秒的淡化用它会一顿一顿的
+function bgTick(){
+  if(!S.bgReady){ requestAnimationFrame(bgTick); return; }
+  const t = bgEl.currentTime;
+  if(!seeking && t >= LOOP_END){
+    seeking = true;
+    try { bgEl.currentTime = LOOP_START; } catch(e){}
+    setTimeout(function(){ seeking = false; }, 120);
+  }
+  let a = 1;
+  if(LOOP_END - t < FADE) a = Math.min(a, Math.max(0, (LOOP_END - t) / FADE));
+  if(t - LOOP_START < FADE) a = Math.min(a, Math.max(0, (t - LOOP_START) / FADE));
+  const b = BRIGHT_DIM + (BRIGHT_BASE - BRIGHT_DIM) * a;
+  bgEl.style.filter = 'saturate(0.92) brightness(' + b.toFixed(3) + ')';
+  requestAnimationFrame(bgTick);
+}
+requestAnimationFrame(bgTick);
+bgReady();
 
 loadSfx();
 resize();

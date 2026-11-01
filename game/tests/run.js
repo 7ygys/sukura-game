@@ -983,14 +983,23 @@ group('常世的效果');
 {
   // 詩舞：+1 集中力，然后选一项
   let s = withHand(0, ['04-tokoyo-o-n-4']);
-  s.players[0].focus = 0; s.players[0].aura = 3; s.dust = 3;
+  s.players[0].focus = 0; s.players[0].aura = 3; s.dust = 3; s.players[0].flare = 1;
   let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '04-tokoyo-o-n-4' });
   ok('打出詩舞', r.ok, r.error);
   eq('集中力 0→1', r.state.players[0].focus, 1);
   ok('弹出了选项', !!r.state.choice);
-  const r2 = E.actions.applyAction(r.state, { type: 'choose', player: 0, option: 'aura_to_flare' });
-  eq('装 3→2', r2.state.players[0].aura, 2);
-  eq('气 0→1', r2.state.players[0].flare, 1);
+  // 卡面：・自气→自装　・自装→间合
+  const r2 = E.actions.applyAction(r.state, { type: 'choose', player: 0, option: 'flare_to_aura' });
+  eq('自气→自装：装 3→4', r2.state.players[0].aura, 4);
+  eq('自气→自装：气 1→0', r2.state.players[0].flare, 0);
+
+  // 另一条：自装 → 间合
+  let s3 = withHand(0, ['04-tokoyo-o-n-4']);
+  s3.players[0].aura = 3; s3.distance = 5; s3.players[0].flare = 1;
+  let r3 = E.actions.applyAction(s3, { type: 'playCard', player: 0, cardId: '04-tokoyo-o-n-4' });
+  r3 = E.actions.applyAction(r3.state, { type: 'choose', player: 0, option: 'aura_to_dist' });
+  eq('自装→间合：装 3→2', r3.state.players[0].aura, 2);
+  eq('自装→间合：间合 5→6', r3.state.distance, 6);
 }
 
 {
@@ -1032,15 +1041,33 @@ group('常世的效果');
 }
 
 {
-  // 風舞台：展开时 自装→虚
+  // 風舞台：展开时间合2颗→自装，破弃时自装2颗→间合
   let s = withHand(0, ['04-tokoyo-o-n-6']);
-  s.dust = 3; s.players[0].aura = 3;
-  const r = autoNabu(E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '04-tokoyo-o-n-6' }));
-  ok('展开風舞台', r.ok, r.error);
-  // 纳 2 颗从虚取（3→1），展开时 自装→虚 +1（1→2）
-  eq('虚 3-2+1 = 2', r.state.dust, 2);
-  eq('装 3-1 = 2（展开时效果）', r.state.players[0].aura, 2);
+  s.dust = 6; s.players[0].aura = 1; s.distance = 5;
+  let r = autoNabu(E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '04-tokoyo-o-n-6' }));
+  eq('展开：间合 5→3', r.state.distance, 3);
+  eq('展开：装 1→3', r.state.players[0].aura, 3);
+
+  // 破弃：自装够 2 颗 → 移 2 颗
+  let s2 = E.state.clone(r.state);
+  s2.players[0].attachments[0].crystals = 0;
+  E.rules.tickAttachments(s2, 0);
+  eq('破弃：装 3→1', s2.players[0].aura, 1);
+  eq('破弃：间合 3→5', s2.distance, 5);
+
+  // 自装只有 1 颗 → 只移 1 颗，不能凭空多出来
+  let s3 = withHand(0, ['04-tokoyo-o-n-6']);
+  s3.dust = 6; s3.players[0].aura = 1; s3.distance = 5;
+  let r3 = autoNabu(E.actions.applyAction(s3, { type: 'playCard', player: 0, cardId: '04-tokoyo-o-n-6' }));
+  s3 = E.state.clone(r3.state);
+  s3.players[0].aura = 1;
+  const distBefore = s3.distance, auraBefore = s3.players[0].aura;
+  s3.players[0].attachments[0].crystals = 0;
+  E.rules.tickAttachments(s3, 0);
+  eq('自装只有 1 颗：装 1→0', s3.players[0].aura, 0);
+  eq('自装只有 1 颗：间合只 +1', s3.distance, distBefore + 1);
 }
+
 
 {
   // 無窮ノ風：不可被对应
@@ -1339,7 +1366,27 @@ group('無音壁 的装伤分配');
   eq('虚多了 3 颗', r2.state.dust, dustBefore + 3);
 }
 
-/* ---------- 24. 不可变性 ---------- */
+/* ---------- 24. 终端：用过之后只能结束回合 ---------- */
+group('终端');
+{
+  // 晴舞台是「付与＋终端」——付与牌会提前 return，容易漏掉终端
+  let s = withHand(0, ['04-tokoyo-o-n-7', '01-yurina-o-n-1']);
+  s.dust = 8; s.players[0].aura = 3; s.players[0].focus = 2; s.distance = 3;
+  let r = autoNabu(E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '04-tokoyo-o-n-7' }));
+  ok('展开晴舞台', r.ok, r.error);
+  eq('标记为终端', r.state.players[0].terminated, true);
+
+  const r2 = E.actions.applyAction(r.state, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-1' });
+  ok('终端之后不能再出牌', !r2.ok);
+
+  const r3 = E.actions.applyAction(r.state, { type: 'basic', player: 0, which: 'charge' });
+  ok('终端之后不能做基本动作', !r3.ok);
+
+  const r4 = E.actions.applyAction(r.state, { type: 'endTurn', player: 0 });
+  ok('终端之后可以结束回合', r4.ok, r4.error);
+}
+
+/* ---------- 25. 不可变性 ---------- */
 group('不可变性');
 {
   const s = freshP0();
