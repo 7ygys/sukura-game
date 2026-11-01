@@ -356,11 +356,42 @@
       // 命里的结晶被打掉后**不会消失**，它飞到气里去
       moveCrystal(state, who, 'life', 'flare', lifeDmg);
       Engine.state.emit(state, 'damage', { who: who, kind: 'life', n: lifeDmg });
+
+      // 《隙》（规则 10-6）：受到 1 点以上命伤时（重组除外），
+      // 把带隙的付与札直接变成伏札，上面的结晶全进虚——不触发【破弃时】
+      if (lifeDmg > 0) triggerGap(state, who);
+
+      // 命伤之后，带隙的付与札会收起（见 triggerGap）
       log(state, 'P' + (who + 1) + ' 命 -' + lifeDmg + '（余 ' + p.life + '）→ 气 +' + lifeDmg);
     }
 
     checkWin(state);
     return true;
+  }
+
+  /**
+   * 《隙》（规则 10-6）
+   * 带「隙」的付与札，在持有者受到 1 点以上命伤时（山札再構成以外的来源），
+   * 直接变成＜伏せ札＞，上面的樱结晶全部进虚。
+   * 因为是从付与札"移走"而不是"破弃"，所以【破弃时】不会触发。
+   */
+  function triggerGap(state, who) {
+    const p = state.players[who];
+    const table = (Engine.effects && Engine.effects.cards) || {};
+    const keep = [];
+    (p.attachments || []).forEach(function (a) {
+      const e = table[a.id];
+      if (e && e.gap) {
+        const n = a.crystals || 0;
+        if (n > 0) moveCrystal(state, who, 'attach', 'dust', n);
+        p.hidden.push(Object.assign({}, a, { crystals: 0 }));
+        Engine.state.emit(state, 'cardTo', { who: who, cardId: a.id, to: 'hidden' });
+        log(state, '「' + a.name + '」的『隙』发动：收进伏札，结晶 ' + n + ' 颗进虚');
+      } else {
+        keep.push(a);
+      }
+    });
+    p.attachments = keep;
   }
 
   /** 「这张牌上的结晶视为在装中」的附加装（無音壁） */
@@ -831,7 +862,8 @@
       const na = p.nextOtherAttack;
       if (na) {
         const g = String(card.id).split('-')[1];
-        if (g !== 'yurina') {
+        const isSpecialAttack = !!ctx.fromSpecial;
+        if (g !== 'yurina' && !(na.notSpecial && isSpecialAttack)) {
           if (ctx.range.length) {
             const mn = Math.min.apply(null, ctx.range);
             if (mn - 1 >= 0) ctx.range.push(mn - 1);   // 距离扩大（近1）
@@ -1207,7 +1239,7 @@
     // 回合
     startTurn, endTurn, tickAttachments,
     // 基本动作
-    BASIC, canBasic, basicAction, hideCard, taijinOf, shadowAura, moveCrystal, recheckRange, effDistance, resolveAuraSplit, confirmNabu, cancelNabu, confirmEndTurn,
+    BASIC, canBasic, basicAction, hideCard, taijinOf, shadowAura, moveCrystal, recheckRange, effDistance, resolveAuraSplit, triggerGap, confirmNabu, cancelNabu, confirmEndTurn,
     // 再起
     tryRevive, stagger,
     // 出牌与攻防

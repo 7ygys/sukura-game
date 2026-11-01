@@ -299,6 +299,9 @@
 
     // 圧気（付与・纳2）：【破弃时】进行一次 1-4、3/- 的攻击
     "01-yurina-o-n-6": {
+      // 《隙》：带隙的付与札，在持有者受到 1 点以上命伤时（重组除外），
+      // 直接变成伏札，上面的结晶全进虚——**不会**触发【破弃时】
+      gap: true,
       onBreak(state, who) {
         generateAttack(state, who, {
           name: '圧気（破弃）', range: [1, 2, 3, 4], aura: 3, life: 0
@@ -319,7 +322,8 @@
       onUse(state, who) {
         const fx = Engine.effects.fx;
         fx.gainFocus(state, who, 1);
-        state.players[who].nextOtherAttack = { noRespond: 'normal', near: 1 };
+        // 卡面：他のメガミによる「切り札でない」《攻撃》——王牌的攻击不吃这个加成
+        state.players[who].nextOtherAttack = { noRespond: 'normal', near: 1, notSpecial: true };
         Engine.state.log(state, '本回合下一次其他女神的《攻击》+不可被对应（通常札）+距离扩大（近1）');
       }
     },

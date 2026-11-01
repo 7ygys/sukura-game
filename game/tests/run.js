@@ -1433,7 +1433,41 @@ group('梳流 / 雅打ち');
   ok('雅打ち 打不掉王牌的攻击（还留着待结算）', !!r2.state.pending);
 }
 
-/* ---------- 26. 不可变性 ---------- */
+/* ---------- 26. 隙 / 气迫只给非王牌 ---------- */
+group('隙（圧気）');
+{
+  // 展开圧気（纳2，带隙）
+  let s = withHand(0, ['01-yurina-o-n-6']);
+  s.dust = 8; s.players[0].aura = 2; s.distance = 6;
+  let r = autoNabu(E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-6' }));
+  eq('圧気 展开，纳 2', r.state.players[0].attachments[0].crystals, 2);
+  eq('付与区 1 张', r.state.players[0].attachments.length, 1);
+
+  // 受到 1 点命伤 → 隙 发动：收进伏札，结晶进虚，且不触发破弃时的攻击
+  const s2 = E.state.clone(r.state);
+  E.rules.applyDamage(s2, 0, 0, 1, 'life');
+  eq('隙：付与区清空', s2.players[0].attachments.length, 0);
+  eq('隙：牌进了伏札', s2.players[0].hidden.length, 1);
+  ok('隙：没有生成破弃攻击', !s2.pending);
+}
+
+group('气迫 只给非王牌的攻击');
+{
+  // 气迫 之后打一张王牌攻击 → 不该有 距离扩大/对应不可
+  let s = withHand(0, ['01-yurina-o-n-5']);
+  s.players[0].flare = 10;
+  s.distance = 3;
+  s.players[0].specials = [Object.assign(cardById('01-yurina-o-s-1'), { used: false })];
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-5' });
+  ok('打出气迫', r.ok, r.error);
+  r = E.actions.applyAction(r.state, { type: 'playCard', player: 0, cardId: '01-yurina-o-s-1' });
+  ok('打出王牌攻击（月影落 3-4）', r.ok, r.error);
+  ok('王牌攻击不吃气迫的加成（距离没被扩大）',
+     r.state.pending.range.join(',') === '3,4');
+  ok('气迫的加成还留着给的下一次', !!r.state.players[0].nextOtherAttack);
+}
+
+/* ---------- 27. 不可变性 ---------- */
 group('不可变性');
 {
   const s = freshP0();
