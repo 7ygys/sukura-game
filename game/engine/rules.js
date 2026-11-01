@@ -940,8 +940,25 @@
       if (re && re.onUse) re.onUse(state, who, card);
       if (re && re.onRespond) re.onRespond(state, who, pd, card);
 
-      // 规则 9-4-ⅰ：对应是「入れ子解決」——它的【攻击后】当场结算，
-      // 如果它生成了攻击，那次攻击要**先**打完，才轮到原来那次攻击
+      // 如果这张对应牌本身是《攻击》牌，并且其效果写明"作为对应时使用"，
+      // 那么它自己的攻击要先打出来（嵌套解决），打完才轮到原攻击
+      if (re && re.attackOnRespond && (card.types || []).indexOf('attack') >= 0) {
+        const dmg = card.damage || { aura: 0, life: 0 };
+        state.attackStack = state.attackStack || [];
+        state.attackStack.push(pd);
+        const np = Engine.effects.generateAttack(state, who, {
+          cardId: card.id,
+          name: card.name,
+          range: (card.range || []).slice(),
+          aura: dmg.aura, life: dmg.life,
+          noRespond: true
+        });
+        if (np) np.fromResponse = true;
+        log(state, '「' + card.name + '」作为对应，先打出自己的攻击');
+        return { ok: true };
+      }
+
+      // 其余情况：对应牌的【攻击后】当场结算（嵌套）
       if (re && re.onAfterAttack) {
         re.onAfterAttack(state, who, Object.assign({}, pd, { usedAsResponse: true }));
       }
@@ -1001,30 +1018,43 @@
     const ok = applyDamage(state, who, dmg.aura, dmg.life, pd.both ? 'both' : choice);
     if (!ok) return { ok: false, error: '装不够，不能选装' };
 
-    // 嵌套攻击打完了 → 把挂起的原攻击接回来，继续它的「选伤害」
-    if (state.attackStack && state.attackStack.length) {
+    // 【攻击后】效果（规则 9-4-ⅶ）——先跑，因为它可能生成新的攻击
+    const table = (Engine.effects && Engine.effects.cards) || {};
+    if (pd.cardId && table[pd.cardId] && table[pd.cardId].onAfterAttack)
+      table[pd.cardId].onAfterAttack(state, pd.attacker,
+        Object.assign({}, pd, { usedAsResponse: !!pd.fromResponse }));
+
+    // 只有"还是这次攻击"时才清空
+    if (state.pending === pd) state.pending = null;
+
+    // 攻击后生成了新攻击（八方振り / 石突き的追击 / 破弃时）→ 让它先打完，
+    // 外层攻击还挂在栈里等
+    if (state.pending) {
+      tryRevive(state, 1 - who);
+      tryRevive(state, who);
+      return { ok: true };
+    }
+
+    // 嵌套打完了 → 把挂起的原攻击接回来
+    while (!state.pending && state.attackStack && state.attackStack.length) {
       const outer = state.attackStack.pop();
       outer.stage = 'damage';
       state.pending = outer;
-      // 原攻击也要按新间合重新确认一次
-      const miss = recheckRange(state);
-      if (!miss) return { ok: true };
-      // 落空了就继续往下（可能还有更外层的）
+      if (!recheckRange(state)) break;   // 落空了就继续取下一个
+    }
+    if (state.pending) {
+      tryRevive(state, 1 - who);
+      tryRevive(state, who);
+      return { ok: true };
     }
 
-    // 【攻击后】效果（规则 9-4-ⅶ）
-    const table = (Engine.effects && Engine.effects.cards) || {};
-    if (pd.cardId && table[pd.cardId] && table[pd.cardId].onAfterAttack)
-      table[pd.cardId].onAfterAttack(state, pd.attacker, pd);
-
-    // 只有"还是这次攻击"时才清空——
-    // 【攻击后】可能已经生成了新的攻击（八方振り / 石突き / 破弃时那种）
-    if (state.pending === pd) state.pending = null;
-    if (!state.pending && state.attackQueue && state.attackQueue.length) {
+    // 多段攻击队列（律動弧戟那种）
+    if (state.attackQueue && state.attackQueue.length) {
       const nextSpec = state.attackQueue.shift();
       Engine.effects.generateAttack(state, pd.attacker, nextSpec);
       return { ok: true };
     }
+
     tryRevive(state, 1 - who);    // 伤害之后检查「即再起」
     tryRevive(state, who);
     return { ok: true };

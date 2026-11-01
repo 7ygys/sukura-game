@@ -369,12 +369,14 @@
 
     // 薙斬り：只是带《对应》的攻击，没有别的效果
 
-    // 石突き：以《对应》使用时，攻击后打一发 3-5、2/1、不可被对应
+    // 石突き：以《对应》使用时，先用它自己的攻击 2-3 / 2-1，
+    // 它的【攻击后】再打一发 3-5 / 2-1（不可被对应）
     "02-saine-o-n-3": {
+      attackOnRespond: true,
       onAfterAttack(state, who, pd) {
-        if (pd && pd.usedAsResponse) {
+        if (pd && (pd.usedAsResponse || pd.fromResponse)) {
           generateAttack(state, who, {
-            name: '石突き（对应后）', range: [3, 4, 5], aura: 2, life: 1, noRespond: true
+            name: '石突き【攻击后】', range: [3, 4, 5], aura: 2, life: 1, noRespond: true
           });
         }
       }
@@ -669,7 +671,7 @@
       kind: 'attack',
       attacker: who,
       defender: 1 - who,
-      cardId: null,
+      cardId: spec.cardId || null,
       cardName: spec.name,
       damage: { aura: Math.min(spec.aura || 0, 5), life: spec.life || 0 },
       range: spec.range.slice(),

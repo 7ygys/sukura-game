@@ -403,23 +403,25 @@ function withHand(who, ids) {
   ok('用「石突き」对应成功', r.ok, r.error);
   s = r.state;
 
-  // 规则 9-4-ⅰ：对应是嵌套解决 → 石突き 的反击**先**打，原攻击挂起
-  ok('石突き 的反击先上桌', !!s.pending && s.pending.cardName.indexOf('石突き') === 0);
+  // 石突き 作为对应：先用它自己的攻击 2-3 / 2-1，
+  // 再跑它的【攻击后】3-5 / 2-1，最后才轮到原攻击
+  ok('石突き 自身攻击先上桌', !!s.pending && s.pending.cardName === '石突き');
+  eq('石突き 自身攻击 2/1', s.pending.damage, { aura: 2, life: 1 });
   eq('原攻击挂在栈里', s.attackStack.length, 1);
   eq('对应牌进弃牌区', s.players[1].discard.length, 1);
 
-  // 反击（2/1，不可被对应）打在原攻击者身上
-  r = E.actions.applyAction(s, { type: 'respond', player: 0, cardId: null });
-  ok('反击不可被对应不影响「不对应」', r.ok, r.error);
-  r = E.actions.applyAction(r.state, { type: 'resolveDamage', player: 0, choice: 'life' });
-  ok('反击结算成功', r.ok, r.error);
-  eq('原攻击者命 10→9（反击 2/1 选命）', r.state.players[0].life, 9);
+  let r2 = E.actions.applyAction(s, { type: 'respond', player: 0, cardId: null });
+  r2 = E.actions.applyAction(r2.state, { type: 'resolveDamage', player: 0, choice: 'life' });
+  eq('原攻击者命 10→9（石突き 2/1 选命）', r2.state.players[0].life, 9);
+  ok('接着是【攻击后】那发', !!r2.state.pending && r2.state.pending.cardName.indexOf('石突き') === 0);
 
-  // 反击打完，原攻击才回来
-  ok('原攻击接回来', !!r.state.pending && r.state.pending.cardName === '一閃');
-  eq('原攻击回到选伤害阶段', r.state.pending.stage, 'damage');
-  r = E.actions.applyAction(r.state, { type: 'resolveDamage', player: 1, choice: 'life' });
-  eq('被攻击方命 10→8（一閃 2/2）', r.state.players[1].life, 8);
+  r2 = E.actions.applyAction(r2.state, { type: 'respond', player: 0, cardId: null });
+  r2 = E.actions.applyAction(r2.state, { type: 'resolveDamage', player: 0, choice: 'life' });
+  eq('原攻击者命 10→8（【攻击后】2/1）', r2.state.players[0].life, 8);
+
+  ok('最后原攻击接回来', !!r2.state.pending && r2.state.pending.cardName === '一閃');
+  r2 = E.actions.applyAction(r2.state, { type: 'resolveDamage', player: 1, choice: 'life' });
+  eq('被攻击方命 10→8（一閃 2/2）', r2.state.players[1].life, 8);
 }
 
 {
