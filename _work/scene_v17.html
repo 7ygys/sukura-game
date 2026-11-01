@@ -274,7 +274,21 @@ function act(a){
 function syncPending(){
   // 回合刚开始：等黑条扫完再弹窗
   if(S.holdDialogUntil && S.t < S.holdDialogUntil){ S.dialog=null; return; }
-  // 子步骤优先：纳分配 > 焦燥 > 结束选牌 > 其他选择 > 攻击
+  // 优先级：黑条（上面的冻结期）→ 重组询问 → 焦燥 → 其余按出现顺序
+  // 顺序来自需求：黑条最先，其次是"扣命洗牌"，再次是焦燥
+  if(G.choice && G.choice.sourceId==='reshuffle'){
+    S.dialog={type:'choice', prompt:G.choice.prompt,
+      options:(G.choice.options||[]).map(function(id){
+        return {id:id, label:CHOICE_LABEL[id]||id};
+      })};
+    return;
+  }
+  if(G.exhaust && G.exhaust.remaining>0){
+    S.dialog={type:'exhaust', n:G.exhaust.remaining, canAura:G.players[G.exhaust.who].aura>0};
+    return;
+  }
+
+  // 以下是"其他弹窗"：谁先出现谁先处理
   if(G.nabu){
     if(!S.nabuAlloc || S.nabuAlloc.cardId!==G.nabu.cardId){
       const d0=Math.min(G.nabu.maxDust, G.nabu.cap);
@@ -285,10 +299,6 @@ function syncPending(){
   }
   if(G.auraSplit){
     S.dialog={type:'auraSplit'};
-    return;
-  }
-  if(G.exhaust && G.exhaust.remaining>0){
-    S.dialog={type:'exhaust', n:G.exhaust.remaining, canAura:G.players[G.exhaust.who].aura>0};
     return;
   }
   if(G.endTurnPending){
@@ -1562,9 +1572,27 @@ function frameBody(ts){
   drawVoid();drawTrack();
   drawSide(true);
   pumpEvents();
+  if(!S.over && G.winner!==null && G.winner!==undefined){
+    // 分出胜负：先给一眼结果，然后自动回主界面
+    S.over={t0:S.t, winner:G.winner};
+    playSfx('react');
+    if(!S.noNav) setTimeout(function(){ location.href='prep.html'; }, 2200);
+  }
   if(S.holdDialogUntil && S.t >= S.holdDialogUntil){ S.holdDialogUntil = 0; syncPending(); }
   if(S.shake>0 || S.shaking){}
   drawPlay();drawSweep();drawDrawAnims();drawCardFlights();drawSparks();drawFloats();
+  if(S.over){
+    const k=Math.min(1,(S.t-S.over.t0)/0.45);
+    ctx.save();
+    ctx.fillStyle='rgba(6,4,8,'+(0.72*k)+')';
+    ctx.fillRect(0,0,W,H);
+    ctx.globalAlpha=k;
+    const meWin = (S.over.winner===meIdx());
+    txt(W/2, H*0.42, meWin?'胜  利':'败  北', 76, meWin?'#ffe6a8':'#c9c3d6');
+    txt(W/2, H*0.42+70, meWin?'你赢了':'你输了', 24, 'rgba(240,235,225,0.85)');
+    txt(W/2, H*0.42+112, '即将返回主界面…', 15, 'rgba(230,225,215,0.55)');
+    ctx.restore();
+  }
   if(LAST_ERROR){
     ctx.save();
     ctx.fillStyle='rgba(120,10,20,0.88)';
@@ -1770,9 +1798,6 @@ function handleClick(e){
       S.openPile=null;
       // 视角跟着新的当前玩家走；顺手扫一下回合条
       S.sweep={t0:S.t,dur:0.6,text:'第 '+G.turn+' 回合'};
-      if(G.winner!==null){
-        S.banner={img:IMG.tStart,t0:S.t};
-      }
     }
     return;
   }
@@ -1854,6 +1879,8 @@ resize();
     },1200);
   }
   if(q.get('stagger')==='1') G.players[G.active].staggered=true;
+  if(q.get('win')) G.winner = (q.get('win')==='me') ? G.active : 1-G.active;   // 调试胜负画面
+  if(q.get('nonav')) S.noNav = true;                                          // 调试时别跳回主界面
   if(q.get('vigor')) S.focusVal=parseInt(q.get('vigor'),10)||0;
   const dlg=q.get('dlg');
   if(dlg==='response') S.dialog={type:'response'};
