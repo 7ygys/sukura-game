@@ -259,11 +259,13 @@
     const set = (k, v) => { if (k === 'dust' || k === 'distance') state[k] = v; else p[k] = v; };
 
     // 「付与札」不是数值区域：减/加由调用方自己处理，这里只负责发事件
+    // 注意：n 可能是 0（这次伤害是 0），不能用 `n || 1`，否则 0 会变成 1
+    const want = (n === undefined || n === null) ? 1 : n;
     let num;
     if (from === 'attach') {
-      num = n || 1;                      // 调用方已经从卡片上扣掉了
+      num = want;                        // 调用方已经从卡片上扣掉了
     } else {
-      num = Math.min(get(from) || 0, n || 1);
+      num = Math.min(get(from) || 0, want);
       if (to === 'aura') num = Math.min(num, Engine.state.INIT.AURA_MAX - p.aura);
       if (to === 'distance') num = Math.min(num, 10 - state.distance);
       if (from === 'distance' && (p.attachments || []).some((a) => {
@@ -1016,9 +1018,26 @@
     if (pd.stage !== 'damage') return { ok: false, error: '还没到选伤害的时候' };
 
     const dmg = pd.damage;
+
+    // 有「这张牌上的结晶视为在装中」的付与札（無音壁）时，
+    // 装伤由玩家自己决定：多少从真装扣、多少从那张牌上扣
+    if (choice === 'aura' && shadowAura(state, who) > 0) {
+      pd.stage = 'auraSplit';
+      state.auraSplit = { who: who, total: dmg.aura, maxAttach: Math.min(shadowAura(state, who), dmg.aura) };
+      return { ok: true };
+    }
+
     const ok = applyDamage(state, who, dmg.aura, dmg.life, pd.both ? 'both' : choice);
     if (!ok) return { ok: false, error: '装不够，不能选装' };
 
+    return finishAttack(state, pd, who);
+  }
+
+  /**
+   * 一次攻击的收尾：攻击后 → 接回外层 / 多段 → 即再起。
+   * resolveDamage 和「装伤分配」都会走到这里。
+   */
+  function finishAttack(state, pd, who) {
     // 【攻击后】效果（规则 9-4-ⅶ）——先跑，因为它可能生成新的攻击
     const table = (Engine.effects && Engine.effects.cards) || {};
     if (pd.cardId && table[pd.cardId] && table[pd.cardId].onAfterAttack)
@@ -1059,6 +1078,49 @@
     tryRevive(state, 1 - who);    // 伤害之后检查「即再起」
     tryRevive(state, who);
     return { ok: true };
+  }
+
+  /**
+   * 「装伤分配」：玩家决定多少从真装扣、多少从無音壁那张牌上扣。
+   */
+  function resolveAuraSplit(state, who, fromAttach) {
+    const sp = state.auraSplit;
+    if (!sp || sp.who !== who) return { ok: false, error: '现在没有要分配的装伤' };
+    const pd = state.pending;
+    if (!pd || pd.stage !== 'auraSplit') return { ok: false, error: '现在没有待结算的装伤' };
+
+    fromAttach = Math.max(0, fromAttach | 0);
+    if (fromAttach > sp.maxAttach) return { ok: false, error: '这张牌上没那么多结晶' };
+    const fromAura = sp.total - fromAttach;
+    if (fromAura < 0) return { ok: false, error: '分配不对' };
+    if (fromAura > state.players[who].aura) return { ok: false, error: '装不够' };
+
+    // 先从付与札上扣
+    if (fromAttach > 0) {
+      let left = fromAttach;
+      const p = state.players[who];
+      const keep = [];
+      (p.attachments || []).forEach(function (a) {
+        const e = (Engine.effects && Engine.effects.cards && Engine.effects.cards[a.id]);
+        if (left > 0 && e && e.auraShield) {
+          const take = Math.min(a.crystals, left);
+          a.crystals -= take; left -= take;
+          state.dust += take;
+        }
+        if (a.crystals > 0) keep.push(a);
+        else p.discard.push(Object.assign({}, a, { crystals: 0 }));
+      });
+      p.attachments = keep;
+    }
+    if (fromAura > 0) moveCrystal(state, who, 'aura', 'dust', fromAura);
+
+    Engine.state.emit(state, 'damage', { who: who, kind: 'aura', n: sp.total });
+    log(state, 'P' + (who + 1) + ' 装伤 -' + sp.total +
+      '（真装 -' + fromAura + '，付与札 -' + fromAttach + '）');
+
+    state.auraSplit = null;
+    pd.stage = 'damage';
+    return finishAttack(state, pd, who);
   }
 
   /* ==========================================================================
@@ -1141,7 +1203,7 @@
     // 回合
     startTurn, endTurn, tickAttachments,
     // 基本动作
-    BASIC, canBasic, basicAction, hideCard, taijinOf, shadowAura, moveCrystal, recheckRange, effDistance, confirmNabu, cancelNabu, confirmEndTurn,
+    BASIC, canBasic, basicAction, hideCard, taijinOf, shadowAura, moveCrystal, recheckRange, effDistance, resolveAuraSplit, confirmNabu, cancelNabu, confirmEndTurn,
     // 再起
     tryRevive, stagger,
     // 出牌与攻防

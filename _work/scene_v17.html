@@ -270,6 +270,10 @@ function syncPending(){
     S.dialog={type:'nabu'};
     return;
   }
+  if(G.auraSplit){
+    S.dialog={type:'auraSplit'};
+    return;
+  }
   if(G.exhaust && G.exhaust.remaining>0){
     S.dialog={type:'exhaust', n:G.exhaust.remaining, canAura:G.players[G.exhaust.who].aura>0};
     return;
@@ -1229,6 +1233,34 @@ function drawDialog(){
       HIT.push({id:'dlg_pick'+i, x:cx-cw2/2, y:cy-ch2/2, w:cw2, h:ch2});
       if(S.hover==='dlg_pick'+i) S.tip={card:arr[i], ax:cx, ay:cy-ch2/2};
     }
+  } else if(d.type==='auraSplit' && G.auraSplit){
+    const sp=G.auraSplit;
+    if(!S.splitAlloc || S.splitAlloc.total!==sp.total)
+      S.splitAlloc={total:sp.total, attach:0};
+    const al=S.splitAlloc, fromAura=sp.total-al.attach;
+    txt(bx+bw*0.56,by+bh*0.18,'受到 '+sp.total+' 点装伤，选择从哪里扣',18,'#f2ece2');
+    const rows=[
+      {key:'aura',   label:'装',    cur:fromAura,       y:by+bh*0.36},
+      {key:'attach', label:'無音壁', cur:al.attach,       y:by+bh*0.54}
+    ];
+    rows.forEach(function(r){
+      const cx=bx+bw*0.56;
+      txt(cx-160, r.y+18, r.label, 16, '#f2ece2');
+      if(r.key==='attach'){
+        glass(cx-70, r.y, 44, 40, 8, 0.6);
+        txt(cx-48, r.y+20, '−', 20, '#f2ece2');
+        HIT.push({id:'dlg_sp_attach_minus', x:cx-70, y:r.y, w:44, h:40});
+        txt(cx, r.y+18, String(r.cur)+' / '+sp.maxAttach, 18, '#ffe4b8');
+        glass(cx+30, r.y, 44, 40, 8, 0.6);
+        txt(cx+52, r.y+20, '＋', 20, '#f2ece2');
+        HIT.push({id:'dlg_sp_attach_plus', x:cx+30, y:r.y, w:44, h:40});
+      } else {
+        txt(cx, r.y+18, String(r.cur), 18, '#ffe4b8');
+      }
+    });
+    glass(bx+bw*0.62-60, by+bh*0.76, 120, 46, 8, 0.7);
+    txt(bx+bw*0.62, by+bh*0.76+23, '确认', 16, '#f2ece2');
+    HIT.push({id:'dlg_sp_ok', x:bx+bw*0.62-60, y:by+bh*0.76, w:120, h:46});
   } else if(d.type==='exhaust'){
     txt(bx+bw*0.56,by+bh*0.26,'焦燥：还有 '+d.n+' 点要承受',19,'#f2ece2');
     txt(bx+bw*0.56,by+bh*0.42,'（每点可以自己选扣装还是扣命）',12,'rgba(232,226,220,0.7)');
@@ -1593,6 +1625,13 @@ cvs.addEventListener('click',function(e){
         S.flash={card:card, t0:S.t};
         act({type:'respond', player:G.pending.defender, cardId:card.id});
       }
+    } else if(dlg.type==='auraSplit'){
+      const sp=G.auraSplit, al=S.splitAlloc;
+      if(!sp||!al) return;
+      if(tag==='sp_ok'){ act({type:'resolveAuraSplit', player:sp.who, fromAttach:al.attach}); S.splitAlloc=null; return; }
+      if(tag==='sp_attach_plus' && al.attach<sp.maxAttach) al.attach++;
+      if(tag==='sp_attach_minus' && al.attach>0) al.attach--;
+      return;
     } else if(dlg.type==='exhaust'){
       if(tag==='exAura') act({type:'resolveExhaust', player:G.exhaust.who, choice:'aura'});
       if(tag==='exLife') act({type:'resolveExhaust', player:G.exhaust.who, choice:'life'});
@@ -1785,6 +1824,12 @@ S.sweep={t0:2.2,dur:0.6,text:'第 1 回合'};
     // 造一个"下一次攻击 +1/+1"的状态，看看卡面上的红字
     G.players[G.active].buff={aura:1, life:1};
     S.bannerScale=1;
+  }
+  if(d==='split'){
+    G.auraSplit={who:G.active, total:3, maxAttach:5};
+    G.pending={kind:'attack',attacker:1-G.active,defender:G.active,stage:'auraSplit',
+      damage:{aura:3,life:0},range:[0,1,2,3,4,5,6,7,8,9,10]};
+    syncPending();
   }
   if(d==='exhaust2'){
     G.exhaust={who:G.active, remaining:2};

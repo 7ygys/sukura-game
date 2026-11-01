@@ -1303,7 +1303,43 @@ group('全力之后');
   ok('全力之后可以结束回合', r5.ok, r5.error);
 }
 
-/* ---------- 22. 不可变性 ---------- */
+/* ---------- 22. 零伤害不动结晶 ---------- */
+group('伤害为 0 时不动结晶');
+{
+  const s = fresh();
+  const life0 = s.players[0].life, flare0 = s.players[0].flare;
+  const dust0 = s.dust;
+  E.rules.applyDamage(s, 0, 2, 0, 'life');   // 命伤 0
+  eq('命伤 0 → 命不变', s.players[0].life, life0);
+  eq('命伤 0 → 气不变', s.players[0].flare, flare0);
+  eq('装没被碰', s.dust, dust0);
+}
+
+/* ---------- 23. 無音壁：装伤自己分配 ---------- */
+group('無音壁 的装伤分配');
+{
+  let s = withHand(0, ['02-saine-o-n-7']);    // 無音壁 纳5
+  s.distance = 7; s.dust = 8; s.players[0].aura = 3;
+  let r = autoNabu(E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '02-saine-o-n-7' }));
+  s = r.state;
+  eq('無音壁 纳 5', s.players[0].attachments[0].crystals, 5);
+
+  // 挨 3 点装伤：选择从無音壁扣 2、真装扣 1
+  s.players[0].aura = 3;
+  const dustBefore = s.dust;
+  // 直接走分配接口
+  const st = E.state.clone(s);
+  st.pending = { kind: 'attack', attacker: 1, defender: 0, stage: 'auraSplit',
+                 damage: { aura: 3, life: 0 }, range: [0,1,2,3,4,5,6,7,8,9,10] };
+  st.auraSplit = { who: 0, total: 3, maxAttach: 5 };
+  const r2 = E.actions.applyAction(st, { type: 'resolveAuraSplit', player: 0, fromAttach: 2 });
+  ok('分配结算成功', r2.ok, r2.error);
+  eq('装 3→2（扣 1）', r2.state.players[0].aura, 2);
+  eq('無音壁 5→3（扣 2）', r2.state.players[0].attachments[0].crystals, 3);
+  eq('虚多了 3 颗', r2.state.dust, dustBefore + 3);
+}
+
+/* ---------- 24. 不可变性 ---------- */
 group('不可变性');
 {
   const s = freshP0();

@@ -57,7 +57,7 @@
     // 攻击没结算时，只能做"处理这次攻击"相关的动作；
     // 「选择」「纳分配」这些是子步骤，不算打断
     const pending = next.pending;
-    const allowedDuringPending = ['respond', 'resolveDamage', 'choose', 'confirmNabu', 'cancelNabu', 'damage', 'resolveExhaust'];
+    const allowedDuringPending = ['respond', 'resolveDamage', 'resolveAuraSplit', 'choose', 'confirmNabu', 'cancelNabu', 'damage', 'resolveExhaust'];
     if (pending && allowedDuringPending.indexOf(action.type) < 0) {
       return { ok: false, state, error: '有一张攻击还没结算' };
     }
@@ -179,6 +179,12 @@
       /* ---------------------------------------------------------------
        * 选择如何分配伤害（装 / 命）
        * ------------------------------------------------------------- */
+      case 'resolveAuraSplit': {
+        const r = R.resolveAuraSplit(next, action.player, action.fromAttach);
+        if (!r.ok) return { ok: false, state, error: r.error };
+        return { ok: true, state: afterAction(next) };
+      }
+
       case 'resolveDamage': {
         const r = R.resolveDamage(next, action.player, action.choice);
         if (!r.ok) return { ok: false, state, error: r.error };

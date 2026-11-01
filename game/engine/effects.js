@@ -118,7 +118,8 @@
         }
       }
 
-      let num = Math.min(get(from), n || 1);
+      const want2 = (n === undefined || n === null) ? 1 : n;
+      let num = Math.min(get(from), want2);
       // 目标区域有上限：装 5、间合 10。
       // 收不下的**留在原处**——全场结晶总数永远是 36 颗，不会凭空消失。
       if (to === 'aura') num = Math.min(num, Engine.state.INIT.AURA_MAX - p.aura);
