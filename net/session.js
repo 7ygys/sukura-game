@@ -16,6 +16,16 @@
   const Proto = (root.Net) || null;
   const WebRTCNet = root.WebRTCNet || null;
 
+  /** 从牌组 id 推出用到的女神（头像要用这个字段） */
+  function gkeysOf(ids) {
+    const set = [];
+    (ids || []).forEach(function (id) {
+      const k = String(id).split('-')[1];
+      if (k && set.indexOf(k) < 0) set.push(k);
+    });
+    return set;
+  }
+
   const SEAT_HOST = 0;
   const SEAT_GUEST = 1;
 
@@ -61,11 +71,15 @@
         onError: onError,
         onCustom: onCustom,
         makeState: function (guestDeckIds) {
-          return engine.state.create({
+          const st = engine.state.create({
             myCards: makeDeck(myDeckIds || opts.fallbackDeck),
             oppCards: makeDeck(guestDeckIds),
             myName: '主机', oppName: '客机'
           });
+          // 头像依赖这个字段（单机模式是在页面里补的，联机得在这里补）
+          st.players[0].goddesses = gkeysOf(myDeckIds || opts.fallbackDeck);
+          st.players[1].goddesses = gkeysOf(guestDeckIds);
+          return st;
         }
       });
 

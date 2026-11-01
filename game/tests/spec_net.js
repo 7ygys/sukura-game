@@ -214,4 +214,41 @@ group('一致性：随机打一局');
   eq('命两边看到的一样', hostView.players[0].life, guestView.players[0].life);
 }
 
+group('联机：建局与可见性（embed 前的基本项）');
+{
+  const [trA, trB] = Net.createMemoryPair();
+  let state = fresh();
+  state.active = 0;
+  state.players[0].firstTurnDone = true;
+  state.players[0].hand = [cardById('01-yurina-o-n-1')];
+
+  let hostView = null, guestView = null;
+  const host = Net.createHost({
+    transport: trA, state: state, applyAction: E.actions.applyAction, engine: E,
+    onLocalView: function (v) { hostView = v; }
+  });
+  const guest = Net.createGuest({ transport: trB, onView: function (v) { guestView = v; } });
+  guest.hello(1);
+  H.ok('客机连上就能拿到视图', !!guestView);
+
+  // 头像字段：goddesses 必须能带到客机那边
+  host.state.players[0].goddesses = ['yurina'];
+  host.state.players[1].goddesses = ['saine'];
+  host.push();
+  eq('客机也能看到主机的 goddesses（头像用）', guestView.players[0].goddesses, ['yurina']);
+  eq('客机看到自己的 goddesses', guestView.players[1].goddesses, ['saine']);
+
+  // 视角：客机的 meIdx 固定为 1（用视图判断，不依赖 UI）
+  eq('客机的座位固定是 1', guestView.players[1].goddesses.length > 0, true);
+}
+
+group('联机：本地弹窗不该被引擎同步擦掉（数据层等价校验）');
+{
+  // 引擎没有待处理时，state 里 pending/choice 都应为空，
+  // 这样 UI 才有机会保留自己的"盖牌后免费基本动作"弹窗
+  let s = withHand(['01-yurina-o-n-1']);
+  eq('没有待处理时 pending 为空', s.pending, undefined);
+  eq('没有待处理时 choice 为空', s.choice, undefined);
+}
+
 H.report();

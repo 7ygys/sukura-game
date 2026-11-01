@@ -441,29 +441,30 @@ function makeDeckByIds(ids){
 }
 function heroPool(){ return (window.GAME_DATA.goddesses||[]).map(g=>g.key); }
 
-/** 主机：随机分两位不同的女神，自己一位、对方一位 */
+/** 主机：把 4 位女神随机分成两半（各 2 位），双方候选不重叠 */
 function assignRoles(){
   const pool = heroPool().slice();
-  const i = Math.floor(Math.random()*pool.length);
-  const mine = pool.splice(i,1)[0];
-  const j = Math.floor(Math.random()*pool.length);
-  const theirs = pool.splice(j,1)[0];
-  myGoddess = mine;
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
+  }
+  const mid = Math.ceil(pool.length / 2);
+  const mine = pool.slice(0, mid);
+  const theirs = pool.slice(mid);
   netSession.sendCustom({ t:'assign', host:mine, guest:theirs });
-  afterAssign();
+  enterSelect(mine);
 }
 
-/** 双方都进入"只用一个女神的组卡" */
-function afterAssign(){
-  if(!myGoddess) return;
+/** 进入选人界面：候选是分到的那一半（双方不重叠） */
+function enterSelect(half){
+  if(!half || !half.length) return;
   nbHide();
-  splitRoster();
-  state.picks = [myGoddess];           // 只用分到的那位女神
+  state.myHalf = half.slice();
+  state.oppHalf = new Array(Math.max(0, heroPool().length - half.length)).fill(null);
+  state.picks = [];
   state.deck = { normal:[], special:[] };
-  renderDeck();
-  show('deck');
-  const g = gByKey(myGoddess);
-  $('#deckTip') && ($('#deckTip').textContent = '你的女神：'+(g?g.name:myGoddess));
+  renderSelect();
+  show('select');
 }
 
 /** 开始联机对局：把牌组交出去，等主机发第一份视图再打开战斗页 */
@@ -555,8 +556,7 @@ function openLobby(role){
         return;
       }
       if(msg && msg.t === 'assign'){
-        myGoddess = (role === 'host') ? msg.host : msg.guest;
-        afterAssign();
+        enterSelect((role === 'host') ? msg.host : msg.guest);
       }
     }
   });
