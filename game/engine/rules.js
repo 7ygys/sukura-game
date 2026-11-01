@@ -850,6 +850,7 @@
         defender: 1 - who,
         cardId: card.id,
         cardName: card.name,
+        fromSpecial: fromSpecial,      // 这次《攻击》是不是来自王牌（切札）
         damage: { aura: ctx.aura, life: ctx.life },
         both: !!ctx.both,
         noRespond: ctx.noRespond ? true : (ctx.noRespondNormal ? 'normal' : false),

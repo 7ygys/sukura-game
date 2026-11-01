@@ -978,8 +978,8 @@ group('常世的效果');
   s.distance = 3; s.dust = 3;
   let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '04-tokoyo-o-n-3' });
   ok('打出跳ね兔', r.ok, r.error);
-  eq('间合 3→4', r.state.distance, 4);
-  eq('虚 3→2', r.state.dust, 2);
+  eq('间合 3→5（卡面是 2 颗）', r.state.distance, 5);
+  eq('虚 3→1', r.state.dust, 1);
 
   s = withHand(0, ['04-tokoyo-o-n-3']);
   s.distance = 5; s.dust = 3;
@@ -1393,7 +1393,47 @@ group('终端');
   ok('终端之后可以结束回合', r4.ok, r4.error);
 }
 
-/* ---------- 25. 不可变性 ---------- */
+/* ---------- 25. 梳流的「-」/ 雅打ち只打非王牌 ---------- */
+group('梳流 / 雅打ち');
+{
+  // 梳流 4 / -1：装挡不住，只能吃命
+  let s = withHand(0, ['04-tokoyo-o-n-1']);
+  s.distance = 4;
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '04-tokoyo-o-n-1' });
+  ok('打出梳流し', r.ok, r.error);
+  ok('气伤是「-」', r.state.pending.damage.aura === null);
+
+  let r2 = E.actions.applyAction(r.state, { type: 'respond', player: 1, cardId: null });
+  const bad = E.actions.applyAction(r2.state, { type: 'resolveDamage', player: 1, choice: 'aura' });
+  ok('「-」的装伤不能选', !bad.ok);
+  const good = E.actions.applyAction(r2.state, { type: 'resolveDamage', player: 1, choice: 'life' });
+  eq('只能吃命 10→9', good.state.players[1].life, 9);
+}
+
+{
+  // 雅打ち：能打消通常札的攻击，打不掉王牌的攻击
+  let s = withHand(0, ['01-yurina-o-n-1']);       // 斬（通常札）
+  s.players[1].hand = [cardById('04-tokoyo-o-n-2')];
+  s.players[1].focus = 2;                          // 境地
+  s.distance = 3;
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-1' });
+  r = E.actions.applyAction(r.state, { type: 'respond', player: 1, cardId: '04-tokoyo-o-n-2' });
+  ok('雅打ち 能打消通常札的攻击', r.ok && !r.state.pending);
+
+  // 王牌攻击 → 打不掉
+  let s2 = withHand(0, []);
+  s2.players[0].flare = 10;
+  s2.players[0].specials = [Object.assign(cardById('01-yurina-o-s-1'), { used: false })];
+  s2.players[1].hand = [cardById('04-tokoyo-o-n-2')];
+  s2.players[1].focus = 2;
+  s2.distance = 3;                                  // 月影落 3-4
+  let r2 = E.actions.applyAction(s2, { type: 'playCard', player: 0, cardId: '01-yurina-o-s-1' });
+  ok('打出王牌攻击', r2.ok, r2.error);
+  r2 = E.actions.applyAction(r2.state, { type: 'respond', player: 1, cardId: '04-tokoyo-o-n-2' });
+  ok('雅打ち 打不掉王牌的攻击（还留着待结算）', !!r2.state.pending);
+}
+
+/* ---------- 26. 不可变性 ---------- */
 group('不可变性');
 {
   const s = freshP0();

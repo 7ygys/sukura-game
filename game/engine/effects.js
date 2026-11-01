@@ -560,8 +560,12 @@
     "04-tokoyo-o-n-2": {
       onRespond(state, who, pd) {
         if (!kyouchi(state, who)) return;
-        const c = pd.card;
-        if (c && (c.types || []).indexOf('fullpower') >= 0) return;
+        // 卡面：対応した「切札でない」《攻撃》を打ち消す
+        // 这里判的是「这次攻击来自王牌（切札）吗」，不是《全力》
+        if (pd.fromSpecial) {
+          Engine.state.log(state, '雅打ち：对方这次是王牌攻击，打不掉');
+          return;
+        }
         pd.cancelled = true;
         Engine.state.log(state, '雅打ち：打消这次攻击');
       }
@@ -570,8 +574,8 @@
     // 跳ね兔：间合 ≤3 → 虚→间合
     "04-tokoyo-o-n-3": {
       onUse(state, who) {
-        if (state.distance <= 3) Engine.effects.fx.moveCrystal(state, who, 'dust', 'distance', 1);
-        else Engine.state.log(state, '跳ね兔：间合不是 3 以下，无事发生');
+        if (state.distance <= 3) Engine.effects.fx.moveCrystal(state, who, 'dust', 'distance', 2);
+        else Engine.state.log(state, '跳ね兎：间合不是 3 以下，无事发生');
       }
     },
 
@@ -597,7 +601,7 @@
           });
         });
         if (pool.length) Engine.state.log(state, '要返し：把 ' + pool.length + ' 张牌放到牌库底');
-        Engine.effects.fx.moveCrystal(state, who, 'dust', 'aura', 1);
+        Engine.effects.fx.moveCrystal(state, who, 'dust', 'aura', 2);   // 卡面：ダスト→自オーラ：2
       }
     },
 
