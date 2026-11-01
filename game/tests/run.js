@@ -602,7 +602,7 @@ group('卡牌效果');
   E.rules.tickAttachments(s, 0);
   eq('破弃后付与区清空', s.players[0].attachments.length, 0);
   ok('破弃时生成了攻击', !!s.pending);
-  eq('生成攻击的伤害 3/0', s.pending.damage, { aura: 3, life: 0 });
+  eq('生成攻击的伤害 3/-（「-」保留成 null）', s.pending.damage, { aura: 3, life: null });
 }
 
 /* ---------- 10. 摇波剩下几张 ---------- */
@@ -1467,7 +1467,34 @@ group('气迫 只给非王牌的攻击');
   ok('气迫的加成还留着给的下一次', !!r.state.players[0].nextOtherAttack);
 }
 
-/* ---------- 27. 不可变性 ---------- */
+/* ---------- 27. 攻击牌当对应也要看距离 ---------- */
+group('对应时的适正距离');
+{
+  // 石突 是 2-3 的攻击牌，间合 5 时不能拿它当对应
+  let s = withHand(0, ['01-yurina-o-n-1']);        // 斬 3-4
+  s.players[1].hand = [cardById('02-saine-o-n-3')]; // 石突 2-3
+  s.distance = 5;
+  s.players[1].aura = 3;
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-1' });
+  // 斬 打不到 5，先走近一点
+  ok('間合 5 時 斬(3-4) 打不出', !r.ok);
+  s.distance = 4;
+  r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-1' });
+  ok('間合 4 時 斬 打出', r.ok, r.error);
+  s = r.state;
+  s.distance = 5;                                    // 对应前把距离推远
+  const bad = E.actions.applyAction(s, { type: 'respond', player: 1, cardId: '02-saine-o-n-3' });
+  ok('間合 5 時 石突(2-3) 不能当对应', !bad.ok);
+  eq('失败后石突还在手里', bad.state.players[1].hand.length, 1);
+
+  // 间合 3 时可以
+  const s2 = E.state.clone(s);
+  s2.distance = 3;
+  const good = E.actions.applyAction(s2, { type: 'respond', player: 1, cardId: '02-saine-o-n-3' });
+  ok('間合 3 時 石突 可以对应', good.ok, good.error);
+}
+
+/* ---------- 28. 不可变性 ---------- */
 group('不可变性');
 {
   const s = freshP0();

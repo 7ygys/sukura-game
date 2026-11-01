@@ -304,7 +304,8 @@
       gap: true,
       onBreak(state, who) {
         generateAttack(state, who, {
-          name: '圧気（破弃）', range: [1, 2, 3, 4], aura: 3, life: 0
+          // 卡面是 3/-：命伤是「-」，玩家只能选装
+          name: '圧気（破弃）', range: [1, 2, 3, 4], aura: 3, life: null
         });
       }
     },
@@ -416,7 +417,8 @@
       onBreak(state, who) {
         Engine.effects.fx.moveCrystal(state, who, 'dust', 'distance', 1);
         generateAttack(state, who, {
-          name: '衝音晶（破弃）', range: [0,1,2,3,4,5,6,7,8,9,10], aura: 1, life: 0, noRespond: true
+          // 卡面是 1/-：只能选装
+          name: '衝音晶（破弃）', range: [0,1,2,3,4,5,6,7,8,9,10], aura: 1, life: null, noRespond: true
         });
       }
     },
@@ -627,7 +629,8 @@
         state.players[who].focus = 2;
       },
       onBreak(state, who) {
-        generateAttack(state, who, { name: '晴舞台（破弃）', range: [3,4,5,6], aura: 0, life: 1 });
+        // 卡面是 -/1：只能选命
+        generateAttack(state, who, { name: '晴舞台（破弃）', range: [3,4,5,6], aura: null, life: 1 });
       }
     },
 
@@ -689,7 +692,11 @@
       defender: 1 - who,
       cardId: spec.cardId || null,
       cardName: spec.name,
-      damage: { aura: Math.min(spec.aura || 0, 5), life: spec.life || 0 },
+      // 「-」要保留成 null：null 表示"这条没有伤害，不能选"，0 表示"可以选但不扣"
+      damage: {
+        aura: (spec.aura === null || spec.aura === undefined) ? null : Math.min(spec.aura, 5),
+        life: (spec.life === null || spec.life === undefined) ? null : spec.life
+      },
       range: spec.range.slice(),
       noRespond: !!spec.noRespond,
       stage: 'respond',

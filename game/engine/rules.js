@@ -114,12 +114,18 @@
     const back = p.discard.concat(p.hidden).filter(c => c.kind === 'normal');
     if (!back.length) return false;
 
-    // 规则 9-7-ⅰ：由规则产生的再构成，先失去 1 点命
+    // 规则 9-7-ⅰ：由规则产生的再构成，先失去 1 点命。
+    // 这里的命伤是"重组自身"的代价，**不是**普通伤害：
+    //   - 不触发《隙》（规则 10-6 写的是「山札の再構成以外から」的命伤）
+    //   - 也无所谓选择，直接把命里 1 颗结晶搬到气
     if (payLife) {
       log(state, 'P' + (who + 1) + ' 重组的代价：命 -1');
-      applyDamage(state, who, 0, 1, 'life');
+      moveCrystal(state, who, 'life', 'flare', 1);
+      Engine.state.emit(state, 'damage', { who: who, kind: 'life', n: 1 });
     }
 
+    // 先收好要洗回去的牌，再清空那两个区域——
+    // 顺序反了的话，期间任何效果塞进 hidden 的牌都会被清掉（曾经因此丢过牌）
     p.discard = [];
     p.hidden = [];
     // 注意：要**把原来牌库里剩下的牌也算进去**再洗，不能直接覆盖
@@ -614,6 +620,36 @@
     return Math.max(0, Math.min(10, d));
   }
 
+  /**
+   * 这一发《攻击》**实际**的适正距离（含所有修正）。
+   * 只读：不改状态，也不消耗任何一次性的加成 —— 用来在"出牌之前"做距离确认。
+   */
+  function effectiveRange(state, who, card, fromSpecial) {
+    const p = state.players[who];
+    const ctx = {
+      aura: 0, life: 0, range: (card.range || []).slice(),
+      chokoku: false, both: false, fromSpecial: !!fromSpecial, tags: {}, dry: true
+    };
+    const table = (Engine.effects && Engine.effects.cards) || {};
+    const e = table[card.id];
+    if (e && e.onAttack) e.onAttack(state, who, ctx, card);
+    (p.attachments || []).forEach(function (a) {
+      const ae = table[a.id];
+      if (ae && ae.onModifyAttack) ae.onModifyAttack(state, who, ctx, card, a);
+    });
+    // 気迫：下一发「其他女神的非王牌攻击」距离扩大（近1）
+    const na = p.nextOtherAttack;
+    if (na && na.near && ctx.range.length) {
+      const g = String(card.id).split('-')[1];
+      const isSpecial = !!fromSpecial;
+      if (g !== 'yurina' && !(na.notSpecial && isSpecial)) {
+        const mn = Math.min.apply(null, ctx.range);
+        if (mn - 1 >= 0) ctx.range.push(mn - 1);
+      }
+    }
+    return ctx.range;
+  }
+
   /** 达人距离：默认 2，付与札可以加（例如圏域 +1） */
   function taijinOf(state) {
     let base = 2;
@@ -777,8 +813,13 @@
     }
 
     // ---- 攻击要检查距离 ----
-    if (isAttack && !inRange(state, card)) {
-      return { ok: false, error: '距离 ' + effDistance(state) + ' 不在适正距离内' };
+    // 注意：要用「算上所有修正后的距离」，不能用卡面上的原始值，
+    // 否则 気迫 的「距离扩大（近1）」在出牌这一关就被挡掉了
+    if (isAttack) {
+      const eff = effectiveRange(state, who, card, fromSpecial);
+      if (eff.indexOf(effDistance(state)) < 0) {
+        return { ok: false, error: '距离 ' + effDistance(state) + ' 不在适正距离内' };
+      }
     }
 
     // 《终端》：使用之后本回合不能再出牌、也不能做基本动作（规则 9-2）。
@@ -847,6 +888,7 @@
         range: (card.range || []).slice(),
         chokoku: false,
         both: false,
+        fromSpecial: fromSpecial,     // 这一发是不是来自王牌（切札）
         tags: {}
       };
       p.buff = { aura: 0, life: 0 };
@@ -953,6 +995,13 @@
       }
       if (pd.noRespond === 'normal' && card.kind === 'normal')
         return { ok: false, error: '这次攻击不可被通常札对应' };
+
+      // 规则 9-2-1 ⅰ：《攻击》卡当《对应》用时也要先做适正距离确认。
+      // 距离不对就是"使用不正"，这张牌要原样退回手里。
+      const isAttackCard = (card.types || []).indexOf('attack') >= 0;
+      if (isAttackCard && card.range && card.range.indexOf(effDistance(state)) < 0) {
+        return { ok: false, error: '距离 ' + effDistance(state) + ' 不在「' + card.name + '」的适正距离内，不能这样对应' };
+      }
 
       // 王牌当对应用，一样要付气，付掉的气进虚
       if (fromSpecial) {
