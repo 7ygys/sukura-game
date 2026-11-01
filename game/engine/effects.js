@@ -431,11 +431,14 @@
     // 律動弧戟（王牌・费5·行动）：连续三发攻击
     "02-saine-o-s-1": {
       onUse(state, who) {
+        // 卡面：3-4/1-1 → 4-5/1-1 → 3-5/2-2
+        // 三段都进队列，由 nextQueuedAttack 依次打；打不到的那段自动跳过
         state.attackQueue = [
-          { name: '律動弧戟②', range: [4, 5], aura: 1, life: 1 },
-          { name: '律動弧戟③', range: [3, 4, 5], aura: 2, life: 2 }
+          { cardId: '02-saine-o-s-1', name: '律動弧戟①', range: [3, 4], aura: 1, life: 1 },
+          { cardId: '02-saine-o-s-1', name: '律動弧戟②', range: [4, 5], aura: 1, life: 1 },
+          { cardId: '02-saine-o-s-1', name: '律動弧戟③', range: [3, 4, 5], aura: 2, life: 2 }
         ];
-        generateAttack(state, who, { name: '律動弧戟①', range: [3, 4], aura: 1, life: 1 });
+        Engine.rules.nextQueuedAttack(state, who);
       }
     },
 
@@ -505,7 +508,8 @@
       onUse(state, who) {
         Engine.effects.fx.stagger(state, 1 - who);
         if (renka(state, who)) {
-          state.players[who].nextOtherAttack = { bonus: { aura: 1, life: 1 } };
+          // 卡面：他のメガミによる《攻撃》を+1/+1 —— 记下来源女神，绯弥香自己的攻击不吃
+        state.players[who].nextOtherAttack = { bonus: { aura: 1, life: 1 }, src: 'himika', notSpecial: true };
           Engine.state.log(state, '连火：下一次其他女神的《攻击》+1/+1');
         }
       }

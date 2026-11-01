@@ -79,8 +79,15 @@
       Engine.state.emit(state, 'draw', { who: who, n: got });
     }
     if (exhaustCount > 0) {
-      log(state, 'P' + (who + 1) + ' 焦燥 ' + exhaustCount + ' 点（待结算）');
-      state.exhaust = { who: who, remaining: exhaustCount };
+      // 同一个回合里可能先因为「开始阶段抽 2」缺 2 张，
+      // 又因为卡牌效果再抽而缺 1 张 —— 这些焦燥要**累加**，不能被后一笔覆盖
+      if (state.exhaust && state.exhaust.who === who) {
+        state.exhaust.remaining += exhaustCount;
+        log(state, 'P' + (who + 1) + ' 焦燥再 +' + exhaustCount + ' 点（累计 ' + state.exhaust.remaining + '）');
+      } else {
+        state.exhaust = { who: who, remaining: exhaustCount };
+        log(state, 'P' + (who + 1) + ' 焦燥 ' + exhaustCount + ' 点（待结算）');
+      }
       Engine.state.emit(state, 'exhaust', { who: who, n: exhaustCount });
     }
     return got;
@@ -213,6 +220,7 @@
     Engine.state.emit(state, 'enhance', { who: who });
 
     state.nabu = null;
+    // 这里是「确认展开」：牌已经用掉了 → 《终端》要**保留**
     return { ok: true };
   }
 
@@ -220,6 +228,9 @@
   function cancelNabu(state, who) {
     if (!state.nabu || state.nabu.who !== who) return { ok: false, error: '没有要取消的付与' };
     state.nabu = null;
+    // 取消 = 这张牌没被使用过：如果它是《终端》，那条限制也跟着撤销
+    const used = state.players[who] && state.players[who].terminated;
+    if (used) state.players[who].terminated = false;
     log(state, '取消展开');
     return { ok: true };
   }
@@ -439,6 +450,9 @@
     p.terminated = false;
     p.fullpowerUsed = false;
     p.usedBasicThisTurn = false;
+    // 「本回合下一次攻击 +X/+Y」这类加成不能跨回合留着
+    p.buff = { aura: 0, life: 0 };
+    p.nextOtherAttack = null;
 
     if (!p.firstTurnDone) {
       p.firstTurnDone = true;
@@ -722,11 +736,22 @@
 
     log(state, '对应改变了间合，攻击落空（间合 ' + effDistance(state) + '）');
     state.pending = null;
-    if (state.attackQueue && state.attackQueue.length) {
-      const spec = state.attackQueue.shift();
-      Engine.effects.generateAttack(state, pd.attacker, spec);
-    }
+    nextQueuedAttack(state, pd.attacker);
     return true;
+  }
+
+  /**
+   * 把攻击队列推到下一发。
+   * 规则：每一发都要各自做适正距离确认，打不到的那一发直接作废（10-5），
+   * 但后面的照常继续；全部打完就清空队列。
+   */
+  function nextQueuedAttack(state, attacker) {
+    while (state.attackQueue && state.attackQueue.length) {
+      const spec = state.attackQueue.shift();
+      const made = Engine.effects.generateAttack(state, attacker, spec);
+      if (made) return true;      // 打得出，停下等它结算
+    }
+    return false;
   }
 
   /* ==========================================================================
@@ -882,9 +907,12 @@
       // 「本回合下一次攻击 +X/+Y」这类加成先叠上去，然后清空
       const buff = p.buff || { aura: 0, life: 0 };
       // 「-」要在后面保持 null（代表"没有这条伤害"），不能变成 0
+      // 「+X/+Y」如果是「他のメガミによる《攻撃》」限定，自己女神的攻击就不吃
+      const cardGoddess = String(card.id).split('-')[1];
+      const buffApplies = !buff.otherGoddess || cardGoddess !== buff.otherGoddess;
       const ctx = {
-        aura: (dmg.aura === null || dmg.aura === undefined) ? null : dmg.aura + (buff.aura || 0),
-        life: (dmg.life === null || dmg.life === undefined) ? null : dmg.life + (buff.life || 0),
+        aura: (dmg.aura === null || dmg.aura === undefined) ? null : dmg.aura + (buffApplies ? (buff.aura || 0) : 0),
+        life: (dmg.life === null || dmg.life === undefined) ? null : dmg.life + (buffApplies ? (buff.life || 0) : 0),
         range: (card.range || []).slice(),
         chokoku: false,
         both: false,
@@ -904,8 +932,9 @@
       const na = p.nextOtherAttack;
       if (na) {
         const g = String(card.id).split('-')[1];
+        const srcGoddess = na.src || 'yurina';       // 谁给的加成（気迫 = 刀）
         const isSpecialAttack = !!ctx.fromSpecial;
-        if (g !== 'yurina' && !(na.notSpecial && isSpecialAttack)) {
+        if (g !== srcGoddess && !(na.notSpecial && isSpecialAttack)) {
           if (ctx.range.length) {
             const mn = Math.min.apply(null, ctx.range);
             if (mn - 1 >= 0) ctx.range.push(mn - 1);   // 距离扩大（近1）
@@ -1060,10 +1089,7 @@
     if (!pd.cancelled && pd.range && pd.range.indexOf(effDistance(state)) < 0) {
       log(state, '对应改变了间合，攻击落空（间合 ' + state.distance + '）');
       state.pending = null;
-      if (state.attackQueue && state.attackQueue.length) {
-        const spec = state.attackQueue.shift();
-        Engine.effects.generateAttack(state, pd.attacker, spec);
-      }
+      nextQueuedAttack(state, pd.attacker);
       return { ok: true };
     }
 
@@ -1080,10 +1106,7 @@
       log(state, '这次的《攻击》被打消了');
       Engine.state.emit(state, 'cancel', { who: pd.defender });
       state.pending = null;
-      if (state.attackQueue && state.attackQueue.length) {
-        const nextSpec = state.attackQueue.shift();
-        Engine.effects.generateAttack(state, pd.attacker, nextSpec);
-      }
+      nextQueuedAttack(state, pd.attacker);
       return { ok: true };
     }
 
@@ -1104,11 +1127,24 @@
 
     const dmg = pd.damage;
 
+    const isBoth = !!pd.both;
+
     // 有「这张牌上的结晶视为在装中」的付与札（無音壁）时，
     // 装伤由玩家自己决定：多少从真装扣、多少从那张牌上扣
-    if (choice === 'aura' && shadowAura(state, who) > 0) {
+    if ((isBoth || choice === 'aura') && shadowAura(state, who) > 0) {
+      const abletotal = state.players[who].aura + shadowAura(state, who);
+      // 不是 both 的普通装伤：吃不下就当场拒绝（不能进分配后再卡住）
+      if (!isBoth && abletotal < dmg.aura) {
+        return { ok: false, error: '装不够，不能选装' };
+      }
       pd.stage = 'auraSplit';
-      state.auraSplit = { who: who, total: dmg.aura, maxAttach: Math.min(shadowAura(state, who), dmg.aura) };
+      state.auraSplit = {
+        who: who,
+        total: Math.min(dmg.aura, abletotal),      // both 时按现有的扣，溢出丢失
+        maxAttach: Math.min(shadowAura(state, who), dmg.aura),
+        both: isBoth,
+        life: isBoth ? dmg.life : null              // both 的命伤要在分配之后补上
+      };
       return { ok: true };
     }
 
@@ -1154,11 +1190,7 @@
     }
 
     // 多段攻击队列（律動弧戟那种）
-    if (state.attackQueue && state.attackQueue.length) {
-      const nextSpec = state.attackQueue.shift();
-      Engine.effects.generateAttack(state, pd.attacker, nextSpec);
-      return { ok: true };
-    }
+    if (nextQueuedAttack(state, pd.attacker)) return { ok: true };
 
     tryRevive(state, 1 - who);    // 伤害之后检查「即再起」
     tryRevive(state, who);
@@ -1202,6 +1234,11 @@
     Engine.state.emit(state, 'damage', { who: who, kind: 'aura', n: sp.total });
     log(state, 'P' + (who + 1) + ' 装伤 -' + sp.total +
       '（真装 -' + fromAura + '，付与札 -' + fromAttach + '）');
+
+    // both：一边分配气伤，一边把命伤也照吃（规则 10-26）
+    if (sp.both && sp.life !== null && sp.life !== undefined && sp.life > 0) {
+      applyDamage(state, who, 0, sp.life, 'life');
+    }
 
     state.auraSplit = null;
     pd.stage = 'damage';
@@ -1288,7 +1325,7 @@
     // 回合
     startTurn, endTurn, tickAttachments,
     // 基本动作
-    BASIC, canBasic, basicAction, hideCard, taijinOf, shadowAura, moveCrystal, recheckRange, effDistance, resolveAuraSplit, triggerGap, confirmNabu, cancelNabu, confirmEndTurn,
+    BASIC, canBasic, basicAction, hideCard, taijinOf, shadowAura, moveCrystal, recheckRange, effDistance, resolveAuraSplit, triggerGap, nextQueuedAttack, confirmNabu, cancelNabu, confirmEndTurn,
     // 再起
     tryRevive, stagger,
     // 出牌与攻防

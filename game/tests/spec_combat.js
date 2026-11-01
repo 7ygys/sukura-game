@@ -20,7 +20,12 @@
  *   15  攻击后生成的攻击（八方振り）
  *   16  多段攻击（律動弧戟）
  *   17  破弃时的攻击（衝音晶）
- *   18  结晶守恒：每个场景收尾都断言总数 = 36
+ *   18  装伤分配（無音壁）+ 结晶守恒
+ *   19  结晶守恒：连打 5 发，每一步都查
+ *
+ * 另外 20–22 是**本次写测试时发现的引擎问题**（已被引擎侧修好）：
+ * 断言按官方规则保留为回归测试，防止再退回去；每组注释里都写了
+ * 「复现 / 期望 / 当时的实际」。
  *
  * 写法约定：
  *   - 推演一律走 Engine.actions.applyAction（界面同一入口）；
@@ -289,6 +294,27 @@ group('3. 气伤上限 5');
   let r2 = A(s2, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-1' });
   eq('命伤 1 + 6 = 7，不被压到 5', r2.state.pending.damage, { aura: 3, life: 7 });
   eqc(r2.state, '命伤无上限');
+
+  // 边界：带「超克」时上限取消（気炎万丈：决死时其他女神的攻击 +1/+1 且超克）
+  let s3 = mk('yurina', 'saine', ['02-saine-o-n-2'], []);   // 薙斬り 3/1（其他女神）
+  setDist(s3, 5);
+  putAttach(s3, 0, '01-yurina-o-n-7', 4);        // 気炎万丈（纳 4）已在场上
+  setNum(s3, 0, 'life', 3);                      // 决死
+  s3.players[0].buff = { aura: 5, life: 0 };     // 气伤 3 + 1 + 5 = 9
+  let r3 = A(s3, { type: 'playCard', player: 0, cardId: '02-saine-o-n-2' });
+  ok('决死 + 気炎万丈：打出薙斬り', r3.ok, r3.error);
+  eq('超克取消上限：3 + 1（気炎万丈）+ 5 = 9，不被压到 5', r3.state.pending.damage.aura, 9);
+  eq('命伤同样 +1 → 2', r3.state.pending.damage.life, 2);
+  eqc(r3.state, '超克取消气伤上限');
+
+  // 对照：非决死时気炎万丈 不生效，也就没有超克，8 点照旧压到 5
+  let s4 = mk('yurina', 'saine', ['02-saine-o-n-2'], []);
+  setDist(s4, 5);
+  putAttach(s4, 0, '01-yurina-o-n-7', 4);
+  s4.players[0].buff = { aura: 5, life: 0 };     // 3 + 5 = 8
+  let r4 = A(s4, { type: 'playCard', player: 0, cardId: '02-saine-o-n-2' });
+  eq('非决死：没有超克，3 + 5 = 8 → 还是压到 5', r4.state.pending.damage.aura, 5);
+  eqc(r4.state, '非决死 · 上限照旧');
 }
 
 /* ============================================================
@@ -704,6 +730,9 @@ group('12. 终端：用后只能结束回合');
   s = r.state;
   eq('晴舞台 展开，纳 2', s.players[0].attachments[0].crystals, 2);
   eq('【展开时】集中力变成 2', s.players[0].focus, 2);
+  // 注：下面这一串断言抓到过一次回归——confirmNabu（**成功展开**）末尾误把
+  // terminated 清掉，导致《终端》完全不生效（展开晴舞台后还能继续出牌）。
+  // 正确的做法是只在 cancelNabu（取消展开）里撤销终端。
   eq('终端标记已立起', s.players[0].terminated, true);
   eqc(s, '晴舞台 展开');
 
@@ -802,6 +831,9 @@ group('14. 距离扩大：気迫 给下一发「非王牌」攻击');
   eqc(okSpecial.state, '気迫 加成');
 
   // 王牌攻击不吃这个加成（卡面写的是「切り札でない」）
+  // 注：这三条刚写出来时是失败的——playCard 算 ctx 时没有把 fromSpecial 传进去，
+  // 「非王牌」这条限制形同虚设：王牌攻击白拿距离扩大 + 不可被通常札对应，
+  // 还把加成消耗掉。引擎后来补了 ctx.fromSpecial，现在通过，保留为回归。
   let s2 = mk('himika', 'saine', ['01-yurina-o-n-5'], []);
   setDist(s2, 6);
   let r2 = A(s2, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-5' });
@@ -972,8 +1004,9 @@ group('18. 装伤分配：無音壁上的结晶视为装');
   r = A(r.state, { type: 'respond', player: 1, cardId: null });
   r = A(r.state, { type: 'resolveDamage', player: 1, choice: 'aura' });
   ok('有無音壁时选气要先做「分配」', r.ok, r.error);
-  eq('装伤分配挂起：共 3 点，最多 2 点能从牌上走', r.state.auraSplit,
-     { who: 1, total: 3, maxAttach: 2 });
+  eq('装伤分配：共 3 点', r.state.auraSplit && r.state.auraSplit.total, 3);
+  eq('装伤分配：最多 2 点能从牌上走', r.state.auraSplit && r.state.auraSplit.maxAttach, 2);
+  eq('装伤分配：由受害者自己分配', r.state.auraSplit && r.state.auraSplit.who, 1);
   const tooMuch = A(r.state, { type: 'resolveAuraSplit', player: 1, fromAttach: 3 });
   ok('从牌上扣超过它拥有的结晶数 → 被拒', !tooMuch.ok, tooMuch.error);
   const split = A(r.state, { type: 'resolveAuraSplit', player: 1, fromAttach: 2 });
@@ -1017,17 +1050,18 @@ group('19. 结晶守恒：连续多次攻击');
 }
 
 /* ============================================================
- * 20–22. 已发现的引擎问题（断言按官方规则写，引擎目前不满足）
+ * 20–22. 写这份测试时发现的引擎问题 → 保留为回归测试
  * ------------------------------------------------------------
- * 按任务要求：这些断言**保留为失败**，用来把 bug 钉住；
- * 每条都写清了「期望 / 实际 / 复现步骤」。
+ * 这三组刚写出来时都是**失败**的（引擎不满足规则），随后引擎侧
+ * 改了 rules.js，现在通过。断言保留下来当回归，防止再退回去；
+ * 每组都写清了「复现 / 期望 / 当时的实际」。
  * ============================================================ */
-group('20. 【问题 · 严重】無音壁 上结晶不足时「选气」会把这次攻击卡死');
+group('20. 回归：無音壁 上结晶不足时「选气」不能把攻击卡死');
 {
   // 复现：真装 1 + 無音壁 1 = 2 < 气伤 3，受害者选「气」
   // 期望：像普通的"装不够"一样被直接拒绝，攻击停在选伤害时机，可以改选「命」
-  // 实际：进了 auraSplit；分配怎么选都报「装不够」，改选命报「还没到选伤害的时候」，
-  //       结束回合报「有一张攻击还没结算」→ 这局永久卡死
+  // 当时的实际：进了 auraSplit；分配怎么选都报「装不够」，改选命报
+  //   「还没到选伤害的时候」，结束回合报「有一张攻击还没结算」→ 这局永久卡死
   let s = mk('yurina', 'saine', ['01-yurina-o-n-1'], []);
   setDist(s, 3);
   putAttach(s, 1, '02-saine-o-n-7', 1);
@@ -1041,15 +1075,15 @@ group('20. 【问题 · 严重】無音壁 上结晶不足时「选气」会把�
      bad.ok ? (bad.state.pending && bad.state.pending.stage) : bad.error);
   const alt = A(bad.state, { type: 'resolveDamage', player: 1, choice: 'life' });
   const end = A(bad.state, { type: 'endTurn', player: 0 });
-  ok('进入分配之后仍应有出路（改选「命」或结束回合）', alt.ok || end.ok,
+  ok('仍应有出路（改选「命」或结束回合），不能把这一局卡死', alt.ok || end.ok,
      [alt.error, end.error].join(' / '));
 }
 
-group('21. 【问题】both 攻击遇上無音壁：走装伤分配后命伤丢了');
+group('21. 回归：both 攻击遇上無音壁，走装伤分配后命伤也要照吃');
 {
   // 复现：フルバースト（both 3/1）打向有 無音壁(2) 的受害者，受害者选「气」→ 分配 2 颗
   // 期望：both = 两种伤害都吃，命伤 1 点照扣（规则 10-26）
-  // 实际：只结算了气伤，命和「气」都没动
+  // 当时的实际：只结算了气伤，命和「气」都没动
   let s = mk('himika', 'saine', ['03-himika-o-n-4'], []);
   setDist(s, 5);
   putAttach(s, 1, '02-saine-o-n-7', 2);
@@ -1057,8 +1091,8 @@ group('21. 【问题】both 攻击遇上無音壁：走装伤分配后命伤丢�
   ok('打出フルバースト（both 3/1）', r.ok, r.error);
   r = A(r.state, { type: 'respond', player: 1, cardId: null });
   r = A(r.state, { type: 'resolveDamage', player: 1, choice: 'aura' });
-  eq('选气 → 进入装伤分配（3 点，最多 2 点从牌上走）', r.state.auraSplit,
-     { who: 1, total: 3, maxAttach: 2 });
+  eq('选气 → 进入装伤分配：共 3 点', r.state.auraSplit && r.state.auraSplit.total, 3);
+  eq('最多 2 点从牌上走', r.state.auraSplit && r.state.auraSplit.maxAttach, 2);
   r = A(r.state, { type: 'resolveAuraSplit', player: 1, fromAttach: 2 });
   ok('分配完成', r.ok, r.error);
   s = r.state;
@@ -1068,11 +1102,11 @@ group('21. 【问题】both 攻击遇上無音壁：走装伤分配后命伤丢�
   eqc(s, 'both + 無音壁');
 }
 
-group('22. 【问题 · 轻】「取消展开」之后不该留下「终端」');
+group('22. 回归：「取消展开」之后不该留下「终端」');
 {
   // 复现：打出带《终端》的付与札（晴舞台）→ 出现「纳」分配 → 取消
   // 期望：取消 = 这张牌没被使用过，终端不该留下，还能正常出牌
-  // 实际：牌回到手里，但 terminated 仍是 true → 本回合既不能出牌也不能做基本动作
+  // 当时的实际：牌回到手里，但 terminated 仍是 true → 本回合既不能出牌也不能做基本动作
   let s = mk('yurina', 'saine', ['04-tokoyo-o-n-7', '01-yurina-o-n-1'], []);
   setDist(s, 3);
   let r = A(s, { type: 'playCard', player: 0, cardId: '04-tokoyo-o-n-7' });
