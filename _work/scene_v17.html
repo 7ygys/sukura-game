@@ -297,9 +297,8 @@ function syncPending(){
   }
   if(G.choice){
     const opts=(G.choice.options||[]).map(function(id){
-      const labelMap={yes:'是',no:'否'};
       const card=ALL[id];
-      return {id:id, label:labelMap[id] || (card?card.name:id)};
+      return {id:id, label:CHOICE_LABEL[id] || (card?card.name:id)};
     });
     S.dialog={type:'choice', prompt:G.choice.prompt, options:opts};
     return;
@@ -909,6 +908,17 @@ function drawFlash(){
   ctx.restore();
   txt(W/2, H*0.42+h/2+22, '对应：'+f.card.name, 13, 'rgba(255,225,190,'+a+')');
 }
+
+// 选择项的显示名（引擎里用的是代号）
+const CHOICE_LABEL = {
+  yes: '是',
+  no: '否',
+  flare_to_aura: '自气 → 自装',
+  aura_to_dist:  '自装 → 间合',
+  aura_to_flare: '自装 → 自气',
+  dist_to_dust:  '间合 → 虚',
+  dust_to_dist:  '虚 → 间合'
+};
 
 // ===== 引擎事件 → 中央大图标 =====
 // 做了什么，就在屏幕中央弹一下对应的图标（像原版那样）
@@ -1574,9 +1584,13 @@ function toWorld(e){
   return {x:(e.clientX-r.left)/r.width*W,y:(e.clientY-r.top)/r.height*H};
 }
 function pick(p){
+  function inside(z){ return p.x>=z.x && p.x<=z.x+z.w && p.y>=z.y && p.y<=z.y+z.h; }
+  // 弹窗按钮永远优先：底下的卡牌/按钮再大也不能抢走点击
   for(let i=HIT.length-1;i>=0;i--){
-    const z=HIT[i];
-    if(p.x>=z.x&&p.x<=z.x+z.w&&p.y>=z.y&&p.y<=z.y+z.h) return z.id;
+    if(String(HIT[i].id).indexOf('dlg_')===0 && inside(HIT[i])) return HIT[i].id;
+  }
+  for(let i=HIT.length-1;i>=0;i--){
+    if(inside(HIT[i])) return HIT[i].id;
   }
   return null;
 }
@@ -1626,6 +1640,14 @@ cvs.addEventListener('mouseup',function(e){
   }
 });
 cvs.addEventListener('click',function(e){
+  try { handleClick(e); }
+  catch(err){
+    LAST_ERROR = '点击出错：' + ((err && err.message) || err);
+    console.error(err);
+  }
+});
+
+function handleClick(e){
   startBgm();                 // 浏览器要求先有用户操作才能播声音
   const id=pick(toWorld(e));
   if(S.swallowClick){ S.swallowClick=false; }
@@ -1761,7 +1783,7 @@ cvs.addEventListener('click',function(e){
   if(id==='opile_discard'){ S.openPile = S.openPile==='odiscard'?null:'odiscard'; return; }
   if(id==='opile_hidden'){ S.openPile = S.openPile==='ohidden'?null:'ohidden'; return; }
   if(id==='opile_deck'){ S.openPile=null; return; }
-});
+}
 
 window.addEventListener('keydown',function(e){
   if(e.key===' ')S.sweep={t0:S.t,dur:0.6,text:'第 1 回合'};
@@ -1818,6 +1840,19 @@ resize();
 // 调试：弹窗 / 中央信号 / 畏缩 / 集中力数字
 (function(){
   const q=new URLSearchParams(location.search);
+  // 调试：?autoclick=dlg_opt_yes —— 1.2 秒后自动点一下那个按钮（用来测点击链路）
+  if(q.get('autoclick')){
+    const want=q.get('autoclick');
+    setTimeout(function(){
+      const h=HIT.find(function(z){ return z.id===want; });
+      if(!h){ console.log('autoclick: 没找到 '+want); return; }
+      const r=cvs.getBoundingClientRect();
+      const cx=(h.x+h.w/2)/W*r.width+r.left;
+      const cy=(h.y+h.h/2)/H*r.height+r.top;
+      cvs.dispatchEvent(new MouseEvent('click',{clientX:cx,clientY:cy,bubbles:true}));
+      console.log('autoclick 点了 '+want);
+    },1200);
+  }
   if(q.get('stagger')==='1') G.players[G.active].staggered=true;
   if(q.get('vigor')) S.focusVal=parseInt(q.get('vigor'),10)||0;
   const dlg=q.get('dlg');
@@ -1838,6 +1873,19 @@ S.sweep={t0:2.2,dur:0.6,text:'第 1 回合'};
 // 调试：?dbg=attack 直接打一张攻击牌看对应弹窗；?dbg=basic 走一次前进
 (function(){
   const q=new URLSearchParams(location.search);
+  // 调试：?autoclick=dlg_opt_yes —— 1.2 秒后自动点一下那个按钮（用来测点击链路）
+  if(q.get('autoclick')){
+    const want=q.get('autoclick');
+    setTimeout(function(){
+      const h=HIT.find(function(z){ return z.id===want; });
+      if(!h){ console.log('autoclick: 没找到 '+want); return; }
+      const r=cvs.getBoundingClientRect();
+      const cx=(h.x+h.w/2)/W*r.width+r.left;
+      const cy=(h.y+h.h/2)/H*r.height+r.top;
+      cvs.dispatchEvent(new MouseEvent('click',{clientX:cx,clientY:cy,bubbles:true}));
+      console.log('autoclick 点了 '+want);
+    },1200);
+  }
   const op=q.get('open');
   if(op) S.openPile=op;
   const d=q.get('dbg');
@@ -1875,6 +1923,12 @@ S.sweep={t0:2.2,dur:0.6,text:'第 1 回合'};
         .concat(def.specials.filter(function(c){return !c.used && (c.types||[]).indexOf('reaction')>=0;}));
       S.dialog={type:'pickReact', cards:picks};
     }
+  }
+  if(d==='shibu'){
+    // 调试：直接把 詩舞 塞进手里并打出，走到"选一项"
+    G.players[G.active].hand=[ALL['04-tokoyo-o-n-4']];
+    G.players[G.active].flare=2;
+    act({type:'playCard', player:G.active, cardId:'04-tokoyo-o-n-4'});
   }
   if(d==='choice'){
     G.choice={who:G.active, sourceId:'reshuffle',
