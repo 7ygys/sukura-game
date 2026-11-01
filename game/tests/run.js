@@ -390,38 +390,45 @@ function withHand(who, ids) {
 }
 
 {
-  // 对应：一闪(2/2, 距离3) 被 石突(攻击+对应) 对应
-  let s = withHand(0, ['01-yurina-o-n-2']);
+  // 对应：斬(3-4, 3/1) 被 石突（攻击 2-3/2-1 ＋ 对应）拦下
+  // 石突作为对应时：先结算它自己的攻击 → 【攻击后】八相 虚→间合 → 最后原攻击
+  let s = withHand(0, ['01-yurina-o-n-1']);        // 斬 3-4 / 3-1
   s.players[1].hand = [cardById('02-saine-o-n-3')];
   s.distance = 3;
+  s.players[1].aura = 1;      // 八相（自装 ≤1）
+  s.dust = 5;
 
-  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-2' });
-  ok('打出「一闪」', r.ok, r.error);
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-1' });
+  ok('打出「斬」', r.ok, r.error);
+  r = E.actions.applyAction(r.state, { type: 'respond', player: 1, cardId: '02-saine-o-n-3' });
+  ok('用「石突」对应成功', r.ok, r.error);
   s = r.state;
 
-  r = E.actions.applyAction(s, { type: 'respond', player: 1, cardId: '02-saine-o-n-3' });
-  ok('用「石突き」对应成功', r.ok, r.error);
-  s = r.state;
-
-  // 石突き 作为对应：先用它自己的攻击 2-3 / 2-1，
-  // 再跑它的【攻击后】3-5 / 2-1，最后才轮到原攻击
-  ok('石突き 自身攻击先上桌', !!s.pending && s.pending.cardName === '石突き');
-  eq('石突き 自身攻击 2/1', s.pending.damage, { aura: 2, life: 1 });
+  ok('石突 自身攻击先上桌', !!s.pending && s.pending.cardName.indexOf('石突') === 0);
+  eq('石突 自身攻击 2/1', s.pending.damage, { aura: 2, life: 1 });
   eq('原攻击挂在栈里', s.attackStack.length, 1);
   eq('对应牌进弃牌区', s.players[1].discard.length, 1);
 
   let r2 = E.actions.applyAction(s, { type: 'respond', player: 0, cardId: null });
   r2 = E.actions.applyAction(r2.state, { type: 'resolveDamage', player: 0, choice: 'life' });
-  eq('原攻击者命 10→9（石突き 2/1 选命）', r2.state.players[0].life, 9);
-  ok('接着是【攻击后】那发', !!r2.state.pending && r2.state.pending.cardName.indexOf('石突き') === 0);
+  eq('原攻击者命 10→9（石突 2/1 选命）', r2.state.players[0].life, 9);
+  eq('【攻击后】八相：虚→间合，间合 3→4', r2.state.distance, 4);
+  ok('原攻击这时才回来', !!r2.state.pending && r2.state.pending.cardName === '斬');
 
-  r2 = E.actions.applyAction(r2.state, { type: 'respond', player: 0, cardId: null });
-  r2 = E.actions.applyAction(r2.state, { type: 'resolveDamage', player: 0, choice: 'life' });
-  eq('原攻击者命 10→8（【攻击后】2/1）', r2.state.players[0].life, 8);
-
-  ok('最后原攻击接回来', !!r2.state.pending && r2.state.pending.cardName === '一閃');
   r2 = E.actions.applyAction(r2.state, { type: 'resolveDamage', player: 1, choice: 'life' });
-  eq('被攻击方命 10→8（一閃 2/2）', r2.state.players[1].life, 8);
+  eq('被攻击方命 10→9（斬 3/1 选命）', r2.state.players[1].life, 9);
+}
+
+{
+  // 非八相（自装 3）时，石突的【攻击后】不发动
+  let s = withHand(0, ['01-yurina-o-n-1']);
+  s.players[1].hand = [cardById('02-saine-o-n-3')];
+  s.distance = 3; s.dust = 5; s.players[1].aura = 3;
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-1' });
+  r = E.actions.applyAction(r.state, { type: 'respond', player: 1, cardId: '02-saine-o-n-3' });
+  let r2 = E.actions.applyAction(r.state, { type: 'respond', player: 0, cardId: null });
+  r2 = E.actions.applyAction(r2.state, { type: 'resolveDamage', player: 0, choice: 'life' });
+  eq('不是八相：间合不变', r2.state.distance, 3);
 }
 
 {

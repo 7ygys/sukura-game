@@ -376,11 +376,12 @@
     // 它的【攻击后】再打一发 3-5 / 2-1（不可被对应）
     "02-saine-o-n-3": {
       attackOnRespond: true,
-      onAfterAttack(state, who, pd) {
-        if (pd && (pd.usedAsResponse || pd.fromResponse)) {
-          generateAttack(state, who, {
-            name: '石突き【攻击后】', range: [3, 4, 5], aura: 2, life: 1, noRespond: true
-          });
+      // 【攻击后】八相～自装 ≤1 时，虚 → 间合 1 颗
+      // （卡面是图标记法：枯树「ダスト」→ 足迹「間合」，1 枚羽饰 = 1 颗）
+      onAfterAttack(state, who) {
+        if (hassou(state, who)) {
+          Engine.effects.fx.moveCrystal(state, who, 'dust', 'distance', 1);
+          Engine.state.log(state, '石突【攻击后】八相：虚 → 间合 1 颗');
         }
       }
     },
