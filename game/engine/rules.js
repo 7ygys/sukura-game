@@ -587,6 +587,9 @@
     advance: {
       name: '前进',
       need: (st, p) => effDistance(st) > taijinOf(st) && p.aura < Engine.state.INIT.AURA_MAX,
+      why: (st, p) => p.aura >= Engine.state.INIT.AURA_MAX
+        ? '装已经满了（上限 ' + Engine.state.INIT.AURA_MAX + '）'
+        : '间合 ' + effDistance(st) + ' 已经到了达人距离（' + taijinOf(st) + '）以内，不能再前进',
       apply: (st, p, who) => { moveCrystal(st, who, 'distance', 'aura', 1); }
     },
 
@@ -594,6 +597,7 @@
     retreat: {
       name: '后退',
       need: (st, p) => p.aura >= 1 && st.distance < 10,
+      why: (st, p) => p.aura < 1 ? '装里没有结晶' : '间合已经 10（上限），不能再后退',
       apply: (st, p, who) => { moveCrystal(st, who, 'aura', 'distance', 1); }
     },
 
@@ -601,6 +605,9 @@
     gather: {
       name: '缠绕',
       need: (st, p) => st.dust >= 1 && p.aura < Engine.state.INIT.AURA_MAX,
+      why: (st, p) => p.aura >= Engine.state.INIT.AURA_MAX
+        ? '装已经满了（上限 ' + Engine.state.INIT.AURA_MAX + '）'
+        : '虚里没有结晶',
       apply: (st, p, who) => { moveCrystal(st, who, 'dust', 'aura', 1); }
     },
 
@@ -608,6 +615,7 @@
     charge: {
       name: '宿命',
       need: (st, p) => p.aura >= 1,
+      why: (st, p) => '装里没有结晶',
       apply: (st, p, who) => { moveCrystal(st, who, 'aura', 'flare', 1); }
     },
 
@@ -615,6 +623,12 @@
     disengage: {
       name: '离脱',
       need: (st, p) => effDistance(st) <= taijinOf(st) && st.distance < 10 && st.dust >= 1,
+      why: (st, p) => {
+        if (effDistance(st) > taijinOf(st))
+          return '间合 ' + effDistance(st) + ' 比达人距离（' + taijinOf(st) + '）远，不能用离脱';
+        if (st.distance >= 10) return '间合已经 10（上限）';
+        return '虚里没有结晶可以移动';   // 最常见：间合够了，但虚是空的
+      },
       apply: (st, p, who) => { moveCrystal(st, who, 'dust', 'distance', 1); }
     }
   };
@@ -703,7 +717,10 @@
     if (p.terminated) return { ok: false, error: '终端：本回合不能再使用牌或做基本动作' };
     // 用了《全力》卡之后就进入全力行动，不能再做基本动作
     if (p.fullpowerUsed) return { ok: false, error: '全力行动：本回合已经用过牌了' };
-    if (!b.need(state, p)) return { ok: false, error: b.name + '的条件不满足' };
+    if (!b.need(state, p)) {
+      const reason = b.why ? b.why(state, p) : '条件不满足';
+      return { ok: false, error: b.name + '：' + reason };
+    }
 
     if (!free) {
       const pay = opts.pay || 'focus';
