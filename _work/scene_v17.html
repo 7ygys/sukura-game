@@ -22,6 +22,33 @@
   <canvas id="stage"></canvas>
 </div>
 <div id="loading">载入背景…</div>
+<div id="netBar">
+  <div class="nb-panel">
+    <div class="nb-title">联机对战</div>
+    <div class="nb-status" id="netStatus">准备中…</div>
+    <textarea id="netOut" readonly placeholder="（这里会出现要发给对方的码）"></textarea>
+    <div class="nb-row"><button id="netCopy">复制这段码</button></div>
+    <textarea id="netIn" placeholder="把对方发来的码粘到这里"></textarea>
+    <div class="nb-row"><button id="netOk">连接</button><button id="netCancel">返回主界面</button></div>
+  </div>
+</div>
+<style>
+#netBar{position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+  background:rgba(4,6,10,0.92);z-index:50;font:15px/1.7 "Microsoft YaHei",sans-serif;color:#e6e9f0}
+#netBar.on{display:flex}
+.nb-panel{width:min(680px,92vw);background:#12161f;border:1px solid rgba(255,255,255,0.12);
+  border-radius:14px;padding:22px 24px;box-shadow:0 20px 60px rgba(0,0,0,0.6)}
+.nb-title{font-size:19px;color:#ffd9a0;margin-bottom:6px}
+.nb-status{color:#9fb3d1;font-size:13px;margin-bottom:12px;min-height:22px}
+#netBar textarea{width:100%;height:74px;box-sizing:border-box;background:#0b0f16;color:#cfe0ff;
+  border:1px solid rgba(255,255,255,0.14);border-radius:8px;padding:8px 10px;font:12px/1.5 monospace;
+  resize:none;word-break:break-all;margin-bottom:6px}
+.nb-row{display:flex;gap:10px;margin-bottom:14px}
+#netBar button{flex:1;padding:9px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.16);
+  background:#1b2230;color:#e6e9f0;font:14px "Microsoft YaHei",sans-serif;cursor:pointer}
+#netBar button:hover{background:#243044}
+#netBar button:disabled{opacity:0.45;cursor:default}
+</style>
 <script src="assets.js"></script>
 <script src="gamedata.js"></script>
 <script src="../game/engine/rng.js"></script>
@@ -29,6 +56,11 @@
 <script src="../game/engine/rules.js"></script>
 <script src="../game/engine/effects.js"></script>
 <script src="../game/engine/actions.js"></script>
+<script src="../net/lz.js"></script>
+<script src="../net/redact.js"></script>
+<script src="../net/proto.js"></script>
+<script src="../net/webrtc.js"></script>
+<script src="../net/session.js"></script>
 <script>
 (function(){
 'use strict';
@@ -237,9 +269,16 @@ const G = (function(){
   return st;
 })();
 
-/** 视角：单机热座，永远跟着"当前回合的人" */
-function meIdx(){ return G.active; }
-function oppIdx(){ return 1 - G.active; }
+/** 现在轮不轮到我操作（单机永远是 true） */
+function canIOperate(){ return !NET.active || G.active === NET.seat; }
+function isNetWaiting(){ return NET.active && (!NET.ready || !canIOperate()); }
+
+/** 联机状态（单机时 NET.active === false，一切照旧） */
+const NET = { active:false, mode:null, seat:0, session:null, ready:false, waiting:false };
+
+/** 视角：单机热座跟着"当前回合的人"；联机时固定为我的座位 */
+function meIdx(){ return NET.active ? NET.seat : G.active; }
+function oppIdx(){ return NET.active ? (1 - NET.seat) : (1 - G.active); }
 function myPlayer(){ return G.players[meIdx()]; }
 
 /** 当前视角玩家手牌（王牌模式返回未使用的王牌） */
@@ -259,8 +298,28 @@ function visActions(){
   return ACTIONS.filter(function(a){ return !a.onlyLow || G.distance <= 2; });
 }
 
+/** 联机模式下，拿到新视图就整份换掉 */
+function applyNetView(view){
+  if(!view) return;
+  Object.assign(G, view);
+  pumpEvents();
+  syncPending();
+  S.netReady = true;
+  var bar=document.getElementById('netBar');
+  if(bar) bar.classList.remove('on');
+}
+
 /** 把动作交给引擎；成功后刷新 UI 的待处理弹窗 */
 function act(a){
+  // 联机：自己不能替对方操作，动作统一交给 session（主机就地执行，客机发过去）
+  if(NET.active){
+    if(a.player !== undefined && a.player !== NET.seat){
+      S.toast={msg:'现在不是你操作', t0:S.t};
+      return false;
+    }
+    NET.session.act(a);
+    return true;
+  }
   const r = E.actions.applyAction(G, a);
   if (!r.ok) { S.toast = { msg: r.error, t0: S.t }; return false; }
   Object.assign(G, r.state);
@@ -271,7 +330,32 @@ function act(a){
 }
 
 /** 根据引擎里的 pending 决定要不要弹窗 */
+/** 这个弹窗应该由哪个座位处理（undefined = 谁都能看） */
+function dialogActor(type){
+  if(type==='nabu') return G.nabu && G.nabu.who;
+  if(type==='auraSplit') return G.auraSplit && G.auraSplit.who;
+  if(type==='exhaust') return G.exhaust && G.exhaust.who;
+  if(type==='endDiscard') return G.endTurnPending && G.endTurnPending.who;
+  if(type==='choice') return G.choice && G.choice.who;
+  if(type==='response' || type==='damage') return G.pending && G.pending.defender;
+  return undefined;
+}
+
+/** 弹窗只弹给该处理的人；联机时对方的弹窗我看不到 */
 function syncPending(){
+  syncPendingRaw();
+  if(NET.active && S.dialog){
+    const who = dialogActor(S.dialog.type);
+    if(who !== undefined && who !== null && who !== NET.seat){
+      S.dialog = null;
+      S.waiting = true;
+      return;
+    }
+  }
+  S.waiting = false;
+}
+
+function syncPendingRaw(){
   // 回合刚开始：等黑条扫完再弹窗
   if(S.holdDialogUntil && S.t < S.holdDialogUntil){ S.dialog=null; return; }
   // 优先级：黑条（上面的冻结期）→ 重组询问 → 焦燥 → 其余按出现顺序
@@ -1629,6 +1713,7 @@ cvs.addEventListener('mousemove',function(e){
 cvs.addEventListener('mousedown',function(e){
   const id=pick(toWorld(e)); if(!id) return;
   if(id.indexOf('hand')===0&&!S.play){
+    if(!canIOperate()){ S.toast={msg:'现在是对面的回合', t0:S.t}; return; }
     const i=parseInt(id.slice(4),10);
     S.drag={i:i,x:toWorld(e).x,y:toWorld(e).y};
     e.preventDefault();
@@ -1782,6 +1867,7 @@ function handleClick(e){
 
   // 基本行动
   if(id.indexOf('act')===0){
+    if(!canIOperate()){ S.toast={msg:'现在是对面的回合', t0:S.t}; return; }
     const list=visActions();
     const a=list[parseInt(id.slice(3),10)];
     if(a) act({type:'basic', player:G.active, which:a.k});
@@ -1792,6 +1878,7 @@ function handleClick(e){
   if(id==='ospec'){ S.openPile = S.openPile==='ospecial'?null:'ospecial'; return; }
 
   if(id==='turnEnd'){
+    if(!canIOperate()){ S.toast={msg:'现在是对面的回合', t0:S.t}; return; }
     const turn=G.turn;
     if(act({type:'endTurn', player:G.active})){
       S.handMode='hand';
@@ -2015,6 +2102,84 @@ S.sweep={t0:2.2,dur:0.6,text:'第 1 回合'};
     if(en) act({type:'playCard', player:G.active, cardId:en.id});
   }
 })();
+
+/* ============================================================
+ * 联机：连接流程
+ *   ?net=host  主机：生成邀请码 → 等对方回传回答码
+ *   ?net=guest 客机：粘邀请码 → 生成回答码 → 等主机连上
+ * ============================================================ */
+(function(){
+  const q = new URLSearchParams(location.search);
+  const mode = q.get('net');
+  if(mode !== 'host' && mode !== 'guest') return;
+
+  NET.active = true;
+  NET.mode = mode;
+  NET.seat = (mode === 'host') ? 0 : 1;
+
+  const bar = document.getElementById('netBar');
+  const statusEl = document.getElementById('netStatus');
+  const out = document.getElementById('netOut');
+  const inp = document.getElementById('netIn');
+  const okBtn = document.getElementById('netOk');
+  const copyBtn = document.getElementById('netCopy');
+  const cancelBtn = document.getElementById('netCancel');
+
+  bar.classList.add('on');
+  statusEl.textContent = (mode === 'host') ? '正在生成邀请码…' : '把主机的邀请码粘到下面，点连接';
+  okBtn.textContent = (mode === 'host') ? '连接（粘好回答码再点）' : '解析邀请码';
+
+  // 我自己的牌组（从主界面带过来）
+  const deckIds = (function(){
+    const d = q.get('deck');
+    if (d) {
+      const ids = d.split(',').filter(function(id){ return !!ALL[id]; });
+      if (ids.length === 10) return ids;
+    }
+    return deckOf(['yurina']).map(function(c){ return c.id; });
+  })();
+
+  function makeDeck(ids){ return ids.map(function(id){ return ALL[id]; }).filter(Boolean); }
+
+  NET.session = NetSession.createSession({
+    mode: mode,
+    engine: E,
+    myDeck: deckIds,
+    hostDeck: deckIds,
+    makeDeck: makeDeck,
+    onStatus: function(s){ statusEl.textContent = s; },
+    onInvite: function(code){ out.value = code; },
+    onView: applyNetView,
+    onError: function(e){
+      statusEl.textContent = '出错了：' + e;
+      S.toast = { msg: e, t0: S.t };
+    },
+    onConnected: function(){ statusEl.textContent = '已连接'; }
+  });
+
+  copyBtn.onclick = function(){
+    out.select();
+    let okCopy = false;
+    try { okCopy = document.execCommand('copy'); } catch(e){}
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(out.value).catch(function(){});
+      okCopy = true;
+    }
+    copyBtn.textContent = okCopy ? '已复制 ✓' : '全选后按 Ctrl+C';
+    setTimeout(function(){ copyBtn.textContent = '复制这段码'; }, 1500);
+  };
+
+  okBtn.onclick = function(){
+    const code = (inp.value || '').trim();
+    if (!code) { statusEl.textContent = '先把对方发来的码粘进来'; return; }
+    okBtn.disabled = true;
+    if (mode === 'host') NET.session.acceptAnswer(code);
+    else NET.session.join(code);
+  };
+
+  cancelBtn.onclick = function(){ location.href = 'prep.html'; };
+})();
+
 requestAnimationFrame(frame);
 })();
 </script>

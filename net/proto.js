@@ -57,8 +57,11 @@
       if (!msg || !msg.t) return;
 
       if (msg.t === 'hello') {
-        // 客机报到：认下座位，把当前局面推过去
+        // 客机报到：认下座位；如果带了牌组，就据此建立初始局面
         if (msg.seat !== undefined) guestSeat = msg.seat === 0 ? 0 : 1;
+        if (opts.makeState && msg.deck) {
+          state = opts.makeState(msg.deck, guestSeat);
+        }
         connected = true;
         bump();
         transport.send({ t: 'welcome', seq: seq, seat: guestSeat, version: VERSION });
@@ -168,9 +171,9 @@
 
     return {
       /** 报到 */
-      hello: function (mySeat) {
+      hello: function (mySeat, deck) {
         seat = (mySeat === 0) ? 0 : 1;
-        transport.send({ t: 'hello', seat: seat, version: VERSION });
+        transport.send({ t: 'hello', seat: seat, deck: deck || null, version: VERSION });
       },
       /** 发一个动作给主机 */
       act: function (action) {

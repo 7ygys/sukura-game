@@ -132,8 +132,11 @@
     <div class="sub">SAKURA&nbsp;ARMS</div>
     <div class="menu">
       <div class="btn" id="btnOnline">联 机 对 战</div>
-      <div class="btn ghost">人 机 对 战</div>
-      <div class="btn ghost">同 屏 双 人</div>
+      <div id="netChoice" style="display:none">
+        <div class="btn" id="btnHost" style="margin-top:8px">创 建 房 间（当主机）</div>
+        <div class="btn ghost" id="btnJoin" style="margin-top:8px">加 入 房 间（当客机）</div>
+      </div>
+      <div class="btn ghost" id="btnLocal">同 屏 双 人</div>
     </div>
     <div class="foot">非官方同人作品，仅供学习交流<br>素材版权归原权利方，禁止商用与再分发</div>
   </section>
@@ -358,10 +361,20 @@ function clearDetail(){
 function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 /* ---------- 事件 ---------- */
-$('#btnOnline').onclick=()=>{
+let netRole = null;          // null = 同屏双人；'host' / 'guest' = 联机
+
+function startBuild(role){
+  netRole = role;
   splitRoster(); state.picks=[]; state.deck={normal:[],special:[]};
   renderSelect(); show('select');
+}
+
+$('#btnOnline').onclick=()=>{
+  $('#netChoice').style.display = ($('#netChoice').style.display==='none') ? 'block' : 'none';
 };
+$('#btnHost').onclick=()=>startBuild('host');
+$('#btnJoin').onclick=()=>startBuild('guest');
+$('#btnLocal').onclick=()=>startBuild(null);
 $('#back1').onclick=()=>show('title');
 $('#back2').onclick=()=>{ renderSelect(); show('select'); };
 $('#toDeck').onclick=()=>{
@@ -369,7 +382,8 @@ $('#toDeck').onclick=()=>{
   renderDeck(); show('deck');
 };
 $('#toBattle').onclick=()=>{
-  const q='?deck='+encodeURIComponent(state.deck.normal.concat(state.deck.special).join(','));
+  let q='?deck='+encodeURIComponent(state.deck.normal.concat(state.deck.special).join(','));
+  if(netRole) q += '&net='+netRole;
   location.href='scene_v17.html'+q;
 };
 
