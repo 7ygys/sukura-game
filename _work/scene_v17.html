@@ -102,6 +102,15 @@ function startBgm(){
   playNextBgm();
 }
 
+// 兜底：任何未捕获的异常都显示在屏幕上，不要再"静默白屏"
+let LAST_ERROR = null;
+window.addEventListener('error', function(e){
+  LAST_ERROR = (e && e.message) ? e.message : String(e);
+});
+window.addEventListener('unhandledrejection', function(e){
+  LAST_ERROR = 'Promise: ' + (e && e.reason ? (e.reason.message || e.reason) : '');
+});
+
 const IMG={};
 (function(){
   const base='../素材/Sprite/';
@@ -948,7 +957,8 @@ function pumpEvents(){
     S.banner={img:img, t0:S.t, label:text};
     S.lastSeq = G.events[i].seq || S.lastSeq;
   }
-  S.lastSeq = G.events[G.events.length-1].seq || S.lastSeq;
+  // 事件可能是空的：不能直接取 [length-1]，否则一上来就抛异常、整个渲染循环直接死掉
+  if(G.events.length) S.lastSeq = G.events[G.events.length-1].seq || S.lastSeq;
 }
 
 // ===== 结晶移动的动画 =====
@@ -1504,6 +1514,15 @@ function drawScrim(){
 let last=0;
 let shakeApplied=false;
 function frame(ts){
+  try { frameBody(ts); }
+  catch(err){
+    LAST_ERROR = (err && err.message) ? err.message : String(err);
+    console.error(err);
+    requestAnimationFrame(frame);      // 关键：异常也不能让循环断掉
+  }
+}
+
+function frameBody(ts){
   const dt=Math.min((ts-last)/1000||0.016,0.05);last=ts;S.t+=dt;
   HIT.length=0;
   S.tip=null;
@@ -1534,6 +1553,16 @@ function frame(ts){
   if(S.holdDialogUntil && S.t >= S.holdDialogUntil){ S.holdDialogUntil = 0; syncPending(); }
   if(S.shake>0 || S.shaking){}
   drawPlay();drawSweep();drawDrawAnims();drawCardFlights();drawSparks();drawFloats();
+  if(LAST_ERROR){
+    ctx.save();
+    ctx.fillStyle='rgba(120,10,20,0.88)';
+    ctx.fillRect(0,H-64,W,64);
+    ctx.fillStyle='#ffd7dc';
+    ctx.font='16px sans-serif';
+    ctx.textAlign='left';ctx.textBaseline='middle';
+    ctx.fillText('脚本出错（把这条发给我）：'+LAST_ERROR, 20, H-32);
+    ctx.restore();
+  }
   if(S.shakeRestore){}drawFlash();drawAvatarTip();drawPilePanels();drawBanner();drawDialog();drawToast();drawCardTip();
   requestAnimationFrame(frame);
 }
