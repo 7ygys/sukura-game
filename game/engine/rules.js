@@ -313,11 +313,15 @@
 
     // 规则 10-26「両方のダメージを受ける」：两种都要吃，不由玩家二选一。
     // 装不够时只扣现有的（多出来的算溢出），命伤照常扣。
+    // 「-」代表这条线没有伤害，不能选
+    if (choice === 'aura' && (auraDmg === null || auraDmg === undefined)) return false;
+    if (choice === 'life' && (lifeDmg === null || lifeDmg === undefined)) return false;
+
     if (choice === 'both') {
       const available = p.aura + shadowAura(state, who);
-      const realAura = Math.min(available, auraDmg);
+      const realAura = (auraDmg === null || auraDmg === undefined) ? 0 : Math.min(available, auraDmg);
       if (realAura > 0) applyDamage(state, who, realAura, 0, 'aura');
-      if (lifeDmg > 0) applyDamage(state, who, 0, lifeDmg, 'life');
+      if (lifeDmg !== null && lifeDmg !== undefined && lifeDmg > 0) applyDamage(state, who, 0, lifeDmg, 'life');
       return true;
     }
 
@@ -425,6 +429,7 @@
 
     state.phase = 'main';
     log(state, '—— 第 ' + state.turn + ' 回合 · P' + (who + 1) + ' ——');
+    Engine.state.emit(state, 'turnStart', { who: who, turn: state.turn });
     return state;
   }
 
@@ -798,9 +803,10 @@
       // 规则 6-4-1-4：装伤上限 5；规则 10-21：带「超克」时上限取消
       // 「本回合下一次攻击 +X/+Y」这类加成先叠上去，然后清空
       const buff = p.buff || { aura: 0, life: 0 };
+      // 「-」要在后面保持 null（代表"没有这条伤害"），不能变成 0
       const ctx = {
-        aura: (dmg.aura || 0) + (buff.aura || 0),
-        life: (dmg.life || 0) + (buff.life || 0),
+        aura: (dmg.aura === null || dmg.aura === undefined) ? null : dmg.aura + (buff.aura || 0),
+        life: (dmg.life === null || dmg.life === undefined) ? null : dmg.life + (buff.life || 0),
         range: (card.range || []).slice(),
         chokoku: false,
         both: false,
@@ -831,7 +837,7 @@
         }
       }
 
-      if (!ctx.chokoku && ctx.aura > 5) ctx.aura = 5;
+      if (ctx.aura !== null && !ctx.chokoku && ctx.aura > 5) ctx.aura = 5;
       state.pending = {
         kind: 'attack',
         attacker: who,
@@ -1010,10 +1016,6 @@
     const table = (Engine.effects && Engine.effects.cards) || {};
     if (pd.cardId && table[pd.cardId] && table[pd.cardId].onAfterAttack)
       table[pd.cardId].onAfterAttack(state, pd.attacker, pd);
-    // 对应牌自己的【攻击后】也要走（例如石突き）
-    if (pd.responseCardId && table[pd.responseCardId] && table[pd.responseCardId].onAfterAttack) {
-      table[pd.responseCardId].onAfterAttack(state, pd.defender, Object.assign({}, pd, { usedAsResponse: true }));
-    }
 
     // 只有"还是这次攻击"时才清空——
     // 【攻击后】可能已经生成了新的攻击（八方振り / 石突き / 破弃时那种）

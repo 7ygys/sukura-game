@@ -1246,7 +1246,26 @@ group('44 张卡都能打出且不丢牌');
   ok('44 张卡全部能打出／结算且不丢牌（' + okCount + '/' + allCards.length + '）', failList.length === 0, failList.slice(0, 6));
 }
 
-/* ---------- 20. 不可变性 ---------- */
+/* ---------- 20. 「-」不是 0 ---------- */
+group('伤害里的「-」');
+{
+  // 三日月（2/-）：只能选装，不能选命
+  let s = withHand(0, ['01-yurina-o-s-2']);   // 浦波嵐 0-10 / 2/-
+  s.distance = 5;
+  s.players[0].flare = 3;
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-s-2' });
+  ok('打出浦波嵐', r.ok, r.error);
+  eq('命伤是 null（不是 0）', r.state.pending.damage.life, null);
+
+  r = E.actions.applyAction(r.state, { type: 'respond', player: 1, cardId: null });
+  ok('进入选伤害', r.ok, r.error);
+  const bad = E.actions.applyAction(r.state, { type: 'resolveDamage', player: 1, choice: 'life' });
+  ok('「-」的那条不能选', !bad.ok);
+  const good = E.actions.applyAction(r.state, { type: 'resolveDamage', player: 1, choice: 'aura' });
+  ok('装可以选', good.ok, good.error);
+}
+
+/* ---------- 21. 不可变性 ---------- */
 group('不可变性');
 {
   const s = freshP0();

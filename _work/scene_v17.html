@@ -293,8 +293,13 @@ function syncPending(){
         || def.specials.some(function(c){return !c.used && (c.types||[]).indexOf('reaction')>=0;});
       S.dialog={type:'response', canReact:canReact};
     } else {
-      S.dialog={type:'damage', dmg:pd.damage.aura+'/'+(pd.damage.life||'-'),
-        both:!!pd.both, canAura:def.aura>=pd.damage.aura, canLife:true};
+      const hasAura = pd.damage.aura !== null && pd.damage.aura !== undefined;
+      const hasLife = pd.damage.life !== null && pd.damage.life !== undefined;
+      S.dialog={type:'damage',
+        dmg:(hasAura?pd.damage.aura:'-')+'/'+(hasLife?pd.damage.life:'-'),
+        both:!!pd.both,
+        canAura: hasAura && def.aura >= pd.damage.aura,
+        canLife: hasLife};
     }
     return;
   }
@@ -643,6 +648,24 @@ function previewDamage(card, who){
   return {aura:ctx.aura, life:ctx.life, base:base, changed:changed};
 }
 
+// 算出这张牌现在打出去的适正距离（可能被距离扩大/缩小改过）
+function previewRange(card, who){
+  if(!card || !card.range) return null;
+  if((card.types||[]).indexOf('attack')<0) return null;
+  const base = card.range.slice();
+  let ctx = { aura:0, life:0, range: base.slice(), chokoku:false, both:false, tags:{} };
+  const p = G.players[who];
+  const tbl=(window.Engine&&Engine.effects&&Engine.effects.cards)||{};
+  const e=tbl[card.id];
+  if(e&&e.onAttack){ try{ e.onAttack(G, who, ctx, card); }catch(err){} }
+  (p.attachments||[]).forEach(function(a){
+    const ae=tbl[a.id];
+    if(ae&&ae.onModifyAttack){ try{ ae.onModifyAttack(G, who, ctx, card, a); }catch(err){} }
+  });
+  const changed = ctx.range.join(',') !== base.join(',');
+  return { range: ctx.range, base: base, changed: changed };
+}
+
 function cardBody(x,y,w,h,o,nameX,nameSize){
   const face=o.id?cardImage(o.id):null;
   if(face){
@@ -657,6 +680,24 @@ function cardBody(x,y,w,h,o,nameX,nameSize){
     rr(x,y,w,h,12); ctx.clip();
     ctx.drawImage(face, x-((dw-w)/2), y, dw, dh);   // 顶端对齐：卡面顶部的「距」不会被裁掉
     ctx.restore();
+
+    // 距被改动过（距离扩大/缩小）→ 卡面顶部红框
+    if(o && o.id){
+      const pr = previewRange(o, S.me);
+      if(pr && pr.changed){
+        const nums = pr.range.slice().sort(function(a,b){return a-b;});
+        const label = '距 ' + (nums.length>1 ? nums[0]+'-'+nums[nums.length-1] : nums[0]);
+        const bw = Math.max(64, w*0.42), bh = Math.max(22, h*0.075);
+        const px = x + w/2, py = y + h*0.13;
+        ctx.save();
+        ctx.fillStyle='rgba(12,6,9,0.82)';
+        rr(px-bw/2, py-bh/2, bw, bh, 6); ctx.fill();
+        ctx.strokeStyle='rgba(255,90,110,0.9)';ctx.lineWidth=1.6;
+        rr(px-bw/2, py-bh/2, bw, bh, 6); ctx.stroke();
+        ctx.restore();
+        txt(px, py, label, Math.max(11, w*0.085), '#ff6b7d');
+      }
+    }
 
     // 伤害被改动过 → 在卡面左下角用红字盖上新数值
     if(o && o.id){
@@ -886,6 +927,8 @@ function pumpEvents(){
       playSfx('react');
     } else if(ev.type==='cancel'){
       playSfx('react');
+    } else if(ev.type==='turnStart'){
+      S.sweep={t0:S.t, dur:1.1, text:'第 '+ev.turn+' 回合 · '+(ev.who===meIdx()?'你的回合':'对方回合')};
     }
     if(!img){ S.evIdx=i+1; continue; }
     // 图片还没加载好就等下一帧再放，别把事件吞掉
@@ -1294,6 +1337,7 @@ function drawDialog(){
     const s2=104;
     drawButton(d.canAura?IMG.bAura:IMG.bAuraDis, bx+bw*0.60, by+bh*0.66, s2,'装','aura');
     drawButton(d.canLife?IMG.bLife:IMG.bLifeDis, bx+bw*0.80, by+bh*0.66, s2,'命','life');
+    if(!d.canLife) txt(bx+bw*0.80, by+bh*0.66+s2*0.62+16, '（这条没有伤害）', 11, 'rgba(240,170,170,0.8)');
   } else {
     txt(bx+bw*0.56,by+bh*0.32,'是否要重构牌组？',21,'#f2ece2');
     txt(bx+bw*0.56,by+bh*0.48,'（重构牌组将会失去 1 点命）',14,'rgba(232,226,230,0.75)');
