@@ -337,6 +337,43 @@ function act(a){
 }
 
 /** 根据引擎里的 pending 决定要不要弹窗 */
+/**
+ * 这张牌现在能不能当《对应》打出去。
+ * 不只要「有对应属性」，还得看：
+ *   - 《攻击》牌当对应时要过适正距离（规则 9-2-1 ⅰ）
+ *   - 有使用条件的（氷雨只能对应王牌等）
+ *   - 王牌要付得起气
+ */
+function canRespondWith(card, who){
+  if(!card || !card.types) return false;
+  const tbl = (window.Engine && Engine.effects && Engine.effects.cards) || {};
+  const e = tbl[card.id];
+  let ok = card.types.indexOf('reaction') >= 0;
+  if(!ok && e && e.canRespond){ try { ok = !!e.canRespond(G, who, card); } catch(err){ ok = false; } }
+  if(!ok) return false;
+
+  // 《攻击》牌：距离必须对
+  if(card.types.indexOf('attack') >= 0 && card.range && card.range.length){
+    if(card.range.indexOf(E.rules.effDistance(G)) < 0) return false;
+  }
+  // 王牌：气要够
+  if(card.kind === 'special'){
+    const cost = (e && e.cost) ? Math.max(0, e.cost(G, who, card)) : (card.cost || 0);
+    if(G.players[who].flare < cost) return false;
+  }
+  // 使用条件
+  if(e && e.canUse){ try { if(e.canUse(G, who, card) !== true) return false; } catch(err){ return false; } }
+  return true;
+}
+
+/** 某个座位现在能打出哪些对应牌 */
+function respondCandidates(who){
+  const p = G.players[who];
+  if(!p) return [];
+  return p.hand.filter(function(c){ return canRespondWith(c, who); })
+    .concat(p.specials.filter(function(c){ return !c.used && canRespondWith(c, who); }));
+}
+
 /** 这个弹窗应该由哪个座位处理（undefined = 谁都能看） */
 function dialogActor(type){
   if(type==='nabu') return G.nabu && G.nabu.who;
@@ -409,9 +446,7 @@ function syncPendingRaw(){
   if(G.pending){
     const pd=G.pending, def=G.players[pd.defender];
     if(pd.stage==='respond'){
-      const canReact = def.hand.some(function(c){return (c.types||[]).indexOf('reaction')>=0;})
-        || def.specials.some(function(c){return !c.used && (c.types||[]).indexOf('reaction')>=0;});
-      S.dialog={type:'response', canReact:canReact};
+      S.dialog={type:'response', canReact: respondCandidates(pd.defender).length > 0};
     } else {
       const hasAura = pd.damage.aura !== null && pd.damage.aura !== undefined;
       const hasLife = pd.damage.life !== null && pd.damage.life !== undefined;
@@ -425,8 +460,9 @@ function syncPendingRaw(){
   }
   // 「盖牌后的免费基本动作」「选对应牌」是本地 UI 弹窗，
   // 引擎没有待处理时不能把它擦掉（之前会一闪而过）
-  if(S.dialog && (S.dialog.type==='bonus' || S.dialog.type==='pickReact')){
-    return;
+  if(S.dialog && S.dialog.type==='bonus') return;                 // 盖牌后的免费动作：纯本地，永远留
+  if(S.dialog && S.dialog.type==='pickReact'){                    // 选对应牌：攻击没了就该消失
+    if(G.pending && G.pending.stage==='respond') return;
   }
   S.dialog=null;
 }
@@ -1796,26 +1832,21 @@ function handleClick(e){
     if(dlg.type==='response'){
       if(tag==='yes'){
         // 「是」＝我要打一张对应牌 → 先让对方选牌
-        const def=G.players[G.pending.defender];
-        // 对应牌可能在手牌里，也可能是还没用过的王牌
-        const picks=def.hand.filter(function(c){return (c.types||[]).indexOf('reaction')>=0;})
-          .concat(def.specials.filter(function(c){return !c.used && (c.types||[]).indexOf('reaction')>=0;}));
+        const picks = respondCandidates(G.pending.defender);
         if(!picks.length){ act({type:'respond', player:G.pending.defender, cardId:null}); }
         else S.dialog={type:'pickReact', cards:picks};
       } else {
         act({type:'respond', player:G.pending.defender, cardId:null});
       }
     } else if(dlg.type==='pickReact'){
+      if(!G.pending){ S.dialog=null; return; }          // 攻击已经没了（被打消/结算完）
       if(tag==='back'){
-        const def=G.players[G.pending.defender];
-        const canReact=def.hand.some(function(c){return (c.types||[]).indexOf('reaction')>=0;});
-        S.dialog={type:'response', canReact:canReact};
+        S.dialog={type:'response', canReact:respondCandidates(G.pending.defender).length>0};
         return;
       }
       const i=parseInt(tag.slice(4),10);
       const card=(dlg.cards||[])[i];
       if(card){
-        // 打出的对应牌在中央闪一下，然后进弃牌/王牌区
         S.flash={card:card, t0:S.t};
         act({type:'respond', player:G.pending.defender, cardId:card.id});
       }
@@ -2056,10 +2087,7 @@ S.sweep={t0:2.2,dur:0.6,text:'第 1 回合'};
     if(atk){
       if(atk.range && atk.range.length) G.distance=atk.range[0];
       act({type:'playCard', player:G.active, cardId:atk.id});
-      const def=G.players[G.pending.defender];
-      const picks=def.hand.filter(function(c){return (c.types||[]).indexOf('reaction')>=0;})
-        .concat(def.specials.filter(function(c){return !c.used && (c.types||[]).indexOf('reaction')>=0;}));
-      S.dialog={type:'pickReact', cards:picks};
+      S.dialog={type:'pickReact', cards:respondCandidates(G.pending.defender)};
     }
   }
   if(d==='shibu'){

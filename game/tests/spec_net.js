@@ -301,4 +301,47 @@ group('联机：begin 用双方真实牌组建局');
   H.ok('客机看不到主机的牌面', guestView.players[0].hand.every(function (c) { return c.id === '?'; }));
 }
 
+group('联机：对应牌的距离过滤（规则 9-2-1 ⅰ）');
+{
+  // 雅打ち 是 2-4 的攻击牌；间合 5 时不能拿它当对应
+  const s = withHand(['01-yurina-o-n-1']);
+  s.players[1].hand = [cardById('04-tokoyo-o-n-2')];   // 雅打ち 2-4
+  s.players[1].focus = 2;                              // 境地
+  s.distance = 5;
+
+  const r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-1' });
+  // 斬 是 3-4，间合 5 打不到，改近一点再打
+  H.ok('间合 5 时斬打不出', !r.ok);
+
+  s.distance = 4;
+  const r2 = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-1' });
+  H.ok('间合 4 時斬打出', r2.ok, r2.error);
+
+  // 现在把间合推到 5，再用雅打ち对应 → 必须被拒
+  const s2 = E.state.clone(r2.state);
+  s2.distance = 5;
+  const bad = E.actions.applyAction(s2, { type: 'respond', player: 1, cardId: '04-tokoyo-o-n-2' });
+  H.ok('间合 5 时雅打ち(2-4) 不能对应', !bad.ok);
+  H.ok('拒绝原因提到适正距离', /适正距离/.test(bad.error || ''), bad.error);
+
+  // 间合 3 时可以用
+  const s3 = E.state.clone(r2.state);
+  s3.distance = 3;
+  const good = E.actions.applyAction(s3, { type: 'respond', player: 1, cardId: '04-tokoyo-o-n-2' });
+  H.ok('间合 3 时雅打ち可以对应', good.ok, good.error);
+}
+
+group('联机：打消之后不该卡在选牌弹窗');
+{
+  // 攻击被打消 → pending 变 null，对应牌列表也随之失效（数据层可断言）
+  let s = withHand(['01-yurina-o-n-1']);
+  s.players[1].hand = [cardById('04-tokoyo-o-n-2')];
+  s.players[1].focus = 2;
+  s.distance = 3;
+  let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-1' });
+  r = E.actions.applyAction(r.state, { type: 'respond', player: 1, cardId: '04-tokoyo-o-n-2' });
+  H.ok('雅打ち 打消成功', r.ok && !r.state.pending, r.error);
+  H.ok('打消之后没有待处理攻击', !r.state.pending, r.state.pending);
+}
+
 H.report();
