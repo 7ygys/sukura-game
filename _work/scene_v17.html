@@ -138,8 +138,11 @@ function startBgm(){
 
 // 兜底：任何未捕获的异常都显示在屏幕上，不要再"静默白屏"
 let LAST_ERROR = null;
+let LAST_STACK = null;
 window.addEventListener('error', function(e){
   LAST_ERROR = (e && e.message) ? e.message : String(e);
+  const st = (e && e.error && e.error.stack) ? String(e.error.stack).split('\n') : [];
+  LAST_STACK = st.length > 1 ? st[1].trim().slice(0, 120) : null;
 });
 window.addEventListener('unhandledrejection', function(e){
   LAST_ERROR = 'Promise: ' + (e && e.reason ? (e.reason.message || e.reason) : '');
@@ -381,6 +384,7 @@ function syncPendingRaw(){
     if(!S.nabuAlloc || S.nabuAlloc.cardId!==G.nabu.cardId){
       const d0=Math.min(G.nabu.maxDust, G.nabu.cap);
       S.nabuAlloc={cardId:G.nabu.cardId, dust:d0, aura:G.nabu.cap-d0};
+      S.nabuSent=false;
     }
     S.dialog={type:'nabu'};
     return;
@@ -753,6 +757,7 @@ function cardImage(id){
 // 算出这张牌现在打出去的实际伤害（带上加成/关键词），并标记有没有被改过
 function previewDamage(card, who){
   if(!card || !card.damage) return null;
+  if(!G.players || !G.players[who]) return null;
   const base={aura:card.damage.aura||0, life:card.damage.life||0};
   if((card.types||[]).indexOf('attack')<0) return null;
   let ctx={aura:base.aura, life:base.life, range:(card.range||[]).slice(), chokoku:false, both:false, tags:{}};
@@ -772,6 +777,7 @@ function previewDamage(card, who){
 // 算出这张牌现在打出去的适正距离（可能被距离扩大/缩小改过）
 function previewRange(card, who){
   if(!card || !card.range) return null;
+  if(!G.players || !G.players[who]) return null;
   if((card.types||[]).indexOf('attack')<0) return null;
   const base = card.range.slice();
   let ctx = { aura:0, life:0, range: base.slice(), chokoku:false, both:false, tags:{} };
@@ -1399,6 +1405,7 @@ function drawDialog(){
   } else if(d.type==='endDiscard'){
     const pend=G.endTurnPending, pv=G.players[pend.who];
     if(!S.endPick) S.endPick=[];
+    if(S.endPickReset !== pend.need){ S.endPick=[]; S.endSent=false; S.endPickReset=pend.need; }
     txt(bx+bw*0.56,by+bh*0.16,'手牌超过 2 张，请选择 '+pend.need+' 张盖成伏札',17,'#f2ece2');
     const cw3=78, ch3=108, gap3=10;
     const arr=pv.hand;
@@ -1425,6 +1432,7 @@ function drawDialog(){
     if(S.endPick.length===pend.need) HIT.push({id:'dlg_end_ok', x:bx+bw*0.62-60, y:by+bh*0.84, w:120, h:44});
   } else if(d.type==='nabu' && G.nabu){
     const nb=G.nabu, al=S.nabuAlloc;
+    if(!al || !nb) return;            // 数据还没到位：这一帧先不画，等 syncPending 建好
     txt(bx+bw*0.56,by+bh*0.18,'分配「纳 '+nb.cap+'」的结晶来源',18,'#f2ece2');
 
     const rows=[
@@ -1641,6 +1649,7 @@ function frameBody(ts){
   const dt=Math.min((ts-last)/1000||0.016,0.05);last=ts;S.t+=dt;
   HIT.length=0;
   S.tip=null;
+  S.me = meIdx();          // 联机时视角固定在"我的座位"，预览伤害/距离都要用它
   if(FORCE_HOVER!==null) S.hover=FORCE_HOVER;
   ctx.clearRect(0,0,W,H);
   if(!S.bgReady){
@@ -1694,6 +1703,11 @@ function frameBody(ts){
     ctx.font='16px sans-serif';
     ctx.textAlign='left';ctx.textBaseline='middle';
     ctx.fillText('脚本出错（把这条发给我）：'+LAST_ERROR, 20, H-32);
+    if(LAST_STACK){
+      ctx.font='11px monospace';
+      ctx.fillStyle='rgba(255,215,220,0.75)';
+      ctx.fillText(LAST_STACK, 20, H-12);
+    }
     ctx.restore();
   }
   if(S.shakeRestore){}drawFlash();drawAvatarTip();drawPilePanels();drawBanner();drawDialog();drawToast();drawCardTip();
@@ -1841,9 +1855,10 @@ function handleClick(e){
         return;
       }
       if(tag==='nab_ok'){
+        if(S.nabuSent) return;                 // 防连点：已经提交过了
+        S.nabuSent = true;
         act({type:'confirmNabu', player:nb.who, fromDust:al.dust, fromAura:al.aura});
-        S.nabuAlloc=null;
-        return;
+        return;                                 // al 留着，等新视图/新状态再清
       }
       if(tag==='nab_dust_plus' && al.dust<nb.maxDust && al.dust+al.aura<nb.cap) al.dust++;
       if(tag==='nab_dust_minus' && al.dust>0) al.dust--;
@@ -2131,6 +2146,11 @@ S.sweep={t0:2.2,dur:0.6,text:'第 1 回合'};
     window.addEventListener('message', function(e){
       const d = e.data || {};
       if(d.type === 'view'){ applyNetView(d.view); }
+      if(d.type === 'netError'){
+        // 主界面把"动作被拒绝"之类的消息转过来，别让玩家一脸茫然
+        LAST_ERROR = '联机：' + d.msg;
+        S.toast = { msg: '联机：' + d.msg, t0: S.t };
+      }
     });
     // 告诉主界面：我这边渲染好了
     try { parent.postMessage({ type:'battleReady', seat:NET.seat }, '*'); } catch(err){}

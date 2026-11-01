@@ -560,7 +560,11 @@ function openLobby(role){
       if(role === 'host'){ nbStatus('已连接，等对方确认…'); }
       else { nbStatus('已连接，正在通知主机…'); netSession.sendCustom({ t:'ready' }); }
     },
-    onError: function(msg){ nbStatus('出错了：' + msg); },
+    onError: function(msg){
+      nbStatus('出错了：' + msg);
+      const f = document.getElementById('battleFrame');
+      if(f && f.contentWindow) f.contentWindow.postMessage({ type:'netError', msg:msg }, '*');
+    },
     onView: function(view){
       pendingView = view;
       openBattleFrame();

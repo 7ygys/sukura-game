@@ -271,6 +271,7 @@
    * 区域名：'distance' 'dust' 'aura' 'flare' 'life' 'attach'
    */
   function moveCrystal(state, who, from, to, n) {
+    if (!state || !state.players || !state.players[who]) return 0;   // 防御：状态不完整就别动
     const p = state.players[who];
     const get = (k) => (k === 'dust' || k === 'distance') ? state[k] : p[k];
     const set = (k, v) => { if (k === 'dust' || k === 'distance') state[k] = v; else p[k] = v; };
