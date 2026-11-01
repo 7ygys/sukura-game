@@ -471,12 +471,29 @@ function enterSelect(half){
 let battleOpened = false;
 let pendingView = null;
 
+let myDeckReady = false;       // 我这边点了开始
+let peerDeckIds = null;        // 主机会记下客机的牌组
+
 function startNetBattle(){
   const ids = state.deck.normal.concat(state.deck.special);
   if(ids.length !== 10){ alert('要选满 7 张通常札 + 3 张王牌'); return; }
   netSession.setMyDeck(ids);
-  if(netRole === 'guest') netSession.hello();     // 报到，把自己的牌组带给主机
+  myDeckReady = true;
   nbShow('准备开战', '已准备好，等对方也开始…');
+
+  if(netRole === 'guest'){
+    // 客机：把自己的牌组告诉主机
+    netSession.sendCustom({ t:'start', deck: ids });
+  } else {
+    tryBegin();
+  }
+}
+
+/** 主机：两边都准备好才建局（否则会用自己的默认牌组建出错误的局面） */
+function tryBegin(){
+  if(netRole !== 'host') return;
+  if(!myDeckReady || !peerDeckIds) return;
+  netSession.begin(peerDeckIds);
 }
 
 function openBattleFrame(){
@@ -553,6 +570,11 @@ function openLobby(role){
       if(msg && msg.t === 'ready' && role === 'host'){
         nbStatus('对方已到齐，正在分配女神…');
         assignRoles();
+        return;
+      }
+      if(msg && msg.t === 'start' && role === 'host'){
+        peerDeckIds = msg.deck;
+        tryBegin();
         return;
       }
       if(msg && msg.t === 'assign'){

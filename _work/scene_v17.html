@@ -419,6 +419,11 @@ function syncPendingRaw(){
     }
     return;
   }
+  // 「盖牌后的免费基本动作」「选对应牌」是本地 UI 弹窗，
+  // 引擎没有待处理时不能把它擦掉（之前会一闪而过）
+  if(S.dialog && (S.dialog.type==='bonus' || S.dialog.type==='pickReact')){
+    return;
+  }
   S.dialog=null;
 }
 

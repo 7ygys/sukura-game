@@ -251,4 +251,54 @@ group('联机：本地弹窗不该被引擎同步擦掉（数据层等价校验�
   eq('没有待处理时 choice 为空', s.choice, undefined);
 }
 
+group('联机：begin 用双方真实牌组建局');
+{
+  const [trA, trB] = Net.createMemoryPair();
+  const HOST_DECK = ['01-yurina-o-n-1'];
+  const GUEST_DECK = ['03-himika-o-n-1'];
+
+  function gk(ids) {
+    const out = [];
+    ids.forEach(function (id) {
+      const k = String(id).split('-')[1];
+      if (out.indexOf(k) < 0) out.push(k);
+    });
+    return out;
+  }
+  function mk(ids) {
+    return ids.map(function (id) { return cardById(id); });
+  }
+
+  let state = E.state.create({ myCards: mk(HOST_DECK), oppCards: mk(HOST_DECK) });
+  let hostView = null, guestView = null;
+
+  const host = Net.createHost({
+    transport: trA,
+    state: state,
+    applyAction: E.actions.applyAction,
+    engine: E,
+    onLocalView: function (v) { hostView = v; },
+    makeState: function (guestDeckIds) {
+      const st = E.state.create({ myCards: mk(HOST_DECK), oppCards: mk(guestDeckIds) });
+      st.players[0].goddesses = gk(HOST_DECK);
+      st.players[1].goddesses = gk(guestDeckIds);
+      return st;
+    }
+  });
+  const guest = Net.createGuest({ transport: trB, onView: function (v) { guestView = v; } });
+  guest.hello(1, GUEST_DECK);
+
+  // 大厅在"双方都点开始"时才调 begin（这里模拟那一刻）
+  host.begin(GUEST_DECK);
+
+  eq('主机用的是自己的牌组（yurina）', hostView.players[0].goddesses, ['yurina']);
+  eq('客机用自己的牌组（himika）', guestView.players[1].goddesses, ['himika']);
+  eq('客机看到对手是 yurina', guestView.players[0].goddesses, ['yurina']);
+  eq('主机手牌来自自己的牌组',
+     host.state.players[0].deck.concat(host.state.players[0].hand).every(function (c) {
+       return c.id.indexOf('01-yurina') === 0;
+     }), true);
+  H.ok('客机看不到主机的牌面', guestView.players[0].hand.every(function (c) { return c.id === '?'; }));
+}
+
 H.report();

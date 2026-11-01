@@ -129,6 +129,15 @@
       get guestSeat() { return guestSeat; },
       /** 手动推一次视图（例如开局） */
       push: function () { bump(); sendBoth(); },
+      /**
+       * 双方都准备好之后，用两边的牌组建局并广播。
+       * （不能等客机 hello —— 那时主机自己可能还没组好卡）
+       */
+      begin: function (guestDeck) {
+        if (opts.makeState && guestDeck) state = opts.makeState(guestDeck);
+        bump();
+        sendBoth();
+      },
       /** 发自定义消息（大厅协议用，不走权威状态） */
       sendCustom: function (obj) { transport.send(obj); }
     };

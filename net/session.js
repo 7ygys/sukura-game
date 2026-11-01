@@ -100,6 +100,8 @@
           }).catch(function (e) { onError(e.message); });
         },
         act: function (action) { return proto.act(action); },
+        /** 双方都点"开始对战"后，用对方的牌组建局 */
+        begin: function (guestDeckIds) { proto.begin(guestDeckIds); },
         close: function () { conn.close(); }
       };
     }
