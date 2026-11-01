@@ -107,7 +107,11 @@
    * 规则层只负责记，怎么表现是界面的事（比如中央弹一个大图标）。
    */
   function emit(state, type, data) {
-    state.events.push(Object.assign({ type: type, turn: state.turn }, data || {}));
+    // 每个事件带一个只增不减的序号：
+    // 事件数组有上限（会丢弃最旧的），界面不能靠"第几个"来记进度，否则会错位
+    state.eventSeq = (state.eventSeq || 0) + 1;
+    const ev = Object.assign({ type: type, turn: state.turn, seq: state.eventSeq }, data || {});
+    state.events.push(ev);
     if (state.events.length > 50) state.events.shift();
   }
 

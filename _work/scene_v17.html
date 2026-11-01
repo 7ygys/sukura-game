@@ -253,6 +253,8 @@ function act(a){
   const r = E.actions.applyAction(G, a);
   if (!r.ok) { S.toast = { msg: r.error, t0: S.t }; return false; }
   Object.assign(G, r.state);
+  // 先把事件走一遍（黑条 / 音效 / 动画），它会设置"弹窗冻结期"
+  pumpEvents();
   syncPending();
   return true;
 }
@@ -899,11 +901,12 @@ function drawFlash(){
 
 // ===== 引擎事件 → 中央大图标 =====
 // 做了什么，就在屏幕中央弹一下对应的图标（像原版那样）
-S.evIdx=0;
+S.lastSeq=0;
 function pumpEvents(){
   if(!G.events) return;
-  if(S.evIdx>G.events.length) S.evIdx=0;   // 状态被整体替换过
-  for(let i=S.evIdx;i<G.events.length;i++){
+  // 按事件序号推进（数组会丢最旧的，靠下标会错位）
+  for(let i=0;i<G.events.length;i++){
+    if((G.events[i].seq||0) <= (S.lastSeq||0)) continue;
     const ev=G.events[i];
     let img=null, text='';
     if(ev.type==='basic'){
@@ -938,13 +941,14 @@ function pumpEvents(){
       // 黑条扫完之前先别弹窗，让结晶飞行的动画能被看见
       S.holdDialogUntil = S.t + 1.25;
     }
-    if(!img){ S.evIdx=i+1; continue; }
+    S.lastSeq = G.events[i].seq || S.lastSeq;
+    if(!img){ continue; }
     // 图片还没加载好就等下一帧再放，别把事件吞掉
     if(!img.complete || !img.naturalWidth){ return; }
     S.banner={img:img, t0:S.t, label:text};
-    S.evIdx=i+1;
+    S.lastSeq = G.events[i].seq || S.lastSeq;
   }
-  S.evIdx=G.events.length;
+  S.lastSeq = G.events[G.events.length-1].seq || S.lastSeq;
 }
 
 // ===== 结晶移动的动画 =====
@@ -1527,6 +1531,7 @@ function frame(ts){
   drawVoid();drawTrack();
   drawSide(true);
   pumpEvents();
+  if(S.holdDialogUntil && S.t >= S.holdDialogUntil){ S.holdDialogUntil = 0; syncPending(); }
   if(S.shake>0 || S.shaking){}
   drawPlay();drawSweep();drawDrawAnims();drawCardFlights();drawSparks();drawFloats();
   if(S.shakeRestore){}drawFlash();drawAvatarTip();drawPilePanels();drawBanner();drawDialog();drawToast();drawCardTip();
