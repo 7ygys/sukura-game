@@ -458,10 +458,17 @@ function syncPendingRaw(){
     } else {
       const hasAura = pd.damage.aura !== null && pd.damage.aura !== undefined;
       const hasLife = pd.damage.life !== null && pd.damage.life !== undefined;
+      // 规则 5-8-3-2：命伤是「-」时只能吃装伤（装不够也照吃，尽量扣）；
+      // 两边都是整数时，装不够才不能选装
+      let canAura = hasAura;
+      if (hasAura && hasLife) {
+        const shield = (E.rules.shadowAura ? E.rules.shadowAura(G, pd.defender) : 0) || 0;
+        canAura = (def.aura + shield) >= pd.damage.aura;
+      }
       S.dialog={type:'damage',
         dmg:(hasAura?pd.damage.aura:'-')+'/'+(hasLife?pd.damage.life:'-'),
         both:!!pd.both,
-        canAura: hasAura && def.aura >= pd.damage.aura,
+        canAura: canAura,
         canLife: hasLife};
     }
     return;
@@ -642,7 +649,7 @@ function drawSide(isMine){
   // ---------- 伞（雪姬）：画在**她自己那个头像框内** ----------
   // 只有本方能看见自己的伞；对方的伞不在对方头像区画图标
   const ykIdx = gk.indexOf('yukihi');
-  if(isMine && ykIdx >= 0){
+  if(ykIdx >= 0){
     const x = ykIdx ? mid+4 : z.x0, w = mid-z.x0-4;
     const open = (pl.umbrella === 'open');
     const img = open ? IMG.umbOpen : IMG.umbClose;
@@ -651,9 +658,11 @@ function drawSide(isMine){
     ctx.save();
     ctx.fillStyle = 'rgba(8,10,16,0.6)';
     rr(bx-3, by-3, bs+6, bs+6, 7); ctx.fill();
+    ctx.globalAlpha = isMine ? 1 : 0.78;      // 对方的伞看得到，但暗一点
     ctx.strokeStyle = open ? 'rgba(255,168,190,0.9)' : 'rgba(158,190,255,0.8)';
     ctx.lineWidth = 1.3;
     rr(bx-3, by-3, bs+6, bs+6, 7); ctx.stroke();
+    ctx.globalAlpha = 1;
     ctx.restore();
     if(img && img.complete && img.naturalWidth){
       ctx.save();

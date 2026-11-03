@@ -389,4 +389,34 @@ group('守恒');
   eq('结晶总数不变', crystalTotal(s), crys0);
 }
 
+/* ============================================================ */
+group('规则 5-8-3-2：伤害只有一边有数字时不能挑');
+{
+  // ふりまわし（闭 5/-）：命伤是「-」→ 只能吃装伤；装不够也照吃（5-10 尽量扣）
+  const s = yuki(['06-yukihi-o-n-4'], { distance: 5 });
+  s.players[1].aura = 2;                    // 对方只有 2 点装
+  let r = A(s, { type: 'playCard', player: 0, cardId: '06-yukihi-o-n-4' });
+  ok('打出 5/-', r.ok, r.error);
+  r = A(r.state, { type: 'respond', player: 1, cardId: null });
+  const life = A(r.state, { type: 'resolveDamage', player: 1, choice: 'life' });
+  ok('没有命伤 → 不能选「命」', !life.ok, life.error);
+
+  const aura = A(r.state, { type: 'resolveDamage', player: 1, choice: 'aura' });
+  ok('只能选「装」，而且能结算（不会卡死）', aura.ok, aura.error);
+  eq('装被打空（只扣得掉 2）', aura.state.players[1].aura, 0);
+  eq('命没动（这条没有命伤）', aura.state.players[1].life, 10);
+  eq('攻击结算完了', aura.state.pending, null);
+
+  // 两边都有数字时，装不够仍然不能选装
+  const s2 = yuki(['06-yukihi-o-n-1'], { distance: 4 });  // 3/1
+  s2.players[1].aura = 2;
+  let r2 = A(s2, { type: 'playCard', player: 0, cardId: '06-yukihi-o-n-1' });
+  r2 = A(r2.state, { type: 'respond', player: 1, cardId: null });
+  const bad = A(r2.state, { type: 'resolveDamage', player: 1, choice: 'aura' });
+  ok('3/1 且装只有 2 → 不能选装', !bad.ok, bad.error);
+  const good = A(r2.state, { type: 'resolveDamage', player: 1, choice: 'life' });
+  ok('改选「命」可以', good.ok, good.error);
+  eq('命 10 → 9', good.state.players[1].life, 9);
+}
+
 H.report();

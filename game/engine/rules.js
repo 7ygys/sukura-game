@@ -354,8 +354,12 @@
     }
 
     if (choice === 'aura') {
-      // 装不够就不能选装——这是规则里明确的"不合法选择"
-      if (p.aura + shadowAura(state, who) < auraDmg) return false;
+      // 规则 5-10：不足时"行える限りの数"移动（不是失败）
+      // 是否允许选装，由上层按 5-8-3-2 判断，这里只负责执行
+      // 只有"两边都是整数"时，装不够才算非法选择
+      const lifeIsInt = (lifeDmg !== null && lifeDmg !== undefined);
+      const auraIsInt = (auraDmg !== null && auraDmg !== undefined);
+      if (auraIsInt && lifeIsInt && p.aura + shadowAura(state, who) < auraDmg) return false;
       // 先用"视为在装中"的付与札结晶，再扣真正的装
       let rest = auraDmg;
       const shieldFromAttach = Math.min(shadowAura(state, who), rest);
@@ -1292,12 +1296,29 @@
 
     const isBoth = !!pd.both;
 
+    // 规则 5-8-3-2（重要：「装不够」只在**两边都是整数**时才禁止选装）：
+    //   两边都是整数 → 防守方二选一；装不够则不能选装
+    //   一边是「-」  → 只能选另一边（选「-」那边是非法操作）
+    //   两边都是「-」→ 什么也不发生
+    const auraInt = dmg.aura !== null && dmg.aura !== undefined;
+    const lifeInt = dmg.life !== null && dmg.life !== undefined;
+
+    if(!isBoth){
+      if(!auraInt && !lifeInt) return finishAttack(state, pd, who);   // 没有伤害，直接过
+      if(choice === 'aura' && !auraInt) return { ok: false, error: '没有装伤，不能选装' };
+      if(choice === 'life' && !lifeInt) return { ok: false, error: '没有命伤，不能选命' };
+      // 命伤是「-」时只能吃装伤：装不够也照吃（规则 5-10 尽量扣）
+      if(!lifeInt) choice = 'aura';
+      if(!auraInt) choice = 'life';
+    }
+
     // 有「这张牌上的结晶视为在装中」的付与札（無音壁）时，
     // 装伤由玩家自己决定：多少从真装扣、多少从那张牌上扣
     if ((isBoth || choice === 'aura') && shadowAura(state, who) > 0) {
       const abletotal = state.players[who].aura + shadowAura(state, who);
-      // 不是 both 的普通装伤：吃不下就当场拒绝（不能进分配后再卡住）
-      if (!isBoth && abletotal < dmg.aura) {
+      // 两边都是整数时，装不够就是"不合法选择"（规则 5-8-3-2 最后一句）；
+      // 但若命伤是「-」（被强制吃装伤），则按 5-10 扣得掉多少算多少。
+      if (!isBoth && lifeInt && abletotal < dmg.aura) {
         return { ok: false, error: '装不够，不能选装' };
       }
       pd.stage = 'auraSplit';
@@ -1312,7 +1333,7 @@
     }
 
     const ok = applyDamage(state, who, dmg.aura, dmg.life, pd.both ? 'both' : choice);
-    if (!ok) return { ok: false, error: '装不够，不能选装' };
+    if (!ok) return { ok: false, error: '这条伤害不能这样选' };
 
     return finishAttack(state, pd, who);
   }
