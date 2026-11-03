@@ -52,6 +52,7 @@
 <script src="assets.js"></script>
 <script src="gamedata.js"></script>
 <script src="../game/engine/rng.js"></script>
+<script src="../game/engine/umbrella.js"></script>
 <script src="../game/engine/state.js"></script>
 <script src="../game/engine/rules.js"></script>
 <script src="../game/engine/effects.js"></script>
@@ -151,7 +152,9 @@ window.addEventListener('unhandledrejection', function(e){
 const IMG={};
 (function(){
   const base='../素材/Sprite/';
-  ['01','02','03','04'].forEach(function(n){const i=new Image();i.src=base+n+'.png';IMG['av'+n]=i;});
+  ['01','02','03','04','06'].forEach(function(n){const i=new Image();i.src=base+n+'.png';IMG['av'+n]=i;});
+  IMG.umbOpen=new Image();  IMG.umbOpen.src=base+'open.png';    // 伞：开
+  IMG.umbClose=new Image(); IMG.umbClose.src=base+'close.png';  // 伞：闭
   [1,2,3,4,5].forEach(function(n){const i=new Image();i.src=base+'basic_action_'+n+'.png';IMG['act'+n]=i;});
   IMG.act4.onerror=function(){const b=new Image();b.src=base+'basic_action_4_hl.png';IMG.act4=b;};
 
@@ -379,6 +382,7 @@ function dialogActor(type){
   if(type==='nabu') return G.nabu && G.nabu.who;
   if(type==='auraSplit') return G.auraSplit && G.auraSplit.who;
   if(type==='exhaust') return G.exhaust && G.exhaust.who;
+  if(type==='umbrella') return G.umbrellaPending && G.umbrellaPending.who;
   if(type==='endDiscard') return G.endTurnPending && G.endTurnPending.who;
   if(type==='choice') return G.choice && G.choice.who;
   if(type==='response' || type==='damage') return G.pending && G.pending.defender;
@@ -428,6 +432,10 @@ function syncPendingRaw(){
   }
   if(G.auraSplit){
     S.dialog={type:'auraSplit'};
+    return;
+  }
+  if(G.umbrellaPending){
+    S.dialog={type:'umbrella'};
     return;
   }
   if(G.endTurnPending){
@@ -613,7 +621,7 @@ function drawSide(isMine){
     const x=i?mid+4:z.x0,w=mid-z.x0-4;
     glass(x,z.y,w,z.h,10,0.34);
     const key = gk[i];
-    const num = key ? ({yurina:'01',saine:'02',himika:'03',tokoyo:'04'})[key] : null;
+    const num = key ? ({yurina:'01',saine:'02',himika:'03',tokoyo:'04',yukihi:'06'})[key] : null;
     const av = num ? IMG['av'+num] : null;
     if(av&&av.complete&&av.naturalWidth){
       const aw=62, ah=aw*av.naturalHeight/av.naturalWidth;
@@ -629,6 +637,26 @@ function drawSide(isMine){
       ctx.strokeStyle='rgba(196,206,232,0.35)';ctx.lineWidth=1.2;ctx.stroke();
       txt(x+w/2,z.y+z.h-8,'空',9,'rgba(200,210,230,0.4)');
     }
+  }
+
+  // ---------- 伞（雪姬）：画在头像区右端 ----------
+  if((gk.indexOf('yukihi') >= 0) || (pl.umbrella && isMine)){
+    const open = (pl.umbrella === 'open');
+    const img = open ? IMG.umbOpen : IMG.umbClose;
+    const bx = z.x1 - 42, by = z.y + 8, bw = 36, bh = 36;
+    glass(bx, by, bw, bh, 8, 0.5);
+    if(img && img.complete && img.naturalWidth){
+      ctx.save();
+      ctx.shadowColor = open ? 'rgba(255,170,190,0.85)' : 'rgba(160,190,255,0.6)';
+      ctx.shadowBlur = 12;
+      ctx.drawImage(img, bx+4, by+4, bw-8, bh-8);
+      ctx.restore();
+    } else {
+      txt(bx+bw/2, by+bh/2, open ? '开' : '闭', 14, '#ffd9a0');
+    }
+    txt(bx+bw/2, by+bh+10, open ? '伞·开' : '伞·闭', 10,
+        open ? 'rgba(255,190,205,0.9)' : 'rgba(170,200,255,0.85)');
+    HITP('umbrella', bx, by, bw, bh);
   }
 
   // ---------- 基础行动：竖长六边形图标，横排 ----------
@@ -791,9 +819,22 @@ function cardImage(id){
 }
 
 // 算出这张牌现在打出去的实际伤害（带上加成/关键词），并标记有没有被改过
+/**
+ * 雪姬的双面卡：取「当前伞状态下」的样子。
+ * 有 dual 的牌按状态换距离/伤害；场上有どろりうら时距离还会合并。
+ */
+function curCard(card){
+  if(!card || !card.dual) return card;
+  try {
+    const v = E.rules.cardAt(G, S.me, card);
+    return Object.assign({}, card, v);
+  } catch(e){ return card; }
+}
+
 function previewDamage(card, who){
   if(!card || !card.damage) return null;
   if(!G.players || !G.players[who]) return null;
+  card = curCard(card);
   const base={aura:card.damage.aura||0, life:card.damage.life||0};
   if((card.types||[]).indexOf('attack')<0) return null;
   let ctx={aura:base.aura, life:base.life, range:(card.range||[]).slice(), chokoku:false, both:false, tags:{}};
@@ -815,6 +856,7 @@ function previewRange(card, who){
   if(!card || !card.range) return null;
   if(!G.players || !G.players[who]) return null;
   if((card.types||[]).indexOf('attack')<0) return null;
+  card = curCard(card);
   const base = card.range.slice();
   let ctx = { aura:0, life:0, range: base.slice(), chokoku:false, both:false, tags:{} };
   const p = G.players[who];
@@ -1466,6 +1508,20 @@ function drawDialog(){
     txt(bx+bw*0.62, by+bh*0.84+22, '确认', 16, '#f2ece2');
     ctx.restore();
     if(S.endPick.length===pend.need) HIT.push({id:'dlg_end_ok', x:bx+bw*0.62-60, y:by+bh*0.84, w:120, h:44});
+  } else if(d.type==='umbrella' && G.umbrellaPending){
+    const open = G.players[G.umbrellaPending.who].umbrella === 'open';
+    txt(bx+bw*0.56, by+bh*0.22, '结束阶段：要不要开合伞？', 19, '#f2ece2');
+    txt(bx+bw*0.56, by+bh*0.34, '现在是「'+(open?'开':'闭')+'」，本回合可以开合一次', 12,
+        'rgba(240,235,225,0.72)');
+    const bwd=150, gap=20;
+    const label = open ? '收起（→闭）' : '撑开（→开）';
+    const cx1=bx+bw*0.56-bwd/2-gap/2, cx2=bx+bw*0.56+bwd/2+gap/2;
+    glass(cx1-bwd/2, by+bh*0.54, bwd, 50, 8, 0.66);
+    txt(cx1, by+bh*0.54+25, label, 15, '#ffe4b8');
+    HIT.push({id:'dlg_umb_switch', x:cx1-bwd/2, y:by+bh*0.54, w:bwd, h:50});
+    glass(cx2-bwd/2, by+bh*0.54, bwd, 50, 8, 0.66);
+    txt(cx2, by+bh*0.54+25, '保持不变', 15, '#f2ece2');
+    HIT.push({id:'dlg_umb_keep', x:cx2-bwd/2, y:by+bh*0.54, w:bwd, h:50});
   } else if(d.type==='nabu' && G.nabu){
     const nb=G.nabu, al=S.nabuAlloc;
     if(!al || !nb) return;            // 数据还没到位：这一帧先不画，等 syncPending 建好
@@ -1860,6 +1916,13 @@ function handleClick(e){
     } else if(dlg.type==='exhaust'){
       if(tag==='exAura') act({type:'resolveExhaust', player:G.exhaust.who, choice:'aura'});
       if(tag==='exLife') act({type:'resolveExhaust', player:G.exhaust.who, choice:'life'});
+      return;
+    } else if(dlg.type==='umbrella'){
+      const pend = G.umbrellaPending;
+      if(!pend) return;
+      const open = G.players[pend.who].umbrella === 'open';
+      if(tag==='umb_switch') act({type:'umbrella', player:pend.who, open:!open});
+      else if(tag==='umb_keep') act({type:'umbrella', player:pend.who, open:null});
       return;
     } else if(dlg.type==='endDiscard'){
       const pend=G.endTurnPending, pv=G.players[pend.who];

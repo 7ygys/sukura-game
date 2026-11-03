@@ -167,11 +167,7 @@
     }
 
     state.endTurnPending = null;
-    state.phase = 'end';
-    tryRevive(state, who, 'normal');   // 规则 10-7：再起在「结束阶段」检查
-    state.active = 1 - state.active;
-    state.turn++;
-    startTurn(state);
+    finishEndTurn(state, who);
     return { ok: true };
   }
 
@@ -196,15 +192,27 @@
 
     const p = state.players[who];
     const idx = handIndexOf(p, nb.cardId);
-    if (idx < 0) return { ok: false, error: '手上没有这张牌' };
-    const card = p.hand[idx];
+    // 付与也有可能是王牌（例如どろりうら）——那时牌在王牌区，不在手上
+    const sp = idx < 0 ? (p.specials || []).find(function (c) { return c.id === nb.cardId && !c.used; }) : null;
+    if (idx < 0 && !sp) return { ok: false, error: '手上没有这张牌' };
+    const card = idx >= 0 ? p.hand[idx] : sp;
 
-    p.hand.splice(idx, 1);
+    if (idx >= 0) {
+      p.hand.splice(idx, 1);
+    } else {
+      // 王牌付与：牌从王牌区搬到场上（不是"用掉留一份"），
+      // 不然同一张牌会同时存在于王牌区和付与区，牌数就多了一张
+      const k = p.specials.findIndex(function (c) { return c.id === nb.cardId && !c.used; });
+      if (k >= 0) p.specials.splice(k, 1);
+    }
     Engine.state.emit(state, 'cardTo', { who: who, cardId: card.id, to: 'attach' });
     // 结晶从虚/装「搬到付与札上」，这两步也要各自发事件给动画
     if (fromDust) moveCrystal(state, who, 'dust', 'attach', fromDust);
     if (fromAura) moveCrystal(state, who, 'aura', 'attach', fromAura);
-    p.attachments.push(Object.assign({}, card, { crystals: nb.cap }));
+    p.attachments.push(Object.assign({}, card, {
+      crystals: nb.cap,
+      fromSpecial: idx < 0      // 这张付与是从王牌区来的，破弃后要回王牌区（已使用）
+    }));
 
     state.turnUsed[who] = (state.turnUsed[who] || 0) + 1;
     if ((card.types || []).indexOf('fullpower') >= 0) p.fullpowerUsed = true;
@@ -362,7 +370,7 @@
             state.dust += take;
           }
           if (a.crystals > 0) keep.push(a);
-          else p.discard.push(Object.assign({}, a, { crystals: 0 }));
+          else retireAttachment(p, a);
         });
         p.attachments = keep;
         rest -= shieldFromAttach;
@@ -393,6 +401,18 @@
    * 直接变成＜伏せ札＞，上面的樱结晶全部进虚。
    * 因为是从付与札"移走"而不是"破弃"，所以【破弃时】不会触发。
    */
+  /** 付与离开场上：通常札进弃牌区，王牌回到王牌区并标记已使用 */
+  function retireAttachment(p, a) {
+    const card = Object.assign({}, a, { crystals: 0 });
+    delete card.fromSpecial;
+    if (a.fromSpecial) {
+      card.used = true;
+      p.specials.push(card);
+    } else {
+      p.discard.push(card);
+    }
+  }
+
   function triggerGap(state, who) {
     const p = state.players[who];
     const table = (Engine.effects && Engine.effects.cards) || {};
@@ -451,6 +471,7 @@
     p.terminated = false;
     p.fullpowerUsed = false;
     p.usedBasicThisTurn = false;
+    p.umbrellaToggled = false;        // 雪姬：新的回合，结束阶段又能开合一次
     // 「本回合下一次攻击 +X/+Y」这类加成不能跨回合留着
     p.buff = { aura: 0, life: 0 };
     p.nextOtherAttack = null;
@@ -541,6 +562,15 @@
     const p = state.players[who];
     const limit = Engine.state.INIT.END_HAND;   // 结束时手牌最多留几张
 
+    // ---- 特性「变貌」：雪姬在自己的结束阶段可以开合一次伞 ----
+    // 规则上这是「结束阶段时」的效果，早于「手牌超限盖伏札」的既定处理，
+    // 所以先问伞，再问盖牌，最后才换人。
+    if (hasUmbrella(state, who) && !p.umbrellaToggled) {
+      state.umbrellaPending = { who: who };
+      log(state, 'P' + (who + 1) + ' 的结束阶段：是否开合伞？');
+      return state;
+    }
+
     if (p.hand.length > limit) {
       const need = p.hand.length - limit;       // 要盖几张
 
@@ -560,12 +590,87 @@
       });
     }
 
+    return finishEndTurn(state, who);
+  }
+
+  /** 结束阶段的最后一步：再起检查 → 换人 → 下一回合 */
+  function finishEndTurn(state, who) {
     state.phase = 'end';
     tryRevive(state, who, 'normal');   // 规则 10-7：再起在「结束阶段」检查
     state.active = 1 - state.active;   // 0↔1 切换
     state.turn++;
     startTurn(state);
     return state;
+  }
+
+  /* ==========================================================================
+   * 伞（雪姬的特性：变貌）
+   * ==========================================================================
+   *
+   * 规则：
+   *   - 伞有「闭」「开」两种状态，开局是「闭」
+   *   - 自己的结束阶段可以开合一次（可选）
+   *   - 「伞的开合」这件事会被别的牌监听（かさまわし / はらりゆき 的再起）
+   */
+
+  /** 这个玩家的牌组里有没有雪姬的牌（有才需要管伞） */
+  function hasUmbrella(state, who) {
+    const p = state.players[who];
+    if (!p) return false;
+    if ((p.goddesses || []).indexOf('yukihi') >= 0) return true;
+    const all = [].concat(p.hand, p.deck, p.discard, p.hidden,
+                         p.specials || [], p.attachments || []);
+    return all.some(function (c) { return c && String(c.id).indexOf('06-') === 0; });
+  }
+
+  /**
+   * 开合一次伞。
+   * 这是「伞的开合」的唯一入口 —— 所有卡片效果和结束阶段都走这里，
+   * 这样监听者（かさまわし、はらりゆき 的再起）只需要挂一个地方。
+   */
+  function toggleUmbrella(state, who, reason) {
+    const p = state.players[who];
+    if (!p) return null;
+    p.umbrella = (p.umbrella === 'open') ? 'closed' : 'open';
+    p.umbrellaCount = (p.umbrellaCount || 0) + 1;
+    const open = p.umbrella === 'open';
+    log(state, 'P' + (who + 1) + ' 的伞' + (open ? '撑开' : '收起') + (reason ? '（' + reason + '）' : ''));
+    Engine.state.emit(state, 'umbrella', { who: who, open: open });
+
+    // 监听者：效果层统一处理（かさまわし 等）
+    const tbl = (Engine.effects && Engine.effects.cards) || {};
+    (p.hand || []).slice().forEach(function (c) {
+      const e = tbl[c.id];
+      if (e && e.onUmbrellaToggled) e.onUmbrellaToggled(state, who, open, c);
+    });
+    return p.umbrella;
+  }
+
+  /**
+   * 结束阶段的伞处理结果。
+   * @param {string|null} choice  'open' / 'close' / null（不改变）
+   */
+  function resolveUmbrella(state, who, choice) {
+    const pend = state.umbrellaPending;
+    if (!pend || pend.who !== who) return { ok: false, error: '现在不用决定伞' };
+    const p = state.players[who];
+    p.umbrellaToggled = true;
+    state.umbrellaPending = null;
+
+    if (choice === 'open' || choice === 'close') {
+      const want = (choice === 'open');
+      if ((p.umbrella === 'open') !== want) toggleUmbrella(state, who, '结束阶段');
+    }
+
+    // 伞处理完，接着走"手牌超限盖伏札"，再换人
+    const limit = Engine.state.INIT.END_HAND;
+    if (p.hand.length > limit) {
+      state.endTurnPending = { who: who, need: p.hand.length - limit };
+      log(state, 'P' + (who + 1) + ' 需要盖掉 ' + state.endTurnPending.need + ' 张手牌');
+      return { ok: true };
+    }
+    finishEndTurn(state, who);
+    return { ok: true };
   }
 
   /* ==========================================================================
@@ -650,13 +755,52 @@
   }
 
   /**
+   * 一张牌「现在这个伞状态下」的样子。
+   *
+   * 雪姬的牌有 dual（闭/开 两套距离与伤害）；
+   * 场上有「どろりうら」时，她的《攻击》还要拿到**两种状态的合并距离**。
+   *
+   * 返回 { range, rangeRaw, damage, damageRaw, text } —— 不修改原卡。
+   */
+  function cardAt(state, who, card) {
+    const U = Engine.umbrella;
+    if (!card) return card;
+    if (!U || !U.isDual(card)) return card;
+
+    const open = U.isOpen(state, who);
+    const v = U.viewOf(card, open) || card;
+    const out = {
+      range: (v.range || []).slice(),
+      rangeRaw: v.rangeRaw,
+      damage: v.damage,
+      damageRaw: v.damageRaw,
+      text: v.text
+    };
+
+    // どろりうら：【展开中】雪姬的《攻击》同时拥有两种状态的适正距离
+    if ((card.types || []).indexOf('attack') >= 0) {
+      const p = state.players[who] || {};
+      const merged = (p.attachments || []).some(function (a) {
+        const e = (Engine.effects && Engine.effects.cards && Engine.effects.cards[a.id]) || {};
+        return e.mergeUmbrellaRange;
+      });
+      if (merged) {
+        out.range = U.unionRange(card);
+        out.rangeRaw = U.rangeText(out.range);
+      }
+    }
+    return out;
+  }
+
+  /**
    * 这一发《攻击》**实际**的适正距离（含所有修正）。
    * 只读：不改状态，也不消耗任何一次性的加成 —— 用来在"出牌之前"做距离确认。
    */
   function effectiveRange(state, who, card, fromSpecial) {
     const p = state.players[who];
+    const cardView = cardAt(state, who, card);
     const ctx = {
-      aura: 0, life: 0, range: (card.range || []).slice(),
+      aura: 0, life: 0, range: (cardView.range || []).slice(),
       chokoku: false, both: false, fromSpecial: !!fromSpecial, tags: {}, dry: true
     };
     const table = (Engine.effects && Engine.effects.cards) || {};
@@ -920,7 +1064,8 @@
 
     // ---- 攻击 → 进入待处理，等对方决定要不要对应 ----
     if (isAttack) {
-      const dmg = card.damage || { aura: 0, life: 0 };
+      const cardView = cardAt(state, who, card);      // 雪姬：按伞的状态取距离/伤害
+      const dmg = cardView.damage || { aura: 0, life: 0 };
       // 规则 6-4-1-4：装伤上限 5；规则 10-21：带「超克」时上限取消
       // 「本回合下一次攻击 +X/+Y」这类加成先叠上去，然后清空
       const buff = p.buff || { aura: 0, life: 0 };
@@ -931,7 +1076,7 @@
       const ctx = {
         aura: (dmg.aura === null || dmg.aura === undefined) ? null : dmg.aura + (buffApplies ? (buff.aura || 0) : 0),
         life: (dmg.life === null || dmg.life === undefined) ? null : dmg.life + (buffApplies ? (buff.life || 0) : 0),
-        range: (card.range || []).slice(),
+        range: (cardView.range || []).slice(),
         chokoku: false,
         both: false,
         fromSpecial: fromSpecial,     // 这一发是不是来自王牌（切札）
@@ -1243,7 +1388,7 @@
           state.dust += take;
         }
         if (a.crystals > 0) keep.push(a);
-        else p.discard.push(Object.assign({}, a, { crystals: 0 }));
+        else retireAttachment(p, a);
       });
       p.attachments = keep;
     }
@@ -1343,7 +1488,7 @@
     // 回合
     startTurn, endTurn, tickAttachments,
     // 基本动作
-    BASIC, canBasic, basicAction, hideCard, taijinOf, shadowAura, moveCrystal, recheckRange, effDistance, resolveAuraSplit, triggerGap, nextQueuedAttack, confirmNabu, cancelNabu, confirmEndTurn,
+    BASIC, canBasic, basicAction, hideCard, taijinOf, shadowAura, moveCrystal, recheckRange, effDistance, resolveAuraSplit, triggerGap, nextQueuedAttack, cardAt, hasUmbrella, toggleUmbrella, resolveUmbrella, confirmNabu, cancelNabu, confirmEndTurn,
     // 再起
     tryRevive, stagger,
     // 出牌与攻防

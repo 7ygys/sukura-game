@@ -1164,6 +1164,463 @@
      "altNames": []
     }
    ]
+  },
+  {
+   "key": "yukihi",
+   "name": "雪姬",
+   "namejp": "ユキヒ",
+   "weapon": "伞",
+   "weaponjp": "傘",
+   "keyword": "变貌",
+   "keywordDesc": "变貌～你的伞有「闭」和「开」两种状态，部分牌会随状态改变效果。开局是「闭」，自己的结束阶段可以开合一次。",
+   "cards": [
+    {
+     "id": "06-yukihi-o-n-1",
+     "name": "しこみばり／ふくみばり",
+     "namejp": "しこみばり／ふくみばり",
+     "kind": "normal",
+     "types": [
+      "attack"
+     ],
+     "rangeRaw": "4-6",
+     "range": [
+      4,
+      5,
+      6
+     ],
+     "damageRaw": "3/1",
+     "damage": {
+      "aura": 3,
+      "life": 1
+     },
+     "cost": null,
+     "capacity": null,
+     "text": "【闭】适正距离 4-6、伤害 3/1\n【开】适正距离 0-2、伤害 1/2",
+     "textjp": "",
+     "altNames": [],
+     "dual": {
+      "closed": {
+       "rangeRaw": "4-6",
+       "range": [
+        4,
+        5,
+        6
+       ],
+       "damageRaw": "3/1",
+       "damage": {
+        "aura": 3,
+        "life": 1
+       },
+       "text": ""
+      },
+      "open": {
+       "rangeRaw": "0-2",
+       "range": [
+        0,
+        1,
+        2
+       ],
+       "damageRaw": "1/2",
+       "damage": {
+        "aura": 1,
+        "life": 2
+       },
+       "text": ""
+      }
+     }
+    },
+    {
+     "id": "06-yukihi-o-n-2",
+     "name": "しこみび／ねこだまし",
+     "namejp": "しこみび／ねこだまし",
+     "kind": "normal",
+     "types": [
+      "attack"
+     ],
+     "rangeRaw": "5-6",
+     "range": [
+      5,
+      6
+     ],
+     "damageRaw": "1/1",
+     "damage": {
+      "aura": 1,
+      "life": 1
+     },
+     "cost": null,
+     "capacity": null,
+     "text": "【闭】5-6、1/1；【攻击后】回手牌并开合\n【开】0-2、1/1",
+     "textjp": "",
+     "altNames": [],
+     "dual": {
+      "closed": {
+       "rangeRaw": "5-6",
+       "range": [
+        5,
+        6
+       ],
+       "damageRaw": "1/1",
+       "damage": {
+        "aura": 1,
+        "life": 1
+       },
+       "text": "【攻击后】这张牌回到手牌，并进行伞的开合。"
+      },
+      "open": {
+       "rangeRaw": "0-2",
+       "range": [
+        0,
+        1,
+        2
+       ],
+       "damageRaw": "1/1",
+       "damage": {
+        "aura": 1,
+        "life": 1
+       },
+       "text": ""
+      }
+     }
+    },
+    {
+     "id": "06-yukihi-o-n-3",
+     "name": "ふりはらい／たぐりよせ",
+     "namejp": "ふりはらい／たぐりよせ",
+     "kind": "normal",
+     "types": [
+      "attack"
+     ],
+     "rangeRaw": "2-5",
+     "range": [
+      2,
+      3,
+      4,
+      5
+     ],
+     "damageRaw": "1/1",
+     "damage": {
+      "aura": 1,
+      "life": 1
+     },
+     "cost": null,
+     "capacity": null,
+     "text": "【闭】2-5、1/1；【攻击后】虚⇄间合 1\n【开】0-2、1/1；【攻击后】间合→虚 2",
+     "textjp": "",
+     "altNames": [],
+     "dual": {
+      "closed": {
+       "rangeRaw": "2-5",
+       "range": [
+        2,
+        3,
+        4,
+        5
+       ],
+       "damageRaw": "1/1",
+       "damage": {
+        "aura": 1,
+        "life": 1
+       },
+       "text": "【攻击后】虚⇄间合：1（自己选方向）"
+      },
+      "open": {
+       "rangeRaw": "0-2",
+       "range": [
+        0,
+        1,
+        2
+       ],
+       "damageRaw": "1/1",
+       "damage": {
+        "aura": 1,
+        "life": 1
+       },
+       "text": "【攻击后】间合→虚：2"
+      }
+     }
+    },
+    {
+     "id": "06-yukihi-o-n-4",
+     "name": "ふりまわし／つきさし",
+     "namejp": "ふりまわし／つきさし",
+     "kind": "normal",
+     "types": [
+      "attack",
+      "fullpower"
+     ],
+     "rangeRaw": "4-6",
+     "range": [
+      4,
+      5,
+      6
+     ],
+     "damageRaw": "5/-",
+     "damage": {
+      "aura": 5,
+      "life": null
+     },
+     "cost": null,
+     "capacity": null,
+     "text": "全力\n【闭】4-6、伤害 5/-\n【开】0-2、伤害 -/2",
+     "textjp": "",
+     "altNames": [],
+     "dual": {
+      "closed": {
+       "rangeRaw": "4-6",
+       "range": [
+        4,
+        5,
+        6
+       ],
+       "damageRaw": "5/-",
+       "damage": {
+        "aura": 5,
+        "life": null
+       },
+       "text": ""
+      },
+      "open": {
+       "rangeRaw": "0-2",
+       "range": [
+        0,
+        1,
+        2
+       ],
+       "damageRaw": "-/2",
+       "damage": {
+        "aura": null,
+        "life": 2
+       },
+       "text": ""
+      }
+     }
+    },
+    {
+     "id": "06-yukihi-o-n-5",
+     "name": "かさまわし",
+     "namejp": "かさまわし",
+     "kind": "normal",
+     "types": [
+      "action"
+     ],
+     "rangeRaw": null,
+     "range": null,
+     "damageRaw": null,
+     "damage": null,
+     "cost": null,
+     "capacity": null,
+     "text": "使用此牌没有效果。\n【常时】你进行伞的开合时，可以从手牌公开此牌。如此做则 虚→自装：1",
+     "textjp": "（このカードは使用しても効果はない）\n【常時】あなたが傘の開閉を行った時、このカードを手札から公開してもよい。そうした場合、ダスト→自オーラ：1",
+     "altNames": [],
+     "passiveOnly": true
+    },
+    {
+     "id": "06-yukihi-o-n-6",
+     "name": "ひきあし／もぐりこみ",
+     "namejp": "ひきあし／もぐりこみ",
+     "kind": "normal",
+     "types": [
+      "action",
+      "reaction"
+     ],
+     "rangeRaw": "-",
+     "range": null,
+     "damageRaw": null,
+     "damage": {
+      "aura": null,
+      "life": null
+     },
+     "cost": null,
+     "capacity": null,
+     "text": "可在对手攻击时割入使用（对应）。\n【闭】虚→间合：1\n【开】间合→虚：1",
+     "textjp": "",
+     "altNames": [],
+     "dual": {
+      "closed": {
+       "rangeRaw": "-",
+       "range": null,
+       "damageRaw": null,
+       "damage": {
+        "aura": null,
+        "life": null
+       },
+       "text": "【闭】虚→间合：1"
+      },
+      "open": {
+       "rangeRaw": "-",
+       "range": null,
+       "damageRaw": null,
+       "damage": {
+        "aura": null,
+        "life": null
+       },
+       "text": "【开】间合→虚：1"
+      }
+     }
+    },
+    {
+     "id": "06-yukihi-o-n-7",
+     "name": "えんむすび",
+     "namejp": "えんむすび",
+     "kind": "normal",
+     "types": [
+      "enhance"
+     ],
+     "rangeRaw": null,
+     "range": null,
+     "damageRaw": null,
+     "damage": null,
+     "cost": null,
+     "capacity": 2,
+     "text": "【展开时】虚→间合：1\n【破弃时】间合→虚：1\n【常时】若你的伞是开着的，此牌的箭头反向。",
+     "textjp": "【展開時】ダスト→間合：1\n【破棄時】間合→ダスト：1\n【常時】あなたの傘が開いているならば、このカードの矢印は逆になる。",
+     "altNames": []
+    },
+    {
+     "id": "06-yukihi-o-s-1",
+     "name": "はらりゆき",
+     "namejp": "はらりゆき",
+     "kind": "special",
+     "types": [
+      "attack"
+     ],
+     "rangeRaw": "4-5",
+     "range": [
+      4,
+      5
+     ],
+     "damageRaw": "3/1",
+     "damage": {
+      "aura": 3,
+      "life": 1
+     },
+     "cost": 2,
+     "capacity": null,
+     "text": "【攻击后】你获得 1 点集中力。\n【再起】你进行伞的开合。\n【闭】4-5、3/1\n【开】0-2、0/0",
+     "textjp": "",
+     "altNames": [],
+     "dual": {
+      "closed": {
+       "rangeRaw": "4-5",
+       "range": [
+        4,
+        5
+       ],
+       "damageRaw": "3/1",
+       "damage": {
+        "aura": 3,
+        "life": 1
+       },
+       "text": "【攻击后】你获得 1 点集中力。"
+      },
+      "open": {
+       "rangeRaw": "0-2",
+       "range": [
+        0,
+        1,
+        2
+       ],
+       "damageRaw": "0/0",
+       "damage": {
+        "aura": 0,
+        "life": 0
+       },
+       "text": ""
+      }
+     }
+    },
+    {
+     "id": "06-yukihi-o-s-2",
+     "name": "ゆらりび",
+     "namejp": "ゆらりび",
+     "kind": "special",
+     "types": [
+      "attack"
+     ],
+     "rangeRaw": "4-6",
+     "range": [
+      4,
+      5,
+      6
+     ],
+     "damageRaw": "0/0",
+     "damage": {
+      "aura": 0,
+      "life": 0
+     },
+     "cost": 5,
+     "capacity": null,
+     "text": "【闭】4-6、伤害 0/0\n【开】0、伤害 4/5",
+     "textjp": "",
+     "altNames": [],
+     "dual": {
+      "closed": {
+       "rangeRaw": "4-6",
+       "range": [
+        4,
+        5,
+        6
+       ],
+       "damageRaw": "0/0",
+       "damage": {
+        "aura": 0,
+        "life": 0
+       },
+       "text": ""
+      },
+      "open": {
+       "rangeRaw": "0",
+       "range": [
+        0
+       ],
+       "damageRaw": "4/5",
+       "damage": {
+        "aura": 4,
+        "life": 5
+       },
+       "text": ""
+      }
+     }
+    },
+    {
+     "id": "06-yukihi-o-s-3",
+     "name": "どろりうら",
+     "namejp": "どろりうら",
+     "kind": "special",
+     "types": [
+      "enhance",
+      "fullpower"
+     ],
+     "rangeRaw": null,
+     "range": null,
+     "damageRaw": null,
+     "damage": null,
+     "cost": 3,
+     "capacity": 7,
+     "text": "全力：使用此牌后本主阶段不能再做其他事。\n【展开中】你的雪姫《攻击》同时拥有「开」与「闭」两种状态的适正距离。",
+     "textjp": "このカードを使うならば、メインフェイズに他に何もできない。\n【展開中】あなたのユキヒの《攻撃》は傘を開いた状態と傘を閉じた状態両方の適正距離を持つ。",
+     "altNames": []
+    },
+    {
+     "id": "06-yukihi-o-s-4",
+     "name": "くるりみ",
+     "namejp": "くるりみ",
+     "kind": "special",
+     "types": [
+      "action",
+      "reaction"
+     ],
+     "rangeRaw": null,
+     "range": null,
+     "damageRaw": null,
+     "damage": null,
+     "cost": 1,
+     "capacity": null,
+     "text": "可在对手攻击时割入使用（对应）。\n进行伞的开合，然后 虚→自装：1",
+     "textjp": "このカードは相手の攻撃に対して割り込んで使用できる。\n傘の開閉を行う。ダスト→自オーラ：1",
+     "altNames": []
+    }
+   ]
   }
  ]
 }

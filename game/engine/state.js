@@ -38,6 +38,7 @@
       flare: INIT.FLARE,
       focus: INIT.FOCUS,
       staggered: false,   // 畏缩
+      umbrella: 'closed', // 雪姬的伞：'closed' 闭 / 'open' 开（开局是闭）
       deck: [],           // 牌库（索引 0 = 牌堆顶）
       hand: [],
       discard: [],        // 弃牌区（双方可见）
@@ -46,7 +47,8 @@
       buff: { aura: 0, life: 0 },   // 「本回合下一次攻击 +X/+Y」这类加成
       terminated: false,  // 终端：本回合不能再使用牌/基本动作
       specials: [],       // 王牌（各自带 used 标记）
-      firstTurnDone: false
+      firstTurnDone: false,
+      umbrellaToggled: false   // 本回合的结束阶段是否已经开合过（特性：一次）
     };
   }
 

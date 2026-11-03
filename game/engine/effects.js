@@ -205,6 +205,12 @@
   };
 
   // スカーレットイマジン：把选中的那张手牌盖成伏札
+  // 雪姬：闭时的ふりはらい —— 虚⇄间合 1，自己选方向
+  choices.yukihi_slide = {
+    dust_to_dist(state, who) { Engine.effects.fx.moveCrystal(state, who, 'dust', 'distance', 1); },
+    dist_to_dust(state, who) { Engine.effects.fx.moveCrystal(state, who, 'distance', 'dust', 1); }
+  };
+
   choices.imagine = {};
   choices.imagine.resolve = function (state, who, optionId) {
     const p = state.players[who];
@@ -218,6 +224,12 @@
 
 
   // スカーレットイマジン：把选中的那张手牌盖成伏札
+  // 雪姬：闭时的ふりはらい —— 虚⇄间合 1，自己选方向
+  choices.yukihi_slide = {
+    dust_to_dist(state, who) { Engine.effects.fx.moveCrystal(state, who, 'dust', 'distance', 1); },
+    dist_to_dust(state, who) { Engine.effects.fx.moveCrystal(state, who, 'distance', 'dust', 1); }
+  };
+
   choices.imagine = {};
   // 选项是动态的（手牌 id），所以用 Proxy 风格：resolveChoice 找不到时按 id 处理
   choices.imagine.resolve = function (state, who, optionId) {
@@ -676,7 +688,111 @@
         state.players[1 - who].focus = 0;
         Engine.effects.fx.stagger(state, 1 - who);
       }
-    }
+    },
+
+    /* ===== 雪姬（伞：闭 / 开） =====
+     * 所有"当前伞状态"的数据都在 cards.json 的 dual 里，
+     * 这里只写"状态不同 → 效果不同"的部分。
+     */
+
+    // しこみばり／ふくみばり：纯攻击，状态差异全在数据里
+    // しこみび／ねこだまし：闭时【攻击后】这张牌回手牌 + 开合伞
+    "06-yukihi-o-n-2": {
+      onAfterAttack(state, who) {
+        const U = Engine.umbrella;
+        if(!U || U.isOpen(state, who)) return;        // 只有"闭"那一面有这效果
+        const p = state.players[who];
+        const i = p.discard.findIndex(function (c) { return c.id === '06-yukihi-o-n-2'; });
+        if (i >= 0) {
+          const card = p.discard.splice(i, 1)[0];
+          p.hand.push(card);
+          Engine.state.emit(state, 'cardTo', { who: who, cardId: card.id, to: 'hand' });
+          Engine.state.log(state, 'しこみび：这张牌回到手牌');
+        }
+        Engine.rules.toggleUmbrella(state, who, 'しこみび');
+      }
+    },
+
+    // ふりはらい／たぐりよせ：攻击后移动间合
+    "06-yukihi-o-n-3": {
+      onAfterAttack(state, who) {
+        const U = Engine.umbrella;
+        const fx = Engine.effects.fx;
+        if (U.isOpen(state, who)) {
+          // 开：间合 → 虚 2（拉近 2）
+          fx.moveCrystal(state, who, 'distance', 'dust', 2);
+          Engine.state.log(state, 'たぐりよせ：间合 → 虚 2');
+        } else {
+          // 闭：虚 ⇄ 间合 1（自己选方向）
+          fx.ask(state, who, 'yukihi_slide', '虚⇄间合：选方向', ['dust_to_dist', 'dist_to_dust']);
+        }
+      }
+    },
+
+    // ふりまわし／つきさし：纯攻击（全力在 types 里）
+    // かさまわし：【常时】伞开合时从手牌公开 → 虚 → 自装 1
+    "06-yukihi-o-n-5": {
+      passiveOnly: true,
+      onUmbrellaToggled(state, who) {
+        Engine.effects.fx.moveCrystal(state, who, 'dust', 'aura', 1);
+        Engine.state.log(state, 'かさまわし：伞开合 → 虚 → 自装 1');
+      }
+    },
+
+    // ひきあし／もぐりこみ：闭 虚→间合 1；开 间合→虚 1
+    "06-yukihi-o-n-6": {
+      onUse(state, who) {
+        const U = Engine.umbrella, fx = Engine.effects.fx;
+        if (U.isOpen(state, who)) {
+          fx.moveCrystal(state, who, 'distance', 'dust', 1);
+          Engine.state.log(state, 'もぐりこみ：间合 → 虚 1');
+        } else {
+          fx.moveCrystal(state, who, 'dust', 'distance', 1);
+          Engine.state.log(state, 'ひきあし：虚 → 间合 1');
+        }
+      }
+    },
+
+    // えんむすび：箭头随伞状态反向
+    //   闭：展开 间合→虚 1；破弃 虚→间合 1
+    //   开：展开 虚→间合 1；破弃 间合→虚 1
+    "06-yukihi-o-n-7": {
+      onExpanded(state, who) {
+        const open = Engine.umbrella.isOpen(state, who);
+        Engine.effects.fx.moveCrystal(state, who, open ? 'dust' : 'distance',
+                                               open ? 'distance' : 'dust', 1);
+        Engine.state.log(state, 'えんむすび【展开时】：' + (open ? '虚 → 间合 1' : '间合 → 虚 1'));
+      },
+      onBreak(state, who) {
+        const open = Engine.umbrella.isOpen(state, who);
+        Engine.effects.fx.moveCrystal(state, who, open ? 'distance' : 'dust',
+                                               open ? 'dust' : 'distance', 1);
+        Engine.state.log(state, 'えんむすび【破弃时】：' + (open ? '间合 → 虚 1' : '虚 → 间合 1'));
+      }
+    },
+
+    // はらりゆき：【攻击后】+1 集中力（再起条件见 revive 表）
+    "06-yukihi-o-s-1": {
+      onAfterAttack(state, who) {
+        Engine.effects.fx.gainFocus(state, who, 1);
+        Engine.state.log(state, 'はらりゆき：获得 1 点集中力');
+      }
+    },
+
+    // ゆらりび：纯攻击（状态差异在数据里）
+    // どろりうら：【展开中】雪姬的《攻击》拥有两种状态的合并适正距离
+    "06-yukihi-o-s-3": {
+      mergeUmbrellaRange: true
+    },
+
+    // くるりみ：开合伞，然后 虚 → 自装 1
+    "06-yukihi-o-s-4": {
+      onUse(state, who) {
+        Engine.rules.toggleUmbrella(state, who, 'くるりみ');
+        Engine.effects.fx.moveCrystal(state, who, 'dust', 'aura', 1);
+        Engine.state.log(state, 'くるりみ：开合伞 + 虚 → 自装 1');
+      }
+    },
   };
 
   /* ---------- 效果生成的攻击 ---------- */
@@ -711,6 +827,7 @@
     return state.pending;
   }
 
+
   /* ---------- 再起条件（10-7 / 10-8） ---------- */
 
   const revive = {
@@ -721,7 +838,14 @@
     // 真紅領域【再起】
     "03-himika-o-s-4": (state, who) => state.players[who].hand.length === 0,
     // 無窮ノ風【再起】境地：自集中力 = 2
-    "04-tokoyo-o-s-3": (state, who) => state.players[who].focus === 2
+    "04-tokoyo-o-s-3": (state, who) => state.players[who].focus === 2,
+    // はらりゆき【再起】你进行伞的开合：使用之后开合过就算
+    "06-yukihi-o-s-1": (state, who) => {
+      const p = state.players[who];
+      const sp = (p.specials || []).find(function (c) { return c.id === '06-yukihi-o-s-1'; });
+      if (!sp) return false;
+      return (p.umbrellaCount || 0) > (sp.toggleBase || 0);
+    }
   };
 
   Engine.effects = { cards, revive, choices, resolveChoice, fx,

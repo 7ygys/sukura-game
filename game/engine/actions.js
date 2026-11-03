@@ -49,6 +49,10 @@
     if (next.nabu && ['confirmNabu', 'cancelNabu'].indexOf(action.type) < 0) {
       return { ok: false, state, error: '先把付与的结晶分配完' };
     }
+    // 结束阶段先决定伞的开合
+    if (next.umbrellaPending && action.type !== 'umbrella') {
+      return { ok: false, state, error: '结束阶段：先决定是否开合伞' };
+    }
     // 回合结束要选盖哪几张时，只能做这个
     if (next.endTurnPending && ['confirmEndTurn'].indexOf(action.type) < 0) {
       return { ok: false, state, error: '先把要盖的牌选完' };
@@ -123,6 +127,15 @@
         R.applyDamage(next, ex.who, 1, 1, choice);
         ex.remaining -= 1;
         if (ex.remaining <= 0) next.exhaust = null;
+        return { ok: true, state: afterAction(next) };
+      }
+
+      case 'umbrella': {
+        if (next.umbrellaPending && next.umbrellaPending.who !== action.player)
+          return { ok: false, state, error: '现在不是你的伞要处理' };
+        const r = R.resolveUmbrella(next, action.player, action.open === true ? 'open'
+                                                   : action.open === false ? 'close' : null);
+        if (!r.ok) return { ok: false, state, error: r.error };
         return { ok: true, state: afterAction(next) };
       }
 
