@@ -1137,6 +1137,17 @@
 
     // ---- 攻击 → 进入待处理，等对方决定要不要对应 ----
     if (isAttack) {
+      // 【常時】「这把攻击改为不造成伤害，做别的事」（例：立論 盖对方牌）
+      // 这种情况连对应窗口都不需要 —— 直接办完就结束
+      const effShort = table0[card.id];
+      if (effShort && effShort.insteadOfDamage
+          && effShort.insteadOfDamage(state, who, { cardId: card.id, cardName: card.name })) {
+        if (effShort.replaceDamage) effShort.replaceDamage(state, who, { cardId: card.id, cardName: card.name });
+        Engine.state.emit(state, 'play', { who: who, cardId: card.id, name: card.name });
+        log(state, '「' + card.name + '」不结算伤害');
+        return { ok: true };
+      }
+
       const cardView = cardAt(state, who, card);      // 雪姬：按伞的状态取距离/伤害
       const dmg = cardView.damage || { aura: 0, life: 0 };
       // 规则 6-4-1-4：装伤上限 5；规则 10-21：带「超克」时上限取消

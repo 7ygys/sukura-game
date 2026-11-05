@@ -84,9 +84,7 @@ group('n-1 立論：对方牌库 ≥2 时改为盖牌');
   s.players[1].deck = [cardById('01-yurina-o-n-1'), cardById('01-yurina-o-n-2'), cardById('01-yurina-o-n-3')];
   let r = A(s, { type: 'playCard', player: 0, cardId: '07-shinra-o-n-1' });
   ok('打出立論', r.ok, r.error);
-  r = A(r.state, { type: 'respond', player: 1, cardId: null });
-  r = A(r.state, { type: 'resolveDamage', player: 1, choice: 'aura' });
-  ok('结算成功', r.ok, r.error);
+  ok('满足条件时直接盖牌，不进攻击结算', !r.state.pending, r.state.pending);
   eq('对方牌库 3 → 1', r.state.players[1].deck.length, 1);
   eq('对方伏札 0 → 2', r.state.players[1].hidden.length, 2);
   eq('对方装没动（伤害被替换）', r.state.players[1].aura, 3);
@@ -340,7 +338,7 @@ group('s-4 森羅判証：展开回血 / 其他付与破弃 → 1 命伤 / 破�
   s.players[0].specials = [Object.assign(cardById('07-shinra-o-s-4'), { used: false })];
   let r = autoNabu(A(s, { type: 'playCard', player: 0, cardId: '07-shinra-o-s-4' }));
   ok('展开森羅判証', r.ok, r.error);
-  eq('展开时 虚 → 自命 +1', r.state.players[0].life, 9);
+  eq('展开时 虚 → 自命 +2', r.state.players[0].life, 10);
 
   // 其他付与破弃 → 对方 1 命伤
   let st = r.state;

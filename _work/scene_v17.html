@@ -427,6 +427,14 @@ function syncPendingRaw(){
   }
 
   // 以下是"其他弹窗"：谁先出现谁先处理
+  if(G.planPending){
+    S.dialog={type:'plan'};
+    return;
+  }
+  if(G.cardPick){
+    S.dialog={type:'cardPick'};
+    return;
+  }
   if(G.nabu){
     if(!S.nabuAlloc || S.nabuAlloc.cardId!==G.nabu.cardId){
       const d0=Math.min(G.nabu.maxDust, G.nabu.cap);
@@ -438,14 +446,6 @@ function syncPendingRaw(){
   }
   if(G.auraSplit){
     S.dialog={type:'auraSplit'};
-    return;
-  }
-  if(G.planPending){
-    S.dialog={type:'plan'};
-    return;
-  }
-  if(G.cardPick){
-    S.dialog={type:'cardPick'};
     return;
   }
   if(G.umbrellaPending){
@@ -1596,14 +1596,15 @@ function drawDialog(){
       ctx.strokeStyle = (S.pickSel===c.id) ? 'rgba(255,214,140,0.95)' : 'rgba(160,170,195,0.35)';
       ctx.lineWidth = S.pickSel===c.id ? 2.4 : 1;
       rr(cx-cw/2, cy, cw, ch, 8); ctx.stroke();
-      HIT.push({id:'pk_card_'+i, x:cx-cw/2, y:cy, w:cw, h:ch, cardId:c.id});
+      HIT.push({id:'dlg_pk_card_'+i, x:cx-cw/2, y:cy, w:cw, h:ch, cardId:c.id});
+      if(S.hover==='dlg_pk_card_'+i) S.tip={card:c, ax:cx, ay:cy};
     });
     // 动作按钮
     const acts=[];
     (cp.modes||[]).forEach(function(m){
       acts.push({m:m, label:({useFromHand:'使用这张牌',useFromDiscard:'使用这张牌',hide:'盖成伏札',seal:'封印它',sealForever:'永久封印',drain:'结晶全送虚',reuseEnhance:'免费展开'})[m]||m});
     });
-    const aw=Math.max(120, (bw*0.8)/Math.max(1,acts.length)-10);
+    const aw=Math.min(230, Math.max(120, (bw*0.8)/Math.max(1,acts.length)-10));
     acts.forEach(function(a,i){
       const ax=bx+bw*0.56-(acts.length*aw)/2+i*aw;
       const on = !!S.pickSel;
@@ -1611,12 +1612,12 @@ function drawDialog(){
       glass(ax, by+bh*0.70, aw-10, 46, 8, 0.66);
       txt(ax+(aw-10)/2, by+bh*0.70+24, a.label, 13, '#ffe4b8');
       ctx.globalAlpha = 1;
-      if(on) HIT.push({id:'pk_do_'+a.m, x:ax, y:by+bh*0.70, w:aw-10, h:46});
+      if(on) HIT.push({id:'dlg_pk_do_'+a.m, x:ax, y:by+bh*0.70, w:aw-10, h:46});
     });
     if(cp.optional){
       glass(bx+bw*0.56+ (acts.length*aw)/2 + 6, by+bh*0.70, 90, 46, 8, 0.5);
       txt(bx+bw*0.56+(acts.length*aw)/2+51, by+bh*0.70+24, '取消', 13, '#d8d8e0');
-      HIT.push({id:'pk_cancel', x:bx+bw*0.56+(acts.length*aw)/2+6, y:by+bh*0.70, w:90, h:46});
+      HIT.push({id:'dlg_pk_cancel', x:bx+bw*0.56+(acts.length*aw)/2+6, y:by+bh*0.70, w:90, h:46});
     }
   } else if(d.type==='umbrella' && G.umbrellaPending){
     const open = G.players[G.umbrellaPending.who].umbrella === 'open';

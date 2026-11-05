@@ -893,8 +893,8 @@
     // 森羅判証：展开 虚→自命；其他付与破弃 → 对方 1 命伤；破弃 → 败北
     "07-shinra-o-s-4": {
       onExpanded(state, who) {
-        Engine.effects.fx.moveCrystal(state, who, 'dust', 'life', 1);
-        Engine.state.log(state, '森羅判証：虚 → 自命 1');
+        Engine.effects.fx.moveCrystal(state, who, 'dust', 'life', 2);
+        Engine.state.log(state, '森羅判証：虚 → 自命 2');
       },
       onBreak(state, who) {
         state.winner = 1 - who;
