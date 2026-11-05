@@ -1621,6 +1621,249 @@
      "altNames": []
     }
    ]
+  },
+  {
+   "key": "shinra",
+   "name": "雪拉",
+   "namejp": "シンラ",
+   "weapon": "书",
+   "weaponjp": "書",
+   "keyword": "计略",
+   "keywordDesc": "计略～开局秘密准备「神谋」。执行计略的牌会先结算准备好的那一项，然后秘密准备下一个计略（神谋/鬼谋）。对方看不到你准备的是哪一个。",
+   "cards": [
+    {
+     "id": "07-shinra-o-n-1",
+     "name": "立論",
+     "namejp": "立論",
+     "kind": "normal",
+     "types": [
+      "attack"
+     ],
+     "rangeRaw": "2-7",
+     "range": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "damageRaw": "2/-",
+     "damage": {
+      "aura": 2,
+      "life": null
+     },
+     "cost": null,
+     "capacity": null,
+     "text": "【常时】若对方牌库有 2 张以上的牌，此《攻击》改为不造成伤害，\n而是将对方牌库顶的 2 张牌盖成伏札。",
+     "textjp": "",
+     "altNames": []
+    },
+    {
+     "id": "07-shinra-o-n-2",
+     "name": "反論",
+     "namejp": "反論",
+     "kind": "normal",
+     "types": [
+      "attack",
+      "reaction"
+     ],
+     "rangeRaw": "2-7",
+     "range": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "damageRaw": "1/-",
+     "damage": {
+      "aura": 1,
+      "life": null
+     },
+     "cost": null,
+     "capacity": null,
+     "text": "可在对手攻击时割入使用（对应）。\n【攻击后】打消「不是作为对应打出的切札、且气伤 3 以上」的那次《攻击》的伤害。\n【攻击后】对方抽 1 张牌。",
+     "textjp": "",
+     "altNames": []
+    },
+    {
+     "id": "07-shinra-o-n-3",
+     "name": "詭弁",
+     "namejp": "詭弁",
+     "kind": "normal",
+     "types": [
+      "attack",
+      "fullpower"
+     ],
+     "rangeRaw": "3-8",
+     "range": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "damageRaw": "-/1",
+     "damage": {
+      "aura": null,
+      "life": 1
+     },
+     "cost": null,
+     "capacity": null,
+     "text": "全力\n【攻击后】执行计略，并准备下一个计略。\n・神谋：将对方牌库顶的 3 张牌盖成伏札。\n・鬼谋：从对方弃牌区选 1 张牌，可以使用它。",
+     "textjp": "",
+     "altNames": []
+    },
+    {
+     "id": "07-shinra-o-n-4",
+     "name": "引用",
+     "namejp": "引用",
+     "kind": "normal",
+     "types": [
+      "action"
+     ],
+     "rangeRaw": null,
+     "range": null,
+     "damageRaw": null,
+     "damage": null,
+     "cost": null,
+     "capacity": null,
+     "text": "查看对方手牌，可以选 1 张《攻击》牌。\n如此做则：使用那张牌，或把它盖成伏札。\n之后，若那张牌拥有《全力》，结束当前阶段。",
+     "textjp": "",
+     "altNames": []
+    },
+    {
+     "id": "07-shinra-o-n-5",
+     "name": "煽動",
+     "namejp": "煽動",
+     "kind": "normal",
+     "types": [
+      "action",
+      "reaction"
+     ],
+     "rangeRaw": null,
+     "range": null,
+     "damageRaw": null,
+     "damage": null,
+     "cost": null,
+     "capacity": null,
+     "text": "可在对手攻击时割入使用（对应）。\n执行计略，并准备下一个计略。\n・神谋：虚 → 间合：1\n・鬼谋：间合 → 相手装：1",
+     "textjp": "",
+     "altNames": []
+    },
+    {
+     "id": "07-shinra-o-n-6",
+     "name": "壮語",
+     "namejp": "壮語",
+     "kind": "normal",
+     "types": [
+      "enhance"
+     ],
+     "rangeRaw": null,
+     "range": null,
+     "damageRaw": null,
+     "damage": null,
+     "cost": null,
+     "capacity": 2,
+     "text": "【破弃时】执行计略，并准备下一个计略。\n・神谋：你获得 1 点集中力，并把此牌放到牌库顶。\n・鬼谋：若对方手牌 1 张以下，使对方畏缩，对方抽 3 张、弃 2 张。",
+     "textjp": "",
+     "altNames": []
+    },
+    {
+     "id": "07-shinra-o-n-7",
+     "name": "論破",
+     "namejp": "論破",
+     "kind": "normal",
+     "types": [
+      "enhance"
+     ],
+     "rangeRaw": null,
+     "range": null,
+     "damageRaw": null,
+     "damage": null,
+     "cost": null,
+     "capacity": 4,
+     "text": "【展开时】从对方弃牌区选 1 张牌，封印在此牌之下。\n【破弃时】把封印在此牌下的牌放回对方弃牌区。",
+     "textjp": "",
+     "altNames": []
+    },
+    {
+     "id": "07-shinra-o-s-1",
+     "name": "完全論破",
+     "namejp": "完全論破",
+     "kind": "special",
+     "types": [
+      "action"
+     ],
+     "rangeRaw": null,
+     "range": null,
+     "damageRaw": null,
+     "damage": null,
+     "cost": 2,
+     "capacity": null,
+     "text": "从对方弃牌区选 1 张牌，封印在此牌之下。（不会再回到游戏中）",
+     "textjp": "",
+     "altNames": []
+    },
+    {
+     "id": "07-shinra-o-s-2",
+     "name": "皆式理解",
+     "namejp": "皆式理解",
+     "kind": "special",
+     "types": [
+      "action"
+     ],
+     "rangeRaw": null,
+     "range": null,
+     "damageRaw": null,
+     "damage": null,
+     "cost": 2,
+     "capacity": null,
+     "text": "执行计略，并准备下一个计略。\n・神谋：从你的弃牌区或使用过的切札中，不支付费用使用 1 张《付与》牌。\n　若那张牌是《全力》，结束当前阶段。\n・鬼谋：选 1 张对方不是切札的付与札，把上面的结晶全部送到虚。",
+     "textjp": "",
+     "altNames": []
+    },
+    {
+     "id": "07-shinra-o-s-3",
+     "name": "天地反駁",
+     "namejp": "天地反駁",
+     "kind": "special",
+     "types": [
+      "enhance",
+      "fullpower"
+     ],
+     "rangeRaw": null,
+     "range": null,
+     "damageRaw": null,
+     "damage": null,
+     "cost": 2,
+     "capacity": 5,
+     "text": "全力\n【展开中】你的《攻击》的气伤与命伤互换。\n（伤害互换在伤害增减之前适用）",
+     "textjp": "",
+     "altNames": []
+    },
+    {
+     "id": "07-shinra-o-s-4",
+     "name": "森羅判証",
+     "namejp": "森羅判証",
+     "kind": "special",
+     "types": [
+      "enhance"
+     ],
+     "rangeRaw": null,
+     "range": null,
+     "damageRaw": null,
+     "damage": null,
+     "cost": 6,
+     "capacity": 6,
+     "text": "【展开时】虚 → 自命：1\n【展开中】你的其他付与札被破弃时，给对方 1 点命伤。\n【破弃时】你败北。",
+     "textjp": "",
+     "altNames": []
+    }
+   ]
   }
  ]
 }

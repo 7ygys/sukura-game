@@ -49,6 +49,15 @@
     if (next.nabu && ['confirmNabu', 'cancelNabu'].indexOf(action.type) < 0) {
       return { ok: false, state, error: '先把付与的结晶分配完' };
     }
+    // 正在选牌（引用 / 論破 / 皆式理解…）：只有本人能继续操作
+    if (next.cardPick && next.cardPick.who === action.player && action.type !== 'pickCard') {
+      return { ok: false, state, error: '先选好要处理的牌' };
+    }
+    // 计略还没准备好：本人不能做别的（对方不受影响）
+    if (next.planPending && next.planPending.who === action.player
+        && action.type !== 'plan' && action.type !== 'pickCard') {
+      return { ok: false, state, error: '先准备下一个计略' };
+    }
     // 结束阶段先决定伞的开合
     if (next.umbrellaPending && action.type !== 'umbrella') {
       return { ok: false, state, error: '结束阶段：先决定是否开合伞' };
@@ -127,6 +136,19 @@
         R.applyDamage(next, ex.who, 1, 1, choice);
         ex.remaining -= 1;
         if (ex.remaining <= 0) next.exhaust = null;
+        return { ok: true, state: afterAction(next) };
+      }
+
+      case 'pickCard': {
+        const r = Engine.effects.resolveCardPick(next, action);
+        if (!r.ok) return { ok: false, state, error: r.error };
+        return { ok: true, state: afterAction(next) };
+      }
+
+      case 'plan': {
+        if (!next.planPending || next.planPending.who !== action.player)
+          return { ok: false, state, error: '现在不用准备计略' };
+        Engine.plan.resolve(next, action.player, action.choice === 'oni' ? 'oni' : 'kami');
         return { ok: true, state: afterAction(next) };
       }
 

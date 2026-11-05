@@ -10,6 +10,7 @@ const fs = require('fs');
 // 引擎文件都是 UMD 写法，require 后挂在 globalThis.Engine 上
 require('../engine/rng.js');
 require('../engine/umbrella.js');
+require('../engine/plan.js');
 require('../engine/state.js');
 require('../engine/rules.js');
 require('../engine/effects.js');

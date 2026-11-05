@@ -405,6 +405,40 @@
    * 直接变成＜伏せ札＞，上面的樱结晶全部进虚。
    * 因为是从付与札"移走"而不是"破弃"，所以【破弃时】不会触发。
    */
+  /**
+   * 对方牌库顶 n 张 → 对方的伏札（盖牌）。牌不够就有多少盖多少。
+   */
+  function oppDeckToHidden(state, oppIdx, n) {
+    const p = state.players[oppIdx];
+    let moved = 0;
+    for (let i = 0; i < n && p.deck.length; i++) {
+      p.hidden.push(p.deck.shift());
+      moved++;
+    }
+    if (moved) log(state, 'P' + (oppIdx + 1) + ' 的牌库顶 ' + moved + ' 张被盖成伏札');
+    Engine.state.emit(state, 'cardTo', { who: oppIdx, to: 'hidden', n: moved });
+    return moved;
+  }
+
+  /**
+   * 封印：把一张牌放到某张付与札下面（不进入弃牌区）。
+   * 被封印的牌不再参与游戏，也不再被抽到。
+   */
+  function sealUnder(state, host, card) {
+    host.sealed = host.sealed || [];
+    host.sealed.push(card);
+    log(state, '「' + card.name + '」被封印在「' + host.name + '」之下');
+  }
+
+  /** 解开封印：把牌还给它的持有者（进弃牌区） */
+  function unsealAll(state, who, host) {
+    const back = host.sealed || [];
+    host.sealed = [];
+    back.forEach(function (c) { state.players[who].discard.push(c); });
+    if (back.length) log(state, '「' + host.name + '」的封印解除，' + back.length + ' 张牌回到弃牌区');
+    return back;
+  }
+
   /** 付与离开场上：通常札进弃牌区，王牌回到王牌区并标记已使用 */
   function retireAttachment(p, a) {
     const card = Object.assign({}, a, { crystals: 0 });
@@ -492,7 +526,10 @@
       } else if (p.focus < I.FOCUS_MAX) {
         p.focus++;
       }
-      tickAttachments(state, who);
+      // 规则 8-1-3-ⅱ：开始阶段的既定处理会让**双方**付与札各掉 1 颗结晶
+      // （不是"只掉自己那份"）。所以一张 3 纳的付与：
+      //   我出 → 对方回合开始掉 1 → 我回合开始掉 1 → 对方回合开始掉 1 → 破弃
+      state.players.forEach(function (pl, idx) { tickAttachments(state, idx); });
 
       // ⅲ 重组牌库（每回合都会问，付 1 点命）→ ⅳ 抽 2
       const material = p.discard.concat(p.hidden).filter(c => c.kind === 'normal').length;
@@ -524,6 +561,7 @@
     const keep = [];
     const table = (Engine.effects && Engine.effects.cards) || {};
     p.attachments.forEach(a => {
+      if (a.sealOnly) { keep.push(a); return; }   // 单纯托着封印牌的（完全論破）不掉结晶
       if (a.crystals > 0) {
         const e = table[a.id];
         // 圏域：本该进虚的结晶改为进间合；间合满了就**留在牌上**不动
@@ -543,12 +581,43 @@
       if (a.crystals > 0) {
         keep.push(a);
       } else {
-        // 结晶耗尽 → 破弃：先触发【破弃时】，再进弃牌区
-        const eff = (Engine.effects && Engine.effects.cards && Engine.effects.cards[a.id]);
-        if (eff && eff.onBreak) eff.onBreak(state, who, a);
-        p.discard.push(Object.assign({}, a, { crystals: 0 }));
-        log(state, '付与「' + a.name + '」结晶耗尽，破弃');
+        breakAttachment(state, who, a);
       }
+    });
+    p.attachments = keep;
+  }
+
+  /**
+   * 破弃一张付与札（结晶归零时）。
+   * 规则 5-5-2：结晶为零是"状况起因"，一旦发生就要立刻破弃。
+   */
+  function breakAttachment(state, who, a) {
+    const p = state.players[who];
+    const table = (Engine.effects && Engine.effects.cards) || {};
+    const eff = table[a.id];
+    if (eff && eff.onBreak) eff.onBreak(state, who, a);
+    // 封印在它下面的牌：先回到对手弃牌区（免得丢失）
+    if (a.sealed && a.sealed.length) unsealAll(state, 1 - who, a);
+    // 有些【破弃时】会自己把牌搬走（例如壮语·神谋 放回牌库顶）
+    if (!a.sealOnly && !a.noDiscard) p.discard.push(Object.assign({}, a, { crystals: 0 }));
+    log(state, '付与「' + a.name + '」结晶耗尽，破弃');
+
+    // 【展开中】监听者：森羅判証 —— 自己的其他付与被破弃时给对方 1 命伤
+    (p.attachments || []).forEach(function (other) {
+      if (other === a || other.id === a.id) return;
+      const oe = table[other.id];
+      if (oe && oe.onOtherAttachmentBroken) oe.onOtherAttachmentBroken(state, who, other);
+    });
+  }
+
+  /** 把该破弃的付与札清掉（结晶为 0 的） */
+  function sweepAttachments(state, who) {
+    const p = state.players[who];
+    if (!p || !p.attachments.length) return;
+    const keep = [];
+    p.attachments.forEach(function (a) {
+      if (a.sealOnly || a.crystals > 0) keep.push(a);
+      else breakAttachment(state, who, a);
     });
     p.attachments = keep;
   }
@@ -1077,9 +1146,18 @@
       // 「+X/+Y」如果是「他のメガミによる《攻撃》」限定，自己女神的攻击就不吃
       const cardGoddess = String(card.id).split('-')[1];
       const buffApplies = !buff.otherGoddess || cardGoddess !== buff.otherGoddess;
+      // 天地反駁：【展开中】气伤与命伤互换（在加减之前）
+      const swapTbl = (Engine.effects && Engine.effects.cards) || {};
+      const hasSwap = (p.attachments || []).some(function (a) {
+        const ae = swapTbl[a.id];
+        return ae && ae.swapDamage;
+      });
+      let baseAura = dmg.aura, baseLife = dmg.life;
+      if (hasSwap) { const tmpA = baseAura; baseAura = baseLife; baseLife = tmpA; }
+
       const ctx = {
-        aura: (dmg.aura === null || dmg.aura === undefined) ? null : dmg.aura + (buffApplies ? (buff.aura || 0) : 0),
-        life: (dmg.life === null || dmg.life === undefined) ? null : dmg.life + (buffApplies ? (buff.life || 0) : 0),
+        aura: (baseAura === null || baseAura === undefined) ? null : baseAura + (buffApplies ? (buff.aura || 0) : 0),
+        life: (baseLife === null || baseLife === undefined) ? null : baseLife + (buffApplies ? (buff.life || 0) : 0),
         range: (cardView.range || []).slice(),
         chokoku: false,
         both: false,
@@ -1332,6 +1410,16 @@
       return { ok: true };
     }
 
+    // 【常時】効果によるダメージの置換（例：立論 → 改为盖对方牌库顶）
+    const rtab = (Engine.effects && Engine.effects.cards) || {};
+    const reff = pd.cardId && rtab[pd.cardId];
+    if (reff && reff.insteadOfDamage && reff.insteadOfDamage(state, pd.attacker, pd)) {
+      if (reff.replaceDamage) reff.replaceDamage(state, pd.attacker, pd);
+      pd.damageReplaced = true;
+      Engine.state.log(state, '「' + (pd.cardName || '攻击') + '」的伤害被替换');
+      return finishAttack(state, pd, who);
+    }
+
     const ok = applyDamage(state, who, dmg.aura, dmg.life, pd.both ? 'both' : choice);
     if (!ok) return { ok: false, error: '这条伤害不能这样选' };
 
@@ -1363,6 +1451,12 @@
     // 嵌套打完了 → 把挂起的原攻击接回来
     while (!state.pending && state.attackStack && state.attackStack.length) {
       const outer = state.attackStack.pop();
+      // 被【反論】这类效果打消掉的原攻击：不再结算伤害
+      if (outer.cancelled) {
+        log(state, '「' + (outer.cardName || '攻击') + '」被打消，不结算');
+        Engine.state.emit(state, 'cancel', { who: outer.defender });
+        continue;
+      }
       outer.stage = 'damage';
       state.pending = outer;
       if (!recheckRange(state)) break;   // 落空了就继续取下一个
@@ -1507,9 +1601,9 @@
     // 伤害
     applyDamage, canTakeAura,
     // 回合
-    startTurn, endTurn, tickAttachments,
+    startTurn, endTurn, tickAttachments, sweepAttachments,
     // 基本动作
-    BASIC, canBasic, basicAction, hideCard, taijinOf, shadowAura, moveCrystal, recheckRange, effDistance, resolveAuraSplit, triggerGap, nextQueuedAttack, cardAt, hasUmbrella, toggleUmbrella, resolveUmbrella, confirmNabu, cancelNabu, confirmEndTurn,
+    BASIC, canBasic, basicAction, hideCard, taijinOf, shadowAura, moveCrystal, recheckRange, effDistance, resolveAuraSplit, triggerGap, nextQueuedAttack, cardAt, hasUmbrella, toggleUmbrella, resolveUmbrella, oppDeckToHidden, sealUnder, unsealAll, confirmNabu, cancelNabu, confirmEndTurn,
     // 再起
     tryRevive, stagger,
     // 出牌与攻防

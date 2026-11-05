@@ -962,14 +962,12 @@ group('17. 破弃时的攻击：衝音晶');
      ['02-saine-o-n-6', 1]);
   eqc(s, '衝音晶 展开');
 
-  // 过两个回合：回到 P0 的回合开始时，付与札掉 1 颗结晶 → 破弃 → 【破弃时】攻击
+  // 规则 8-1-3-ⅱ：每个回合开始时**双方**付与札各掉 1 颗。
+  // 所以 P0 一结束、P1 的回合开始，纳 1 的衝音晶立刻就破弃了。
   let r2 = passTurn(s);
   ok('P0 结束回合', r2.ok, r2.error);
   eq('轮到 P1', r2.state.active, 1);
-  r2 = passTurn(r2.state);
-  ok('P1 结束回合，回到 P0', r2.ok, r2.error);
   s = r2.state;
-  eq('重回 P0 的回合', s.active, 0);
   eq('付与札结晶耗尽 → 破弃，付与区清空', s.players[0].attachments.length, 0);
   const broke = s.players[0].discard.filter(function (c) { return c.id === '02-saine-o-n-6'; });
   eq('破弃的牌进弃牌区', broke.length, 1);

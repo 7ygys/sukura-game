@@ -793,7 +793,338 @@
         Engine.state.log(state, 'くるりみ：开合伞 + 虚 → 自装 1');
       }
     },
+
+    /* ===== 雪拉（计略：神谋 / 鬼谋） =====
+     *
+     * 「計略を実行し、次の計略を準備する」通用流程：
+     *   1) plan.execute() → 公开当前计略并返回是哪一个
+     *   2) 走 planEffects[cardId][plan] 分支
+     *   3) plan.needPrepare() → 挂起，等玩家秘密选下一个
+     */
+
+    // 立論：对方牌库 ≥2 时改为盖对方 2 张（伤害不结算）
+    "07-shinra-o-n-1": {
+      insteadOfDamage(state, who) {
+        return state.players[1 - who].deck.length >= 2;
+      },
+      replaceDamage(state, who) {
+        Engine.rules.oppDeckToHidden(state, 1 - who, 2);
+      }
+    },
+
+    // 反論：打消"被对应的那一发"（气伤 ≥3）；然后对方抽 1
+    "07-shinra-o-n-2": {
+      attackOnRespond: true,     // 攻撃+対応：作为对应使用时也会打出自己那一发
+      onAfterAttack(state, who) {
+        const stack = state.attackStack || [];
+        const outer = stack[stack.length - 1];
+        if (outer && !outer.cancelled) {
+          const a = outer.damage && outer.damage.aura;
+          if (a !== null && a !== undefined && a >= 3) {
+            outer.cancelled = true;
+            Engine.state.log(state, '反論：打消「' + (outer.cardName || '攻击') + '」的伤害');
+          }
+        }
+        const opp = state.players[1 - who];
+        if (opp.deck.length) {
+          opp.hand.push(opp.deck.shift());
+          Engine.state.emit(state, 'draw', { who: 1 - who, n: 1 });
+          Engine.state.log(state, '反論：对方抽 1 张');
+        }
+      }
+    },
+
+    // 詭弁：攻击后执行计略
+    "07-shinra-o-n-3": {
+      onAfterAttack(state, who) { runPlan(state, who, '07-shinra-o-n-3'); }
+    },
+
+    // 引用：看对方手牌，选一张《攻击》牌 → 使用 / 盖成伏札
+    "07-shinra-o-n-4": {
+      onUse(state, who) {
+        openCardPick(state, who, {
+          target: 1 - who, zone: 'hand', filter: 'attack',
+          prompt: '引用：选择对方手牌中的一张《攻击》牌（可以取消）',
+          modes: ['useFromHand', 'hide'], optional: true
+        });
+      }
+    },
+
+    // 煽動：对应；执行计略
+    "07-shinra-o-n-5": {
+      onUse(state, who) { runPlan(state, who, '07-shinra-o-n-5'); }
+    },
+
+    // 壮語：破弃时执行计略
+    "07-shinra-o-n-6": {
+      onBreak(state, who, self) { runPlan(state, who, '07-shinra-o-n-6', self); }
+    },
+
+    // 論破：展开时封印对方弃牌区 1 张
+    "07-shinra-o-n-7": {
+      onExpanded(state, who, self) {
+        openCardPick(state, who, {
+          target: 1 - who, zone: 'discard', filter: 'any',
+          prompt: '論破：选一张对方弃牌区的牌，封印在此牌之下',
+          modes: ['seal'], hostId: self && self.id
+        });
+      }
+    },
+
+    // 完全論破：永久封印 1 张
+    "07-shinra-o-s-1": {
+      onUse(state, who) {
+        openCardPick(state, who, {
+          target: 1 - who, zone: 'discard', filter: 'any',
+          prompt: '完全論破：选一张对方弃牌区的牌永久封印',
+          modes: ['sealForever']
+        });
+      }
+    },
+
+    // 皆式理解：执行计略
+    "07-shinra-o-s-2": {
+      onUse(state, who) { runPlan(state, who, '07-shinra-o-s-2'); }
+    },
+
+    // 天地反駁：【展开中】气伤与命伤互换（rules 里读 swapDamage）
+    "07-shinra-o-s-3": { swapDamage: true },
+
+    // 森羅判証：展开 虚→自命；其他付与破弃 → 对方 1 命伤；破弃 → 败北
+    "07-shinra-o-s-4": {
+      onExpanded(state, who) {
+        Engine.effects.fx.moveCrystal(state, who, 'dust', 'life', 1);
+        Engine.state.log(state, '森羅判証：虚 → 自命 1');
+      },
+      onBreak(state, who) {
+        state.winner = 1 - who;
+        Engine.state.log(state, '森羅判証 破弃：P' + (who + 1) + ' 败北');
+        Engine.state.emit(state, 'gameover', { winner: 1 - who, reason: '森羅判証' });
+      },
+      onOtherAttachmentBroken(state, who) {
+        const opp = state.players[1 - who];
+        if (opp.life > 0) {
+          opp.life -= 1;
+          Engine.state.emit(state, 'damage', { who: 1 - who, kind: 'life', n: 1 });
+          Engine.state.log(state, '森羅判証：其他付与破弃 → 对方 1 点命伤');
+        }
+      }
+    },
   };
+
+  /* ============================================================
+   * 雪拉：计略的四个分支（每张"执行计略"的牌各有一套）
+   * ============================================================ */
+  const planEffects = {
+    // 詭弁
+    '07-shinra-o-n-3': {
+      kami(state, who) { Engine.rules.oppDeckToHidden(state, 1 - who, 3); },
+      oni(state, who) {
+        openCardPick(state, who, {
+          target: 1 - who, zone: 'discard', filter: 'any',
+          prompt: '诡辩·鬼谋：可以从对方弃牌区使用一张牌（可以取消）',
+          modes: ['useFromDiscard'], optional: true
+        });
+      }
+    },
+    // 煽動
+    '07-shinra-o-n-5': {
+      kami(state, who) { fx.moveCrystal(state, who, 'dust', 'distance', 1); },
+      oni(state, who) { fx.moveCrystal(state, 1 - who, 'distance', 'aura', 1); }
+    },
+    // 壮語
+    '07-shinra-o-n-6': {
+      kami(state, who, self) {
+        fx.gainFocus(state, who, 1);
+        const p = state.players[who];
+        const i = p.discard.findIndex(function (c) { return c.id === '07-shinra-o-n-6'; });
+        if (i >= 0) {
+          p.deck.unshift(p.discard.splice(i, 1)[0]);
+        } else if (self) {
+          // 破弃时效果：这时牌还没进弃牌区，直接把它放到牌库顶
+          p.deck.unshift(Object.assign({}, self, { crystals: 0 }));
+          self.noDiscard = true;
+        }
+        Engine.state.log(state, '壮语·神谋：+1 集中力，此牌回到牌库顶');
+      },
+      oni(state, who) {
+        const opp = state.players[1 - who];
+        if (opp.hand.length > 1) { Engine.state.log(state, '壮语·鬼谋：对方手牌多于 1 张，没有效果'); return; }
+        Engine.rules.stagger(state, 1 - who);
+        for (let i = 0; i < 3; i++) {
+          if (opp.deck.length) opp.hand.push(opp.deck.shift());
+          else { Engine.rules.exhaust(state, 1 - who); }
+        }
+        // 手牌上限 2：多的进伏札（这里自动取末尾，简化）
+        while (opp.hand.length > 2) opp.hidden.push(opp.hand.pop());
+        Engine.state.log(state, '壮语·鬼谋：对方畏缩，抽 3 张后只剩 2 张');
+      }
+    },
+    // 皆式理解
+    '07-shinra-o-s-2': {
+      kami(state, who) {
+        openCardPick(state, who, {
+          target: who, zone: 'reuse', filter: 'enhance',
+          prompt: '皆式理解·神谋：从弃牌区/使用过的切札里免费展开一张《付与》',
+          modes: ['reuseEnhance']
+        });
+      },
+      oni(state, who) {
+        openCardPick(state, who, {
+          target: 1 - who, zone: 'attachments', filter: 'any', nonSpecial: true,
+          prompt: '皆式理解·鬼谋：选一张对方（非切札）的付与札，结晶全进虚',
+          modes: ['drain']
+        });
+      }
+    }
+  };
+
+  /** 执行计略 → 走分支 → 挂起"准备下一个" */
+  function runPlan(state, who, cardId, self) {
+    const plan = Engine.plan.execute(state, who);
+    const tbl = planEffects[cardId] || {};
+    if (tbl[plan]) tbl[plan](state, who, self);
+    Engine.plan.needPrepare(state, who);
+  }
+
+  /* ============================================================
+   * 雪拉：从某个区域"挑一张牌"的通用待处理
+   * ============================================================ */
+  function openCardPick(state, who, spec) {
+    // 规则 5-10：能选几张就选几张 —— 一张都没有就什么也不发生
+    const cp = Object.assign({ who: who }, spec);
+    if (pickCandidates(state, cp).length === 0) {
+      Engine.state.log(state, '（没有可选的牌，效果跳过）');
+      return null;
+    }
+    state.cardPick = cp;
+    Engine.state.log(state, spec.prompt || '选一张牌');
+    return cp;
+  }
+
+  /** 现在能选哪些牌（给界面用，也给引擎校验用） */
+  function pickCandidates(state, cp) {
+    const t = state.players[cp.target];
+    let list = [];
+    if (cp.zone === 'hand') list = t.hand.slice();
+    else if (cp.zone === 'discard') list = t.discard.slice();
+    else if (cp.zone === 'attachments') list = t.attachments.slice();
+    else if (cp.zone === 'reuse') {
+      list = t.discard.filter(c => (c.types || []).indexOf('enhance') >= 0)
+        .concat((t.specials || []).filter(c => c.used && (c.types || []).indexOf('enhance') >= 0));
+    }
+    if (cp.filter === 'attack') list = list.filter(c => (c.types || []).indexOf('attack') >= 0);
+    if (cp.filter === 'enhance') list = list.filter(c => (c.types || []).indexOf('enhance') >= 0);
+    if (cp.nonSpecial) list = list.filter(c => c.kind !== 'special');
+    return list;
+  }
+
+  /** 拿手里的这张牌打出去（引用 / 诡辩鬼谋共用） */
+  function useBorrowedAttack(state, who, card) {
+    const made = Engine.effects.generateAttack(state, who, {
+      name: card.name + '（借）',
+      range: (card.range || []).slice(),
+      aura: card.damage ? card.damage.aura : null,
+      life: card.damage ? card.damage.life : null,
+      cardId: card.id
+    });
+    return made;
+  }
+
+  /**
+   * 处理"选牌"的结果。
+   * @param {object} action {player, cardId, mode, cancel}
+   */
+  function resolveCardPick(state, action) {
+    const cp = state.cardPick;
+    if (!cp || cp.who !== action.player) return { ok: false, error: '现在不用选牌' };
+    if (action.cancel) {
+      if (!cp.optional) return { ok: false, error: '这一步必须选' };
+      state.cardPick = null;
+      return { ok: true };
+    }
+
+    const list = pickCandidates(state, cp);
+    const card = list.find(c => c.id === action.cardId);
+    if (!card) return { ok: false, error: '这张牌不能选' };
+
+    const mode = action.mode || (cp.modes && cp.modes[0]);
+    const t = state.players[cp.target];
+    const me = state.players[cp.who];
+
+    // 从当前区域里摘掉（后面再决定去哪）
+    function takeFrom(zones) {
+      for (const z of zones) {
+        if (!t[z]) continue;
+        const i = t[z].findIndex(c => c.id === card.id);
+        if (i >= 0) return t[z].splice(i, 1)[0];
+      }
+      return null;
+    }
+
+    if (mode === 'hide') {
+      takeFrom(['hand']);
+      t.hidden.push(card);
+      Engine.state.log(state, '「' + card.name + '」被盖成伏札');
+    } else if (mode === 'useFromHand' || mode === 'useFromDiscard') {
+      // 只从"那个区域"拿：手牌里可能有一模一样的同名卡，不能拿错
+      takeFrom(mode === 'useFromHand' ? ['hand'] : ['discard']);
+      useBorrowedAttack(state, cp.who, card);
+      t.discard.push(card);
+      Engine.state.log(state, '借用了对方的「' + card.name + '」');
+    } else if (mode === 'seal') {
+      takeFrom(['discard']);
+      let host = null;
+      if (cp.hostId) {
+        host = me.attachments.find(a => a.id === cp.hostId) || null;
+      }
+      if (!host) host = me.attachments.find(a => !a.sealOnly) || null;
+      if (host) Engine.rules.sealUnder(state, host, card);
+      else me.attachments.push({ id: cp.hostId || card.id, name: '封印', crystals: 0, sealOnly: true, sealed: [card] });
+    } else if (mode === 'sealForever') {
+      takeFrom(['discard']);
+      me.attachments.push({
+        id: '07-shinra-o-s-1', name: '完全論破', kind: 'special',
+        crystals: 0, sealOnly: true, forever: true, sealed: [card]
+      });
+      Engine.state.log(state, '「' + card.name + '」被永久封印');
+    } else if (mode === 'drain') {
+      const i = t.attachments.findIndex(a => a.id === card.id);
+      if (i >= 0) {
+        const a = t.attachments[i];
+        const n = a.crystals || 0;
+        a.crystals = 0;
+        state.dust += n;
+        Engine.state.log(state, '「' + a.name + '」的 ' + n + ' 颗结晶全部进虚');
+        if (n > 0) Engine.state.emit(state, 'damage', { who: cp.target, kind: 'attach', n: n });
+        Engine.rules.sweepAttachments(state, cp.target);
+      }
+    } else if (mode === 'reuseEnhance') {
+      // 从弃牌区或"使用过的切札"里免费展开
+      let src = null;
+      for (const z of ['discard', 'specials']) {
+        const i = (me[z] || []).findIndex(c => c.id === card.id);
+        if (i >= 0) { src = me[z].splice(i, 1)[0]; break; }
+      }
+      if (!src) return { ok: false, error: '找不到这张牌' };
+      const cap = src.capacity || 0;
+      const fromDust = Math.min(state.dust, cap);
+      state.dust -= fromDust;
+      const fromAura = Math.min(me.aura, cap - fromDust);
+      me.aura -= fromAura;
+      me.attachments.push(Object.assign({}, src, {
+        crystals: fromDust + fromAura,
+        fromSpecial: src.kind === 'special'
+      }));
+      const e2 = cards[src.id];
+      if (e2 && e2.onExpanded) e2.onExpanded(state, cp.who, me.attachments[me.attachments.length - 1]);
+      Engine.state.log(state, '免费展开「' + src.name + '」');
+      if ((src.types || []).indexOf('fullpower') >= 0) state.phaseEnded = true;
+    }
+
+    state.cardPick = null;
+    return { ok: true };
+  }
 
   /* ---------- 效果生成的攻击 ---------- */
 
@@ -848,6 +1179,6 @@
     }
   };
 
-  Engine.effects = { cards, revive, choices, resolveChoice, fx,
+  Engine.effects = { cards, revive, choices, resolveChoice, fx, planEffects, runPlan, openCardPick, pickCandidates, resolveCardPick,
     kesshi, hassou, kyouchi, renka, generateAttack };
 })(typeof window !== 'undefined' ? window : globalThis);

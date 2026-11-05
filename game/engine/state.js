@@ -39,6 +39,8 @@
       focus: INIT.FOCUS,
       staggered: false,   // 畏缩
       umbrella: 'closed', // 雪姬的伞：'closed' 闭 / 'open' 开（开局是闭）
+      plan: 'kami',       // 雪拉的计略：'kami' 神谋 / 'oni' 鬼谋（开局必为神谋）
+      planRevealed: false, // 计略是否已向对方公开（执行中才公开）
       deck: [],           // 牌库（索引 0 = 牌堆顶）
       hand: [],
       discard: [],        // 弃牌区（双方可见）

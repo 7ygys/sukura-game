@@ -53,6 +53,7 @@
 <script src="gamedata.js"></script>
 <script src="../game/engine/rng.js"></script>
 <script src="../game/engine/umbrella.js"></script>
+<script src="../game/engine/plan.js"></script>
 <script src="../game/engine/state.js"></script>
 <script src="../game/engine/rules.js"></script>
 <script src="../game/engine/effects.js"></script>
@@ -152,7 +153,10 @@ window.addEventListener('unhandledrejection', function(e){
 const IMG={};
 (function(){
   const base='../素材/Sprite/';
-  ['01','02','03','04','06'].forEach(function(n){const i=new Image();i.src=base+n+'.png';IMG['av'+n]=i;});
+  ['01','02','03','04','06','07'].forEach(function(n){const i=new Image();i.src=base+n+'.png';IMG['av'+n]=i;});
+  IMG.planKami=new Image(); IMG.planKami.src=base+'plan_blue.png';   // 神谋
+  IMG.planOni=new Image();  IMG.planOni.src=base+'plan_red.png';     // 鬼谋
+  IMG.planBack=new Image(); IMG.planBack.src=base+'plan_back.png';   // 背面（对方视角）
   IMG.umbOpen=new Image();  IMG.umbOpen.src=base+'open.png';    // 伞：开
   IMG.umbClose=new Image(); IMG.umbClose.src=base+'close.png';  // 伞：闭
   [1,2,3,4,5].forEach(function(n){const i=new Image();i.src=base+'basic_action_'+n+'.png';IMG['act'+n]=i;});
@@ -382,6 +386,8 @@ function dialogActor(type){
   if(type==='nabu') return G.nabu && G.nabu.who;
   if(type==='auraSplit') return G.auraSplit && G.auraSplit.who;
   if(type==='exhaust') return G.exhaust && G.exhaust.who;
+  if(type==='plan') return G.planPending && G.planPending.who;
+  if(type==='cardPick') return G.cardPick && G.cardPick.who;
   if(type==='umbrella') return G.umbrellaPending && G.umbrellaPending.who;
   if(type==='endDiscard') return G.endTurnPending && G.endTurnPending.who;
   if(type==='choice') return G.choice && G.choice.who;
@@ -434,6 +440,14 @@ function syncPendingRaw(){
     S.dialog={type:'auraSplit'};
     return;
   }
+  if(G.planPending){
+    S.dialog={type:'plan'};
+    return;
+  }
+  if(G.cardPick){
+    S.dialog={type:'cardPick'};
+    return;
+  }
   if(G.umbrellaPending){
     S.dialog={type:'umbrella'};
     return;
@@ -480,6 +494,13 @@ function syncPendingRaw(){
     if(G.pending && G.pending.stage==='respond') return;
   }
   S.dialog=null;
+}
+
+function doPick(mode){
+  const cp=G.cardPick;
+  if(!cp||!S.pickSel) return;
+  act({type:'pickCard', player:cp.who, cardId:S.pickSel, mode:mode});
+  S.pickSel=null;
 }
 
 function glass(x,y,w,h,r,a){
@@ -628,7 +649,7 @@ function drawSide(isMine){
     const x=i?mid+4:z.x0,w=mid-z.x0-4;
     glass(x,z.y,w,z.h,10,0.34);
     const key = gk[i];
-    const num = key ? ({yurina:'01',saine:'02',himika:'03',tokoyo:'04',yukihi:'06'})[key] : null;
+    const num = key ? ({yurina:'01',saine:'02',himika:'03',tokoyo:'04',yukihi:'06',shinra:'07'})[key] : null;
     const av = num ? IMG['av'+num] : null;
     if(av&&av.complete&&av.naturalWidth){
       const aw=62, ah=aw*av.naturalHeight/av.naturalWidth;
@@ -674,6 +695,32 @@ function drawSide(isMine){
       txt(bx+bs/2, by+bs/2, open ? '开' : '闭', 12, '#ffd9a0');
     }
     HITP('umbrella', bx, by, bs, bs);
+  }
+
+  // ---------- 计略（雪拉）：画在她自己那一格的左下角 ----------
+  const shIdx = gk.indexOf('shinra');
+  if(shIdx >= 0){
+    const x = shIdx ? mid+4 : z.x0, w = mid-z.x0-4;
+    const mine = isMine;
+    const revealed = mine || !!pl.planRevealed;
+    const plan = pl.plan === 'oni' ? 'oni' : 'kami';
+    const img = !revealed ? IMG.planBack : (plan === 'oni' ? IMG.planOni : IMG.planKami);
+    const bs = Math.min(30, z.h - 22);
+    const bx = x + 8, by = z.y + z.h - bs - 8;
+    ctx.save();
+    ctx.fillStyle = 'rgba(8,10,16,0.6)';
+    rr(bx-3, by-3, bs+6, bs+6, 7); ctx.fill();
+    ctx.strokeStyle = revealed
+      ? (plan === 'oni' ? 'rgba(255,140,150,0.9)' : 'rgba(150,215,255,0.9)')
+      : 'rgba(150,155,175,0.7)';
+    ctx.lineWidth = 1.3;
+    rr(bx-3, by-3, bs+6, bs+6, 7); ctx.stroke();
+    ctx.restore();
+    if(img && img.complete && img.naturalWidth) ctx.drawImage(img, bx, by, bs, bs);
+    else txt(bx+bs/2, by+bs/2, revealed ? (plan==='oni'?'鬼':'神') : '？', 12, '#ffd9a0');
+    if(!mine) ctx.globalAlpha = 0.9;
+    HITP('plan', bx, by, bs, bs);
+    ctx.globalAlpha = 1;
   }
 
   // ---------- 基础行动：竖长六边形图标，横排 ----------
@@ -1525,6 +1572,52 @@ function drawDialog(){
     txt(bx+bw*0.62, by+bh*0.84+22, '确认', 16, '#f2ece2');
     ctx.restore();
     if(S.endPick.length===pend.need) HIT.push({id:'dlg_end_ok', x:bx+bw*0.62-60, y:by+bh*0.84, w:120, h:44});
+  } else if(d.type==='plan' && G.planPending){
+    txt(bx+bw*0.56, by+bh*0.20, '准备下一个计略', 19, '#f2ece2');
+    txt(bx+bw*0.56, by+bh*0.30, '对方看不到你选哪个', 12, 'rgba(240,235,225,0.7)');
+    const bwd=170, gap=24;
+    const cx1=bx+bw*0.56-bwd/2-gap/2, cx2=bx+bw*0.56+bwd/2+gap/2;
+    [[IMG.planKami,'神谋','kami',cx1],[IMG.planOni,'鬼谋','oni',cx2]].forEach(function(it){
+      glass(it[3]-bwd/2, by+bh*0.46, bwd, 64, 10, 0.66);
+      if(it[0] && it[0].complete && it[0].naturalWidth) ctx.drawImage(it[0], it[3]-28, by+bh*0.46+8, 28, 32);
+      txt(it[3], by+bh*0.46+50, it[1], 14, '#ffe4b8');
+      HIT.push({id:'dlg_plan_'+it[2], x:it[3]-bwd/2, y:by+bh*0.46, w:bwd, h:64});
+    });
+  } else if(d.type==='cardPick' && G.cardPick){
+    const cp=G.cardPick;
+    txt(bx+bw*0.56, by+bh*0.18, cp.prompt || '选择一张牌', 15, '#f2ece2');
+    const cands = (E.effects.pickCandidates(G, cp) || []);
+    const n=cands.length, cw=76, ch=108, step=Math.min(88,(bw*0.8)/Math.max(1,n));
+    const x0=bx+bw*0.56-(n*step)/2+step/2;
+    cands.forEach(function(c,i){
+      const cx=x0+i*step, cy=by+bh*0.34;
+      if(c.id && ALL[c.id]) cardBody(cx-cw/2, cy, cw, ch, c, true, 9);
+      else { glass(cx-cw/2, cy, cw, ch, 8, 0.5); txt(cx, cy+ch/2, c.name||c.id, 10, '#e8eefc'); }
+      ctx.strokeStyle = (S.pickSel===c.id) ? 'rgba(255,214,140,0.95)' : 'rgba(160,170,195,0.35)';
+      ctx.lineWidth = S.pickSel===c.id ? 2.4 : 1;
+      rr(cx-cw/2, cy, cw, ch, 8); ctx.stroke();
+      HIT.push({id:'pk_card_'+i, x:cx-cw/2, y:cy, w:cw, h:ch, cardId:c.id});
+    });
+    // 动作按钮
+    const acts=[];
+    (cp.modes||[]).forEach(function(m){
+      acts.push({m:m, label:({useFromHand:'使用这张牌',useFromDiscard:'使用这张牌',hide:'盖成伏札',seal:'封印它',sealForever:'永久封印',drain:'结晶全送虚',reuseEnhance:'免费展开'})[m]||m});
+    });
+    const aw=Math.max(120, (bw*0.8)/Math.max(1,acts.length)-10);
+    acts.forEach(function(a,i){
+      const ax=bx+bw*0.56-(acts.length*aw)/2+i*aw;
+      const on = !!S.pickSel;
+      ctx.globalAlpha = on?1:0.4;
+      glass(ax, by+bh*0.70, aw-10, 46, 8, 0.66);
+      txt(ax+(aw-10)/2, by+bh*0.70+24, a.label, 13, '#ffe4b8');
+      ctx.globalAlpha = 1;
+      if(on) HIT.push({id:'pk_do_'+a.m, x:ax, y:by+bh*0.70, w:aw-10, h:46});
+    });
+    if(cp.optional){
+      glass(bx+bw*0.56+ (acts.length*aw)/2 + 6, by+bh*0.70, 90, 46, 8, 0.5);
+      txt(bx+bw*0.56+(acts.length*aw)/2+51, by+bh*0.70+24, '取消', 13, '#d8d8e0');
+      HIT.push({id:'pk_cancel', x:bx+bw*0.56+(acts.length*aw)/2+6, y:by+bh*0.70, w:90, h:46});
+    }
   } else if(d.type==='umbrella' && G.umbrellaPending){
     const open = G.players[G.umbrellaPending.who].umbrella === 'open';
     txt(bx+bw*0.56, by+bh*0.22, '结束阶段：要不要开合伞？', 19, '#f2ece2');
@@ -1933,6 +2026,28 @@ function handleClick(e){
     } else if(dlg.type==='exhaust'){
       if(tag==='exAura') act({type:'resolveExhaust', player:G.exhaust.who, choice:'aura'});
       if(tag==='exLife') act({type:'resolveExhaust', player:G.exhaust.who, choice:'life'});
+      return;
+    } else if(dlg.type==='plan'){
+      const pend=G.planPending;
+      if(!pend) return;
+      if(tag==='plan_kami') act({type:'plan', player:pend.who, choice:'kami'});
+      else if(tag==='plan_oni') act({type:'plan', player:pend.who, choice:'oni'});
+      return;
+    } else if(dlg.type==='cardPick'){
+      const cp=G.cardPick;
+      if(!cp) return;
+      if(tag.indexOf('pk_card_')===0){
+        const i=parseInt(tag.slice(8),10);
+        const cands=E.effects.pickCandidates(G, cp)||[];
+        const c=cands[i];
+        if(!c) return;
+        S.pickSel=c.id;
+        // 只有一个动作就直接执行
+        if((cp.modes||[]).length===1) doPick(cp.modes[0]);
+        return;
+      }
+      if(tag.indexOf('pk_do_')===0){ doPick(tag.slice(6)); return; }
+      if(tag==='pk_cancel'){ act({type:'pickCard', player:cp.who, cancel:true}); S.pickSel=null; return; }
       return;
     } else if(dlg.type==='umbrella'){
       const pend = G.umbrellaPending;

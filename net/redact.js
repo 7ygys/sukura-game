@@ -28,8 +28,23 @@
     const s = JSON.parse(JSON.stringify(state));
     const opp = 1 - seat;
 
+    // 「引用」这类效果会让玩家合法地看到对方手牌：这时不打码
+    const cp = s.cardPick;
+    const peek = !!(cp && cp.who === seat && cp.zone === 'hand');
+
+    // ---- 计略：对方只能看到「背面」（正在执行=公开中时除外）----
+    if (s.players[seat]) {
+      s.players[seat].plan = (s.players[seat].plan === 'oni') ? 'oni' : 'kami';
+    }
+    if (s.players[opp]) {
+      s.players[opp].plan = s.players[opp].planRevealed
+        ? ((s.players[opp].plan === 'oni') ? 'oni' : 'kami')
+        : 'back';
+    }
+
     // ---- 对方的手牌 / 牌库 / 盖牌：只留数量 ----
     ['hand', 'deck', 'hidden'].forEach(function (k) {
+      if (k === 'hand' && peek) return;          // 引用：手牌可以看
       const arr = s.players[opp][k] || [];
       s.players[opp][k] = arr.map(function () { return blankCard('normal'); });
     });
