@@ -2201,7 +2201,7 @@
      "damage": null,
      "cost": null,
      "capacity": null,
-     "text": "毒（此牌不能盖成伏札）\n自装→虚：2\n（使用后放回对方的毒袋）",
+     "text": "毒（此牌不能盖成伏札）\n自装→虚：3\n（使用后放回对方的毒袋）",
      "textjp": "",
      "altNames": [],
      "poison": true
@@ -2220,7 +2220,7 @@
      "damage": null,
      "cost": null,
      "capacity": null,
-     "text": "毒（此牌不能盖成伏札）\n自装→虚：2\n（使用后放回对方的毒袋）",
+     "text": "毒（此牌不能盖成伏札）\n自装→虚：3\n（使用后放回对方的毒袋）",
      "textjp": "",
      "altNames": [],
      "poison": true

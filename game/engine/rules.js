@@ -158,18 +158,29 @@
   function confirmEndTurn(state, who, cardIds) {
     const pend = state.endTurnPending;
     if (!pend || pend.who !== who) return { ok: false, error: '现在不用选盖牌' };
-    const ids = cardIds || [];
-    if (ids.length !== pend.need) return { ok: false, error: '要正好选 ' + pend.need + ' 张' };
-
     const p = state.players[who];
+    const ids = cardIds || [];
+
+    // 选的数量 = need 减去"手上只剩毒、弃不满"的那部分
+    const poisonN = p.hand.filter(function (c) { return isPoison(c); }).length;
+    const canDiscard = p.hand.length - poisonN;
+    const mustPick = Math.min(pend.need, canDiscard);
+    if (ids.length !== mustPick) return { ok: false, error: '要正好选 ' + mustPick + ' 张（毒不能弃）' };
+
     for (const id of ids) {
       const i = p.hand.findIndex(c => c.id === id);
       if (i < 0) return { ok: false, error: '手牌里没有这张：' + id };
+      if (isPoison(p.hand[i])) return { ok: false, error: '毒牌不能盖成伏札' };
       const card = p.hand.splice(i, 1)[0];
       p.hidden.push(card);
       Engine.state.emit(state, 'cardTo', { who: who, cardId: card.id, to: 'hidden' });
       log(state, '盖上伏札 ' + card.name);
     }
+
+    // 弃完还超上限 → 多出来的毒随机放对方牌库顶
+    const limit = Engine.state.INIT.END_HAND;
+    const still = p.hand.length - limit;
+    if (still > 0) moveExcessPoison(state, who, still);
 
     state.endTurnPending = null;
     finishEndTurn(state, who);
@@ -457,9 +468,9 @@
     if (a.fromSpecial) {
       card.used = true;
       p.specials.push(card);
-    } else {
+    } else if (!isPoison(card)) {
       p.discard.push(card);
-    }
+    }   // 毒牌不回弃牌区：它们会被各自的 onUse 送回毒袋
   }
 
   function triggerGap(state, who) {
@@ -655,11 +666,10 @@
       return state;
     }
 
-    // 毒牌不能因为"手牌上限"被丢掉（规则：毒只能使用）
-    const discardable = p.hand.filter(function (c) { return !isPoison(c); });
-    const over = discardable.length - limit;
-    if (over > 0) {
-      const need = over;                        // 要盖几张（只从非毒牌里选）
+    // 毒牌**计入**手牌上限，但不可丢弃。
+    // 所以：先算出总超额，再从非毒牌里尽量弃；还超的话，把多出来的毒随机放对方牌库顶。
+    const need = p.hand.length - limit;
+    if (need > 0) {
 
       // 没指定 → 先把"要选几张"挂起来，等玩家自己挑
       if (!discardIdx || !discardIdx.length) {
@@ -668,19 +678,50 @@
         return state;
       }
 
+      // 只能从非毒牌里选（毒牌不能弃）
       const picked = discardIdx.filter(function (i) {
-      const c = p.hand[i];
-      return c && !isPoison(c);
-    }).slice(0, need);
+        const c = p.hand[i];
+        return c && !isPoison(c);
+      }).slice(0, need);
 
       // 规则 8-3-2：超出的手牌是**盖成伏札**，不是丢进弃牌区
       picked.sort((a, b) => b - a).forEach(i => {
         const c = p.hand.splice(i, 1)[0];
         if (c) { p.hidden.push(c); log(state, '盖上伏札 ' + c.name); }
       });
+
+      // 还超上限（手上只剩毒）：把多出来的毒随机放到对方牌库顶
+      const still = p.hand.length - limit;
+      if (still > 0) moveExcessPoison(state, who, still);
     }
 
     return finishEndTurn(state, who);
+  }
+
+  /**
+   * 手牌超上限、剩下的又全是毒时：把多出来的毒**随机**放到对方牌库顶，
+   * 让对方下次抽牌时抽到（毒就这样循环回去）。
+   */
+  function moveExcessPoison(state, who, n) {
+    const p = state.players[who];
+    const opp = state.players[1 - who];
+    const idxs = [];
+    p.hand.forEach(function (c, i) { if (isPoison(c)) idxs.push(i); });
+    if (!idxs.length) return 0;
+    // 随机挑 n 张（洗一下下标再取前 n 个）
+    const shuffled = Engine.rng.shuffle(idxs.slice());
+    const take = shuffled.slice(0, Math.min(n, shuffled.length)).sort(function (a, b) { return b - a; });
+    const moved = [];
+    take.forEach(function (i) {
+      const c = p.hand.splice(i, 1)[0];
+      if (c) moved.push(c);
+    });
+    // 放到对方牌库顶（顺序随机）
+    Engine.rng.shuffle(moved).forEach(function (c) {
+      opp.deck.unshift(c);
+      log(state, '手牌超上限：毒「' + c.name + '」被放到 P' + (2 - who) + ' 的牌库顶');
+    });
+    return moved.length;
   }
 
   /** 结束阶段的最后一步：再起检查 → 换人 → 下一回合 */
@@ -754,9 +795,8 @@
 
     // 伞处理完，接着走"手牌超限盖伏札"，再换人
     const limit = Engine.state.INIT.END_HAND;
-    const discardable2 = p.hand.filter(function (c) { return !isPoison(c); });
-    if (discardable2.length > limit) {
-      state.endTurnPending = { who: who, need: discardable2.length - limit };
+    if (p.hand.length > limit) {
+      state.endTurnPending = { who: who, need: p.hand.length - limit };
       log(state, 'P' + (who + 1) + ' 需要盖掉 ' + state.endTurnPending.need + ' 张手牌');
       return { ok: true };
     }
@@ -1232,9 +1272,9 @@
     if (card.kind === 'special') {
       const sp = p.specials.find(s => s.id === card.id);
       if (sp) sp.used = true;
-    } else {
+    } else if (!isPoison(card)) {
       p.discard.push(card);
-    }
+    }   // 毒牌不回弃牌区：它们会被各自的 onUse 送回毒袋
 
     // ---- 攻击 → 进入待处理，等对方决定要不要对应 ----
     if (isAttack) {

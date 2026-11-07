@@ -972,8 +972,8 @@
     "09-chikage-o-n-5": {
       onUse(state, who) {
         openCardPick(state, who, {
-          target: who, zone: 'poisonBag', filter: 'poison',
-          prompt: '毒雾：选一张毒加入对方手牌',
+          target: who, zone: 'poisonBag', filter: 'poisonThree',
+          prompt: '毒雾：选一张毒（麻痺毒/幻覚毒/弛緩毒）加入对方手牌',
           modes: ['poisonToHand']
         });
       }
@@ -1043,6 +1043,7 @@
       },
       onUse(state, who, card) {
         Engine.rules.returnPoison(state, 1 - who, card);
+        card.returnedToBag = true;
         state.phaseEnded = true;
         Engine.state.log(state, '麻痺毒：结束本阶段');
       }
@@ -1052,6 +1053,7 @@
     "09-chikage-o-p-2": {
       onUse(state, who, card) {
         Engine.rules.returnPoison(state, 1 - who, card);
+        card.returnedToBag = true;
         Engine.effects.fx.moveCrystal(state, who, 'flare', 'dust', 2);
       }
     },
@@ -1067,8 +1069,9 @@
     // 滅灯毒：自装 → 虚 2，回毒袋
     "09-chikage-o-p-4": {
       onUse(state, who, card) {
-        Engine.effects.fx.moveCrystal(state, who, 'aura', 'dust', 2);
+        Engine.effects.fx.moveCrystal(state, who, 'aura', 'dust', 3);
         Engine.rules.returnPoison(state, 1 - who, card);
+        card.returnedToBag = true;
       }
     },
   };
@@ -1180,7 +1183,10 @@
     if (cp.filter === 'attack') list = list.filter(c => (c.types || []).indexOf('attack') >= 0);
     if (cp.filter === 'enhance') list = list.filter(c => (c.types || []).indexOf('enhance') >= 0);
     if (cp.nonSpecial) list = list.filter(c => c.kind !== 'special');
-    if (cp.filter === 'poison') list = list.filter(c => c.poison || c.kind === 'poison');
+    if (cp.filter === 'poison' || cp.filter === 'poisonAny')
+      list = list.filter(c => c.poison || c.kind === 'poison');
+    if (cp.filter === 'poisonThree')
+      list = list.filter(c => ['09-chikage-o-p-1','09-chikage-o-p-2','09-chikage-o-p-3'].indexOf(c.id) >= 0);
     if (cp.filter === 'poisonDeckTop')
       list = list.filter(c => ['09-chikage-o-p-1','09-chikage-o-p-2','09-chikage-o-p-3'].indexOf(c.id) >= 0);
     if (cp.filter === 'poisonHoro') list = list.filter(c => c.id === '09-chikage-o-p-4');

@@ -78,19 +78,40 @@ group('毒：不能盖、不能当结束阶段弃牌');
   const hide = A(s, { type: 'hideCard', player: 1, cardId: '09-chikage-o-p-1' });
   ok('毒不能盖成伏札', !hide.ok, hide.error);
 
-  // 结束阶段：1 张毒 + 3 张普通 → 3 张普通要弃到 2 张，毒不参与
+  // 结束阶段：毒**计入**手牌上限（4 张 → 要弃 2 张），但只能弃普通牌
   s.active = 1;
   s.players[1].hand = ['09-chikage-o-p-1', '01-yurina-o-n-1', '01-yurina-o-n-2', '01-yurina-o-n-3'].map(cardById);
   let r = A(s, { type: 'endTurn', player: 1 });
   ok('手牌超过上限 → 要选盖牌', !!r.state.endTurnPending, r.state.endTurnPending);
-  eq('只需要盖 1 张（毒不算）：4 张里 3 张普通', r.state.endTurnPending.need, 1);
+  eq('毒也计入上限：4 张要弃 2 张', r.state.endTurnPending.need, 2);
   const ids = r.state.players[1].hand.map(c => c.id);
-  const poisonIdx = ids.indexOf('09-chikage-o-p-1');
-  const keep = A(r.state, { type: 'confirmEndTurn', player: 1, cardIds: [poisonIdx] });
-  const stillHasPoison = keep.state
-    ? keep.state.players[1].hand.some(c => c.id === '09-chikage-o-p-1')
-    : true;
-  eq('毒不会被丢掉（盖牌只从普通牌里选）', stillHasPoison, true);
+  const normals = ids.filter(id => !id.startsWith('09-chikage-o-p-'));
+  const badSel = A(r.state, { type: 'confirmEndTurn', player: 1, cardIds: ['09-chikage-o-p-1', normals[0]] });
+  ok('选了毒 → 拒绝', !badSel.ok, badSel.error);
+  const keep = A(r.state, { type: 'confirmEndTurn', player: 1, cardIds: [normals[0], normals[1]] });
+  eq('弃 2 张普通牌后剩 2 张（毒还在）', keep.state ? keep.state.players[1].hand.length : -1, 2);
+  ok('毒还在手上', keep.state ? keep.state.players[1].hand.some(c => c.id === '09-chikage-o-p-1') : false);
+}
+
+/* ============================================================ */
+group('手牌超上限、能弃的都弃完还超 → 多余的毒随机放对方牌库顶');
+{
+  let s2 = mk([]);
+  s2.active = 1;
+  s2.players[0].deck = [];
+  s2.players[1].deck = [];
+  const q1 = E.rules.takePoison(s2, 0, '09-chikage-o-p-1');
+  const q2 = E.rules.takePoison(s2, 0, '09-chikage-o-p-2');
+  const q3 = E.rules.takePoison(s2, 0, '09-chikage-o-p-3');
+  s2.players[1].hand = [q1, q2, q3];
+  let r2 = A(s2, { type: 'endTurn', player: 1 });
+  eq('3 张毒 → 名义上要弃 1 张', r2.state.endTurnPending.need, 1);
+  const noPick = A(r2.state, { type: 'confirmEndTurn', player: 1, cardIds: [] });
+  ok('没有可弃的牌时可以不选', noPick.ok, noPick.error);
+  // 回合已经交给对方 → 对方开场就抽了那 2 张，所以毒在他的手上
+  ok('毒被放到对方牌库顶并被抽到',
+     (noPick.state.players[0].hand || []).some(c => E.rules.isPoison(c)));
+  eq('手牌没超过上限', noPick.state.players[1].hand.length <= 2, true);
 }
 
 /* ============================================================ */
@@ -411,6 +432,24 @@ group('麻痺毒：本回合做过基本动作就不能用');
   const good = A(s, { type: 'playCard', player: 1, cardId: '09-chikage-o-p-1' });
   ok('没做过基本动作 → 可以用', good.ok, good.error);
   eq('用掉后回到毒袋', bag(good.state, 0), 5);
+}
+
+/* ============================================================ */
+group('滅灯毒：自装→虚 3、回毒袋、不进弃牌区');
+{
+  let s = mk([]);
+  const pc = E.rules.takePoison(s, 0, '09-chikage-o-p-4');
+  s.players[1].hand = [pc];
+  s.players[1].aura = 5;
+  s.active = 1;
+  s.players[1].focus = 1;
+  const dust0 = s.dust;
+  let r = A(s, { type: 'playCard', player: 1, cardId: '09-chikage-o-p-4' });
+  ok('使用滅灯毒', r.ok, r.error);
+  eq('装 5 → 2（-3）', r.state.players[1].aura, 2);
+  eq('虚 +3', r.state.dust, dust0 + 3);
+  eq('回到千影的毒袋（5 张）', bag(r.state, 0), 5);
+  eq('没有进弃牌区', r.state.players[1].discard.filter(c => E.rules.isPoison(c)).length, 0);
 }
 
 H.report();

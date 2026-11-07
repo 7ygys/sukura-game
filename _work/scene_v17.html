@@ -1066,17 +1066,22 @@ function drawTrack(){
   const x=TRACK.x,yT=TRACK.yTop,yB=TRACK.yBot;
   ctx.strokeStyle='rgba(200,218,238,0.18)';ctx.lineWidth=1.4;
   ctx.beginPath();ctx.moveTo(x,yT);ctx.lineTo(x,yB);ctx.stroke();
+  // 间合数字显示"有效距离"（抜き足 会让它 -2）
+  const effD = (E.rules && E.rules.effDistance) ? E.rules.effDistance(G) : G.distance;
   for(let i=0;i<=10;i++){
-    const k=i/10,y=yB-k*(yB-yT),active=i===G.distance;
+    const k=i/10,y=yB-k*(yB-yT),active=i===effD;
     if(active){ctx.fillStyle='rgba(255,214,150,0.20)';ctx.beginPath();ctx.arc(x,y,15,0,TAU);ctx.fill();}
     ctx.fillStyle=active?'#ffd696':'rgba(214,226,242,0.40)';
     ctx.beginPath();ctx.arc(x,y,active?5.5:3,0,TAU);ctx.fill();
   }
-  bigNum(x,yT-28,String(G.distance),24);
+  bigNum(x,yT-28,String(effD),24);
+  if(effD !== G.distance){
+    txt(x, yT-48, '实际 ' + effD + '（原 ' + G.distance + '）', 10, 'rgba(255,200,120,0.9)');
+  }
   // 达人距离（默认 2，圏域 会让它 +1）
   const tj = (E.rules && E.rules.taijinOf) ? E.rules.taijinOf(G) : 2;
   txt(x+26, yT+4, '达人 '+tj, 10, 'rgba(200,220,255,0.55)', 'left');
-  bigNum(x,yB+28,String(G.distance),24);
+  bigNum(x,yB+28,String(effD),24);
 }
 function drawVoid(){
   const cx=TRACK.x, cy=(TRACK.yTop+TRACK.yBot)/2, r=(TRACK.yBot-TRACK.yTop)/2+14;
