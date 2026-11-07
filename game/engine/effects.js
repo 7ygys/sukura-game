@@ -211,6 +211,54 @@
     dist_to_dust(state, who) { Engine.effects.fx.moveCrystal(state, who, 'distance', 'dust', 1); }
   };
 
+  // 莱拉
+  choices.raira_gauge1 = {
+    wind(state, who) { Engine.gauge.add(state, who, 'wind', 1); },
+    thunder(state, who) { Engine.gauge.add(state, who, 'thunder', 1); }
+  };
+  choices.raira_yobigoe = {
+    both(state, who) {
+      Engine.gauge.add(state, who, 'wind', 1);
+      Engine.gauge.add(state, who, 'thunder', 1);
+    },
+    double(state, who) {
+      const p = state.players[who];
+      while (p.hand.length) p.hidden.push(p.hand.pop());
+      Engine.gauge.set(state, who, 'thunder', Engine.gauge.thunder(state, who) * 2);
+      Engine.state.log(state, '呼び声：手牌全部盖伏，雷神翻倍');
+    }
+  };
+  choices.raira_sorakake = {
+    to_dist(state, who) { Engine.effects.fx.moveCrystal(state, who, 'dust', 'distance', 2); },
+    to_dust(state, who) { Engine.effects.fx.moveCrystal(state, who, 'distance', 'dust', 2); }
+  };
+  choices.raira_enkan = {
+    yes(state, who) {
+      state.choice = {
+        who: who, sourceId: 'raira_enkan_dir',
+        prompt: '円環輪廻旋：间合⇄虚 1，往哪边？',
+        options: ['to_dist', 'to_dust']
+      };
+    },
+    no(state, who) {}
+  };
+  choices.raira_enkan_dir = {
+    to_dist(state, who) {
+      Engine.effects.fx.moveCrystal(state, who, 'dust', 'distance', 1);
+      Engine.gauge.add(state, who, 'wind', 1);
+    },
+    to_dust(state, who) {
+      Engine.effects.fx.moveCrystal(state, who, 'distance', 'dust', 1);
+      Engine.gauge.add(state, who, 'wind', 1);
+    }
+  };
+  choices.raira_tengu = {
+    to_dist(state, who) { Engine.effects.fx.moveCrystal(state, who, 'dust', 'distance', 2); },
+    to_dust(state, who) { Engine.effects.fx.moveCrystal(state, who, 'distance', 'dust', 2); },
+    one_dist(state, who) { Engine.effects.fx.moveCrystal(state, who, 'dust', 'distance', 1); },
+    one_dust(state, who) { Engine.effects.fx.moveCrystal(state, who, 'distance', 'dust', 1); }
+  };
+
   choices.imagine = {};
   choices.imagine.resolve = function (state, who, optionId) {
     const p = state.players[who];
@@ -228,6 +276,54 @@
   choices.yukihi_slide = {
     dust_to_dist(state, who) { Engine.effects.fx.moveCrystal(state, who, 'dust', 'distance', 1); },
     dist_to_dust(state, who) { Engine.effects.fx.moveCrystal(state, who, 'distance', 'dust', 1); }
+  };
+
+  // 莱拉
+  choices.raira_gauge1 = {
+    wind(state, who) { Engine.gauge.add(state, who, 'wind', 1); },
+    thunder(state, who) { Engine.gauge.add(state, who, 'thunder', 1); }
+  };
+  choices.raira_yobigoe = {
+    both(state, who) {
+      Engine.gauge.add(state, who, 'wind', 1);
+      Engine.gauge.add(state, who, 'thunder', 1);
+    },
+    double(state, who) {
+      const p = state.players[who];
+      while (p.hand.length) p.hidden.push(p.hand.pop());
+      Engine.gauge.set(state, who, 'thunder', Engine.gauge.thunder(state, who) * 2);
+      Engine.state.log(state, '呼び声：手牌全部盖伏，雷神翻倍');
+    }
+  };
+  choices.raira_sorakake = {
+    to_dist(state, who) { Engine.effects.fx.moveCrystal(state, who, 'dust', 'distance', 2); },
+    to_dust(state, who) { Engine.effects.fx.moveCrystal(state, who, 'distance', 'dust', 2); }
+  };
+  choices.raira_enkan = {
+    yes(state, who) {
+      state.choice = {
+        who: who, sourceId: 'raira_enkan_dir',
+        prompt: '円環輪廻旋：间合⇄虚 1，往哪边？',
+        options: ['to_dist', 'to_dust']
+      };
+    },
+    no(state, who) {}
+  };
+  choices.raira_enkan_dir = {
+    to_dist(state, who) {
+      Engine.effects.fx.moveCrystal(state, who, 'dust', 'distance', 1);
+      Engine.gauge.add(state, who, 'wind', 1);
+    },
+    to_dust(state, who) {
+      Engine.effects.fx.moveCrystal(state, who, 'distance', 'dust', 1);
+      Engine.gauge.add(state, who, 'wind', 1);
+    }
+  };
+  choices.raira_tengu = {
+    to_dist(state, who) { Engine.effects.fx.moveCrystal(state, who, 'dust', 'distance', 2); },
+    to_dust(state, who) { Engine.effects.fx.moveCrystal(state, who, 'distance', 'dust', 2); },
+    one_dist(state, who) { Engine.effects.fx.moveCrystal(state, who, 'dust', 'distance', 1); },
+    one_dust(state, who) { Engine.effects.fx.moveCrystal(state, who, 'distance', 'dust', 1); }
   };
 
   choices.imagine = {};
@@ -1074,6 +1170,158 @@
         card.returnedToBag = true;
       }
     },
+
+
+    /* ===== 莱拉（风雷计略） ===== */
+
+    // 風雷撃：气伤 = 风与雷中较小的一方
+    "12-raira-o-n-2": {
+      onAttack(state, who, ctx) {
+        ctx.aura = Math.min(Engine.gauge.wind(state, who), Engine.gauge.thunder(state, who));
+      }
+    },
+
+    // 流転爪：攻击后可以把弃牌区的一张《攻击》放回牌库顶
+    "12-raira-o-n-3": {
+      onAfterAttack(state, who) {
+        openCardPick(state, who, {
+          target: who, zone: 'discard', filter: 'attack',
+          prompt: '流転爪：可以把弃牌区的 1 张《攻击》放回牌库顶（可取消）',
+          modes: ['toDeckTop'], optional: true
+        });
+      }
+    },
+
+    // 風走り：间合 3 以上 → 间合→虚 2
+    "12-raira-o-n-4": {
+      onUse(state, who) {
+        if (Engine.rules.effDistance(state) < 3) {
+          Engine.state.log(state, '風走り：间合不到 3，没有效果');
+          return;
+        }
+        Engine.effects.fx.moveCrystal(state, who, 'distance', 'dust', 2);
+      }
+    },
+
+    // 風雷の知恵：合计 4 以上可回收其他女神的牌；然后风或雷 +1
+    "12-raira-o-n-5": {
+      onUse(state, who) {
+        if (Engine.gauge.total(state, who) >= 4) {
+          openCardPick(state, who, {
+            target: who, zone: 'discard', filter: 'otherGoddess',
+            prompt: '風雷の知恵：可以把弃牌区 1 张其他女神的牌放回牌库顶（可取消）',
+            modes: ['toDeckTop'], optional: true
+          });
+        }
+        state.choice = {
+          who: who, sourceId: 'raira_gauge1',
+          prompt: '风神或雷神 +1，加哪个？',
+          options: ['wind', 'thunder']
+        };
+      }
+    },
+
+    // 呼び声：畏缩 + 二选一
+    "12-raira-o-n-6": {
+      onUse(state, who) {
+        Engine.rules.stagger(state, 1 - who);
+        state.choice = {
+          who: who, sourceId: 'raira_yobigoe',
+          prompt: '呼び声：选一项',
+          options: ['both', 'double']
+        };
+      }
+    },
+
+    // 空駆け：间合⇄虚 2（自选方向）
+    "12-raira-o-n-7": {
+      onUse(state, who) {
+        state.choice = {
+          who: who, sourceId: 'raira_sorakake',
+          prompt: '空駆け：把 2 颗结晶往哪边移？',
+          options: ['to_dist', 'to_dust']
+        };
+      }
+    },
+
+    // 雷螺風神爪：雷神 4 以上 +1/+0
+    "12-raira-o-s-1": {
+      onAttack(state, who, ctx) {
+        if (Engine.gauge.thunder(state, who) >= 4) { ctx.aura += 1; }
+      }
+    },
+
+    // 天雷召喚陣：X 次 0-10 / 1/1
+    "12-raira-o-s-2": {
+      onUse(state, who) {
+        const x = Math.ceil(Engine.gauge.thunder(state, who) / 2);
+        if (x <= 0) { Engine.state.log(state, '天雷召喚陣：雷神 0，没有攻击'); return; }
+        state.attackQueue = state.attackQueue || [];
+        for (let i = 0; i < x; i++) {
+          state.attackQueue.push({ name: '天雷', range: [0,1,2,3,4,5,6,7,8,9,10], aura: 1, life: 1 });
+        }
+        Engine.rules.nextQueuedAttack(state, who);
+      }
+    },
+
+    // 風魔招来孔：按风神给追加札，然后自己移除
+    "12-raira-o-s-3": {
+      onUse(state, who, card) {
+        const w = Engine.gauge.wind(state, who);
+        const p = state.players[who];
+        const ext = state.extraPool || (state.extraPool = []);
+        const got = [];
+        const grant = function (id) {
+          const c = ext.find(function (x) { return x.id === id; });
+          if (!c) return;
+          p.specials.push(Object.assign({}, c, { used: false }));
+          got.push(c.name);
+        };
+        if (w >= 3) grant('12-raira-o-s-3-ex1');
+        if (w >= 7) grant('12-raira-o-s-3-ex2');
+        if (w >= 12) grant('12-raira-o-s-3-ex3');
+        Engine.state.log(state, '風魔招来孔：获得 ' + (got.length ? got.join('、') : '（无）'));
+        // 这张牌从游戏中移除
+        const i = (p.specials || []).findIndex(function (c) { return c.id === '12-raira-o-s-3'; });
+        if (i >= 0) { p.removed = p.removed || []; p.removed.push(p.specials.splice(i, 1)[0]); }
+      }
+    },
+
+    // 円環輪廻旋：对方攻击解决后可以移动 + 加计略
+    "12-raira-o-s-4": {
+      afterOpponentAttack(state, who) {
+        state.choice = {
+          who: who, sourceId: 'raira_enkan',
+          prompt: '円環輪廻旋：要移动间合并把风或雷 +1 吗？',
+          options: ['yes', 'no']
+        };
+      }
+    },
+
+    // 追加札•風魔旋風：纯攻击
+    // 追加札•風魔纏廻：让一张使用过的切札回到未使用
+    "12-raira-o-s-3-ex2": {
+      costDiscount: true,
+      onUse(state, who) {
+        openCardPick(state, who, {
+          target: who, zone: 'usedSpecials', filter: 'any',
+          prompt: '風魔纏廻：选 1 张使用过的切札，使其回到未使用',
+          modes: ['reviveSpecial']
+        });
+      }
+    },
+
+    // 追加札•風魔天狗道：间合⇄虚 最多 2，然后移除
+    "12-raira-o-s-3-ex3": {
+      onUse(state, who, card) {
+        state.choice = {
+          who: who, sourceId: 'raira_tengu',
+          prompt: '風魔天狗道：移动 2 颗结晶（自选方向）',
+          options: ['to_dist', 'to_dust', 'one_dist', 'one_dust']
+        };
+        card.removeSelf = true;
+      }
+    },
   };
 
   /* ============================================================
@@ -1173,6 +1421,9 @@
     if (cp.zone === 'hand') list = t.hand.slice();
     else if (cp.zone === 'discard') list = t.discard.slice();
     else if (cp.zone === 'attachments') list = t.attachments.slice();
+    else if (cp.zone === 'usedSpecials') {
+      list = (t.specials || []).filter(function (c) { return c.used; });
+    }
     else if (cp.zone === 'poisonBag') {
       list = (t.poisonBag || []).slice();
     }
@@ -1183,6 +1434,8 @@
     if (cp.filter === 'attack') list = list.filter(c => (c.types || []).indexOf('attack') >= 0);
     if (cp.filter === 'enhance') list = list.filter(c => (c.types || []).indexOf('enhance') >= 0);
     if (cp.nonSpecial) list = list.filter(c => c.kind !== 'special');
+    if (cp.filter === 'otherGoddess')
+      list = list.filter(c => (String(c.id).split('-')[1]) !== 'raira' && c.kind !== 'poison');
     if (cp.filter === 'poison' || cp.filter === 'poisonAny')
       list = list.filter(c => c.poison || c.kind === 'poison');
     if (cp.filter === 'poisonThree')
@@ -1262,6 +1515,15 @@
         crystals: 0, sealOnly: true, forever: true, sealed: [card]
       });
       Engine.state.log(state, '「' + card.name + '」被永久封印');
+    } else if (mode === 'toDeckTop') {
+      const p2 = state.players[cp.who];
+      const i = (p2.discard || []).findIndex(c => c.id === card.id);
+      if (i >= 0) p2.deck.unshift(p2.discard.splice(i, 1)[0]);
+      Engine.state.log(state, '「' + card.name + '」被放回牌库顶');
+    } else if (mode === 'reviveSpecial') {
+      const p2 = state.players[cp.who];
+      const sp = (p2.specials || []).find(c => c.id === card.id && c.used);
+      if (sp) { sp.used = false; Engine.state.log(state, '「' + sp.name + '」回到未使用'); }
     } else if (mode === 'poisonTop') {
       const owner = cp.target;
       const pc = Engine.rules.takePoison(state, owner, card.id);
@@ -1356,6 +1618,8 @@
     "03-himika-o-s-4": (state, who) => state.players[who].hand.length === 0,
     // 無窮ノ風【再起】境地：自集中力 = 2
     "04-tokoyo-o-s-3": (state, who) => state.players[who].focus === 2,
+    // 雷螺風神爪【再起】风神 4 以上
+    "12-raira-o-s-1": (state, who) => (Engine.gauge.wind(state, who) >= 4),
     // 流転の霞毒【再起】对方手牌 2 张以上
     "09-chikage-o-s-3": (state, who) => (state.players[1 - who].hand.length >= 2),
     // はらりゆき【再起】你进行伞的开合：使用之后开合过就算

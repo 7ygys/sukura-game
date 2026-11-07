@@ -18,6 +18,7 @@ const fs = require('fs');
 require('../engine/rng.js');
 require('../engine/umbrella.js');
 require('../engine/plan.js');
+require('../engine/gauge.js');
 require('../engine/state.js');
 require('../engine/rules.js');
 require('../engine/effects.js');
@@ -109,7 +110,8 @@ function cardTotal(s) {
   let n = 0;
   s.players.forEach(p => {
     n += p.hand.length + p.deck.length + p.discard.length
-       + p.hidden.length + p.attachments.length + p.specials.length;
+       + p.hidden.length + p.attachments.length + p.specials.length
+       + (p.removed ? p.removed.length : 0);   // 「移除」= 从游戏里拿走，牌还在
   });
   return n;
 }

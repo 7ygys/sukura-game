@@ -54,6 +54,7 @@
 <script src="../game/engine/rng.js"></script>
 <script src="../game/engine/umbrella.js"></script>
 <script src="../game/engine/plan.js"></script>
+<script src="../game/engine/gauge.js"></script>
 <script src="../game/engine/state.js"></script>
 <script src="../game/engine/rules.js"></script>
 <script src="../game/engine/effects.js"></script>
@@ -153,7 +154,7 @@ window.addEventListener('unhandledrejection', function(e){
 const IMG={};
 (function(){
   const base='../素材/Sprite/';
-  ['01','02','03','04','06','07','09'].forEach(function(n){const i=new Image();i.src=base+n+'.png';IMG['av'+n]=i;});
+  ['01','02','03','04','06','07','09','12'].forEach(function(n){const i=new Image();i.src=base+n+'.png';IMG['av'+n]=i;});
   IMG.planKami=new Image(); IMG.planKami.src=base+'plan_blue.png';   // 神谋
   IMG.planOni=new Image();  IMG.planOni.src=base+'plan_red.png';     // 鬼谋
   IMG.planBack=new Image(); IMG.planBack.src=base+'plan_back.png';   // 背面（对方视角）
@@ -190,6 +191,8 @@ const IMG={};
   IMG.turnEnd=new Image(); IMG.turnEnd.src=base+'TurnEnd_Player_Normal.png';
   IMG.backN=new Image(); IMG.backN.src=base+'cardback_normal.png';
   IMG.backS=new Image(); IMG.backS.src=base+'cardback_special.png';
+  IMG.windI=new Image(); IMG.windI.src=base+'wind.png';
+  IMG.thunderI=new Image(); IMG.thunderI.src=base+'thunder.png';
   IMG.backP=new Image(); IMG.backP.src=base+'../卡面/chikage/cardback_poison.png';   // 毒专用卡背
   IMG.vigor=new Image(); IMG.vigor.src=base+'vigor_opp.png';
   IMG.vnum0=new Image(); IMG.vnum0.src=base+'vigor_num0.png';
@@ -247,6 +250,12 @@ function poisonsOf(key){
   return (g && g.poisons) ? g.poisons : null;
 }
 
+/** 追加札（莱拉的风魔招来孔用；全局一份） */
+function extrasOf(){
+  const g = (window.GAME_DATA.goddesses||[]).find(x => x.key === 'raira');
+  return (g && g.extras) ? g.extras : null;
+}
+
 function deckOf(keys){
   const out = [];
   keys.forEach(function(k){
@@ -283,7 +292,8 @@ const G = (function(){
 
   const st = E.state.create({
     myCards: mine, oppCards: opp,
-    myPoisons: poisonsOf(gkeysOf(mine)[0]), oppPoisons: poisonsOf(gkeysOf(opp)[0])
+    myPoisons: poisonsOf(gkeysOf(mine)[0]), oppPoisons: poisonsOf(gkeysOf(opp)[0]),
+    extras: extrasOf()
   });
   st.players[0].goddesses = gkeysOf(mine);
   st.players[1].goddesses = gkeysOf(opp);
@@ -397,6 +407,7 @@ function dialogActor(type){
   if(type==='nabu') return G.nabu && G.nabu.who;
   if(type==='auraSplit') return G.auraSplit && G.auraSplit.who;
   if(type==='exhaust') return G.exhaust && G.exhaust.who;
+  if(type==='gauge') return G.gaugePending && G.gaugePending.who;
   if(type==='plan') return G.planPending && G.planPending.who;
   if(type==='cardPick') return G.cardPick && G.cardPick.who;
   if(type==='umbrella') return G.umbrellaPending && G.umbrellaPending.who;
@@ -438,6 +449,10 @@ function syncPendingRaw(){
   }
 
   // 以下是"其他弹窗"：谁先出现谁先处理
+  if(G.gaugePending){
+    S.dialog={type:'gauge'};
+    return;
+  }
   if(G.planPending){
     S.dialog={type:'plan'};
     return;
@@ -663,7 +678,7 @@ function drawSide(isMine){
     const x=i?mid+4:z.x0,w=mid-z.x0-4;
     glass(x,z.y,w,z.h,10,0.34);
     const key = gk[i];
-    const num = key ? ({yurina:'01',saine:'02',himika:'03',tokoyo:'04',yukihi:'06',shinra:'07',chikage:'09'})[key] : null;
+    const num = key ? ({yurina:'01',saine:'02',himika:'03',tokoyo:'04',yukihi:'06',shinra:'07',chikage:'09',raira:'12'})[key] : null;
     const av = num ? IMG['av'+num] : null;
     if(av&&av.complete&&av.naturalWidth){
       const aw=62, ah=aw*av.naturalHeight/av.naturalWidth;
@@ -709,6 +724,24 @@ function drawSide(isMine){
       txt(bx+bs/2, by+bs/2, open ? '开' : '闭', 12, '#ffd9a0');
     }
     HITP('umbrella', bx, by, bs, bs);
+  }
+
+  // ---------- 风雷（莱拉）：她那一格右侧，上下两行 ----------
+  const rlIdx = gk.indexOf('raira');
+  if(rlIdx >= 0){
+    const x = rlIdx ? mid+4 : z.x0, w = mid-z.x0-4;
+    const wx = x + w - 54, wy = z.y + 14;
+    const rows = [
+      { img: IMG.windI,    v: (pl.wind||0),    label: '风' },
+      { img: IMG.thunderI, v: (pl.thunder||0), label: '雷' }
+    ];
+    rows.forEach(function (r, i) {
+      const ry = wy + i*32;
+      if(r.img && r.img.complete && r.img.naturalWidth) ctx.drawImage(r.img, wx, ry, 22, 22);
+      else txt(wx+11, ry+11, r.label, 11, '#cfe3ff');
+      txt(wx+26, ry+11, String(r.v), 14, r.v >= 4 ? '#ffe08a' : '#dfe9f8', 'left');
+    });
+    HITP(rlIdx ? 'oraigauge' : 'raigauge', wx-4, wy-6, 56, 64);
   }
 
   // ---------- 毒袋（千影）：画在她自己那一格的右下角 ----------
@@ -1640,6 +1673,35 @@ function drawDialog(){
     txt(bx+bw*0.62, by+bh*0.84+22, '确认', 16, '#f2ece2');
     ctx.restore();
     if(S.endPick.length===pend.need) HIT.push({id:'dlg_end_ok', x:bx+bw*0.62-60, y:by+bh*0.84, w:120, h:44});
+  } else if(d.type==='gauge' && G.gaugePending){
+    const left = G.gaugePending.left;
+    if(!S.gaugeAlloc || S.gaugeAlloc.left !== left){
+      S.gaugeAlloc = { left: left, wind: 0, thunder: left };
+    }
+    const al = S.gaugeAlloc;
+    txt(bx+bw*0.56, by+bh*0.20, '分配风雷点数（共 ' + left + ' 点）', 19, '#f2ece2');
+    txt(bx+bw*0.56, by+bh*0.28, '对方看不到你分配前的选择', 11, 'rgba(235,232,225,0.65)');
+    [['风神', 'wind'], ['雷神', 'thunder']].forEach(function (it, i) {
+      const y = by + bh*0.38 + i*58, cx = bx + bw*0.56;
+      txt(cx-170, y+22, it[0], 14, '#dfe9f8', 'left');
+      glass(cx-90, y, 44, 40, 8, 0.6);
+      txt(cx-68, y+21, '−', 20, '#f2ece2');
+      HIT.push({id:'dlg_g_'+it[1]+'_minus', x:cx-90, y:y, w:44, h:40});
+      txt(cx, y+21, String(al[it[1]]), 18, '#ffe4b8');
+      glass(cx+40, y, 44, 40, 8, 0.6);
+      txt(cx+62, y+21, '＋', 20, '#f2ece2');
+      HIT.push({id:'dlg_g_'+it[1]+'_plus', x:cx+40, y:y, w:44, h:40});
+    });
+    const okAll = (al.wind + al.thunder) === left;
+    ctx.save();
+    if(!okAll) ctx.globalAlpha = 0.35;
+    glass(bx+bw*0.56-160, by+bh*0.80, 150, 44, 8, 0.66);
+    txt(bx+bw*0.56-85, by+bh*0.80+22, '就这样分配', 13, '#ffe4b8');
+    if(okAll) HIT.push({id:'dlg_g_ok', x:bx+bw*0.56-160, y:by+bh*0.80, w:150, h:44});
+    ctx.restore();
+    glass(bx+bw*0.56+10, by+bh*0.80, 150, 44, 8, 0.5);
+    txt(bx+bw*0.56+85, by+bh*0.80+22, '放弃这些点数', 13, '#d8d8e0');
+    HIT.push({id:'dlg_g_skip', x:bx+bw*0.56+10, y:by+bh*0.80, w:150, h:44});
   } else if(d.type==='plan' && G.planPending){
     txt(bx+bw*0.56, by+bh*0.20, '准备下一个计略', 19, '#f2ece2');
     txt(bx+bw*0.56, by+bh*0.30, '对方看不到你选哪个', 12, 'rgba(240,235,225,0.7)');
@@ -2135,6 +2197,22 @@ function handleClick(e){
       if(tag==='fp_yes'){ S.dialog=null; act({type:'playCard', player:G.active, cardId:c.id, fp:true}); }
       else if(tag==='fp_no'){ S.dialog=null; act({type:'playCard', player:G.active, cardId:c.id, fp:false}); }
       else if(tag==='fp_cancel'){ S.dialog=null; }
+      return;
+    } else if(dlg.type==='gauge'){
+      const pend=G.gaugePending;
+      if(!pend) return;
+      const al = S.gaugeAlloc || { left: pend.left, wind: 0, thunder: pend.left };
+      S.gaugeAlloc = al;
+      if(tag==='g_wind_minus' && al.wind > 0){ al.wind--; al.thunder++; }
+      else if(tag==='g_wind_plus' && al.thunder > 0){ al.wind++; al.thunder--; }
+      else if(tag==='g_thunder_minus' && al.thunder > 0){ al.thunder--; al.wind++; }
+      else if(tag==='g_thunder_plus' && al.wind > 0){ al.thunder++; al.wind--; }
+      else if(tag==='g_ok'){
+        if(!al.wind && !al.thunder) return;
+        act({type:'gauge', player:pend.who, kind:'split', wind:al.wind, thunder:al.thunder});
+        S.gaugeAlloc = null;
+      }
+      else if(tag==='g_skip'){ act({type:'gauge', player:pend.who, kind:'skip'}); S.gaugeAlloc = null; }
       return;
     } else if(dlg.type==='plan'){
       const pend=G.planPending;

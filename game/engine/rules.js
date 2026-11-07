@@ -231,6 +231,7 @@
     }));
 
     state.turnUsed[who] = (state.turnUsed[who] || 0) + 1;
+    Engine.gauge.noteOtherCard(state, who, card);
     if ((card.types || []).indexOf('fullpower') >= 0) p.fullpowerUsed = true;
     state.quietSpark = true;      // 别把这次减装画成"飞向虚"
 
@@ -666,6 +667,14 @@
       return state;
     }
 
+    // 莱拉：先把"其他女神的牌"攒下的点数分配掉
+    const pend = Engine.gauge.pendingPoints(state, who);
+    if (pend > 0) {
+      state.gaugePending = { who: who, left: pend };
+      log(state, 'P' + (who + 1) + ' 的结束阶段：有 ' + pend + ' 点风雷要分配');
+      return state;
+    }
+
     // 毒牌**计入**手牌上限，但不可丢弃。
     // 所以：先算出总超额，再从非毒牌里尽量弃；还超的话，把多出来的毒随机放对方牌库顶。
     const need = p.hand.length - limit;
@@ -696,6 +705,42 @@
     }
 
     return finishEndTurn(state, who);
+  }
+
+  /**
+   * 结束阶段分配风雷点数。
+   * @param {'wind'|'thunder'|'skip'} kind  skip = 剩下的不要了
+   */
+  function resolveGauge(state, who, kind, w, th) {
+    const pend = state.gaugePending;
+    if (!pend || pend.who !== who) return { ok: false, error: '现在不用分配风雷' };
+    if (kind === 'split') {
+      const wn = Math.max(0, Math.min(pend.left, w | 0));
+      const tn = Math.max(0, Math.min(pend.left - wn, th | 0));
+      if (wn + tn !== pend.left) return { ok: false, error: '分配的总点数不对' };
+      Engine.gauge.claim(state, who, 'wind', wn);
+      Engine.gauge.claim(state, who, 'thunder', tn);
+      log(state, '风雷：风神 +' + wn + '，雷神 +' + tn);
+    } else if (kind === 'wind' || kind === 'thunder') {
+      const took = Engine.gauge.claim(state, who, kind, pend.left);
+      log(state, '风雷：' + (kind === 'wind' ? '风神' : '雷神') + ' +' + took);
+    } else {
+      // 放弃：也算"已分配"，免得下次又问
+      const p = state.players[who];
+      p.gaugeClaimed = (p.gaugeClaimed || 0) + pend.left;
+      log(state, '风雷：放弃 ' + pend.left + ' 点');
+    }
+    state.gaugePending = null;
+
+    // 接着走手牌上限那一套
+    const p2 = state.players[who];
+    const limit = Engine.state.INIT.END_HAND;
+    if (p2.hand.length > limit) {
+      state.endTurnPending = { who: who, need: p2.hand.length - limit };
+      return { ok: true };
+    }
+    finishEndTurn(state, who);
+    return { ok: true };
   }
 
   /**
@@ -1210,6 +1255,12 @@
     let cost = card.cost || 0;
     if (card.kind === 'special') {
       if (c0 && c0.cost) cost = Math.max(0, c0.cost(state, who, card));
+      // 風魔纏廻【使用済】：你的切札消费 -1
+      const hasDiscount = (p.specials || []).some(function (x) {
+        const xe = (Engine.effects && Engine.effects.cards && Engine.effects.cards[x.id]) || {};
+        return x.used && xe.costDiscount;
+      });
+      if (hasDiscount) cost = Math.max(0, cost - 1);
       if (p.flare < cost) return { ok: false, error: '气不够（需要 ' + cost + '）' };
     }
 
@@ -1360,6 +1411,7 @@
       }
 
       if (fpCard) p.fullpowerUsed = true;      // 全力化：本回合只能到此为止
+      Engine.gauge.noteOtherCard(state, who, card);
       if (ctx.aura !== null && !ctx.chokoku && ctx.aura > 5) ctx.aura = 5;
       state.pending = {
         kind: 'attack',
@@ -1778,7 +1830,7 @@
     // 回合
     startTurn, endTurn, tickAttachments, sweepAttachments,
     // 基本动作
-    BASIC, canBasic, basicAction, hideCard, taijinOf, shadowAura, moveCrystal, recheckRange, effDistance, resolveAuraSplit, triggerGap, nextQueuedAttack, cardAt, hasUmbrella, toggleUmbrella, resolveUmbrella, oppDeckToHidden, sealUnder, unsealAll, isPoison, basicBanned, initPoisonBag, takePoison, returnPoison, confirmNabu, cancelNabu, confirmEndTurn,
+    BASIC, canBasic, basicAction, hideCard, taijinOf, shadowAura, moveCrystal, recheckRange, effDistance, resolveAuraSplit, triggerGap, nextQueuedAttack, cardAt, hasUmbrella, toggleUmbrella, resolveUmbrella, oppDeckToHidden, sealUnder, unsealAll, isPoison, basicBanned, initPoisonBag, takePoison, returnPoison, resolveGauge, confirmNabu, cancelNabu, confirmEndTurn,
     // 再起
     tryRevive, stagger,
     // 出牌与攻防

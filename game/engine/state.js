@@ -39,6 +39,11 @@
       focus: INIT.FOCUS,
       staggered: false,   // 畏缩
       umbrella: 'closed', // 雪姬的伞：'closed' 闭 / 'open' 开（开局是闭）
+      wind: 0,            // 莱拉：风神计略
+      thunder: 0,         // 莱拉：雷神计略
+      otherCardsUsed: 0,  // 这局用了几张"其他女神"的牌（结束阶段分配点数用）
+      gaugeClaimed: 0,    // 已经分配掉的点数
+      removed: [],        // 从游戏中移除的牌
       poisonBag: [],      // 千影的毒袋（毒牌本身不在这 10 张卡组里）
       basicBan: {},       // 本回合被禁止的基本动作 {advance:true, ...}
       basicBanAll: false, // 本回合所有基本动作都被禁止
@@ -84,9 +89,13 @@
       const p = state.players[i];
       const normal = cards.filter(c => c.kind === 'normal');
       const special = cards.filter(c => c.kind === 'special');
+      p.hasRaira = normal.concat(special).some(function (c) { return String(c.id).indexOf('12-') === 0; });
       p.deck = Engine.rng.shuffle(normal);
       p.specials = special.map(c => Object.assign({}, c, { used: false }));
     });
+
+    // 莱拉：追加札（風魔招来孔 用）
+    if (opts.extras) state.extraPool = JSON.parse(JSON.stringify(opts.extras));
 
     // 千影：毒袋（5 张毒不进牌库，单独放在毒袋里）
     if (opts.myPoisons) Engine.rules.initPoisonBag(state, 0, opts.myPoisons);

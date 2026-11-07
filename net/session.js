@@ -74,6 +74,7 @@
           const st = engine.state.create({
             myCards: makeDeck(myDeckIds || opts.fallbackDeck),
             oppCards: makeDeck(guestDeckIds),
+            extras: opts.extras || null,
             myPoisons: opts.poisonsOf ? opts.poisonsOf(myDeckIds || opts.fallbackDeck) : null,
             oppPoisons: opts.poisonsOf ? opts.poisonsOf(guestDeckIds) : null,
             myName: '主机', oppName: '客机'

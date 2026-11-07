@@ -11,6 +11,7 @@ const fs = require('fs');
 require('../engine/rng.js');
 require('../engine/umbrella.js');
 require('../engine/plan.js');
+require('../engine/gauge.js');
 require('../engine/state.js');
 require('../engine/rules.js');
 require('../engine/effects.js');
@@ -1178,7 +1179,8 @@ group('卡牌守恒');
     let n = 0;
     s.players.forEach(p => {
       n += p.hand.length + p.deck.length + p.discard.length
-         + p.hidden.length + p.attachments.length + p.specials.length;
+         + p.hidden.length + p.attachments.length + p.specials.length
+         + (p.removed ? p.removed.length : 0);
     });
     return n;
   }
@@ -1241,7 +1243,8 @@ group('44 张卡都能打出且不丢牌');
     let n = 0;
     s.players.forEach(p => {
       n += p.hand.length + p.deck.length + p.discard.length
-         + p.hidden.length + p.attachments.length + p.specials.length;
+         + p.hidden.length + p.attachments.length + p.specials.length
+         + (p.removed ? p.removed.length : 0);
     });
     return n;
   }

@@ -53,6 +53,11 @@
     if (next.cardPick && next.cardPick.who === action.player && action.type !== 'pickCard') {
       return { ok: false, state, error: '先选好要处理的牌' };
     }
+    // 风雷点数还没分配：本人不能做别的
+    if (next.gaugePending && next.gaugePending.who === action.player
+        && action.type !== 'gauge' && action.type !== 'pickCard') {
+      return { ok: false, state, error: '先分配风雷点数' };
+    }
     // 计略还没准备好：本人不能做别的（对方不受影响）
     if (next.planPending && next.planPending.who === action.player
         && action.type !== 'plan' && action.type !== 'pickCard') {
@@ -149,6 +154,13 @@
 
       case 'pickCard': {
         const r = Engine.effects.resolveCardPick(next, action);
+        if (!r.ok) return { ok: false, state, error: r.error };
+        return { ok: true, state: afterAction(next) };
+      }
+
+      case 'gauge': {
+        const r = R.resolveGauge(next, action.player, action.kind,
+                                 action.wind, action.thunder);
         if (!r.ok) return { ok: false, state, error: r.error };
         return { ok: true, state: afterAction(next) };
       }
