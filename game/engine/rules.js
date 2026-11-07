@@ -118,7 +118,9 @@
   function reshuffle(state, who, payLife) {
     const p = state.players[who];
 
-    const back = p.discard.concat(p.hidden).filter(c => c.kind === 'normal');
+    // 毒牌不是"普通牌"：它们洗完之后要单独放到牌库顶（新规则）
+    const back = p.discard.concat(p.hidden).filter(c => c.kind === 'normal' && !isPoison(c));
+    const poisonBack = p.discard.concat(p.hidden).filter(c => isPoison(c));
     if (!back.length) return false;
 
     // 规则 9-7-ⅰ：由规则产生的再构成，先失去 1 点命。
@@ -136,10 +138,13 @@
     p.discard = [];
     p.hidden = [];
     // 注意：要**把原来牌库里剩下的牌也算进去**再洗，不能直接覆盖
-    const all = p.deck.concat(back);
-    p.deck = Engine.rng.shuffle(all);
+    const all = p.deck.concat(back).filter(c => !isPoison(c));
+    const poisons = p.deck.concat(poisonBack).filter(c => isPoison(c));
+    // 先洗普通牌，洗完把毒牌按原顺序压到牌库顶
+    p.deck = poisons.concat(Engine.rng.shuffle(all));
 
-    log(state, 'P' + (who + 1) + ' 重组牌库（' + back.length + ' 张洗回，共 ' + all.length + ' 张）');
+    log(state, 'P' + (who + 1) + ' 重组牌库（' + back.length + ' 张洗回，共 ' + all.length + ' 张'
+        + (poisons.length ? '，毒 ' + poisons.length + ' 张放牌库顶' : '') + '）');
     return true;
   }
 

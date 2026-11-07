@@ -190,6 +190,7 @@ const IMG={};
   IMG.turnEnd=new Image(); IMG.turnEnd.src=base+'TurnEnd_Player_Normal.png';
   IMG.backN=new Image(); IMG.backN.src=base+'cardback_normal.png';
   IMG.backS=new Image(); IMG.backS.src=base+'cardback_special.png';
+  IMG.backP=new Image(); IMG.backP.src=base+'../卡面/chikage/cardback_poison.png';   // 毒专用卡背
   IMG.vigor=new Image(); IMG.vigor.src=base+'vigor_opp.png';
   IMG.vnum0=new Image(); IMG.vnum0.src=base+'vigor_num0.png';
   IMG.vnum1=new Image(); IMG.vnum1.src=base+'vigor_num1.png';
@@ -710,6 +711,25 @@ function drawSide(isMine){
     HITP('umbrella', bx, by, bs, bs);
   }
 
+  // ---------- 毒袋（千影）：画在她自己那一格的右下角 ----------
+  const ckIdx = gk.indexOf('chikage');
+  if(ckIdx >= 0){
+    const x = ckIdx ? mid+4 : z.x0, w = mid-z.x0-4;
+    const bagN = (pl.poisonBag || []).length;
+    const bs = Math.min(30, z.h - 22);
+    const bx = x + w - bs - 8, by = z.y + z.h - bs - 8;
+    ctx.save();
+    ctx.fillStyle = 'rgba(8,10,16,0.62)';
+    rr(bx-3, by-3, bs+6, bs+6, 7); ctx.fill();
+    ctx.strokeStyle = 'rgba(170,235,170,0.85)';
+    ctx.lineWidth = 1.3;
+    rr(bx-3, by-3, bs+6, bs+6, 7); ctx.stroke();
+    ctx.restore();
+    txt(bx+bs/2, by+bs/2-5, '毒', 10, '#bff0b0');
+    txt(bx+bs/2, by+bs/2+8, String(bagN), 12, '#eaffea');
+    HITP(ckIdx ? 'opoisonbag' : 'poisonbag', bx, by, bs, bs);
+  }
+
   // ---------- 计略（雪拉）：画在她自己那一格的左下角 ----------
   const shIdx = gk.indexOf('shinra');
   if(shIdx >= 0){
@@ -809,7 +829,7 @@ function drawSide(isMine){
     const x=sx+i*h.step;
     const lifted=(isMine&&(S.hover==='hand'+i))||(isMine&&S.drag&&S.drag.i===i);
     if(lifted) continue;
-    if(back) drawCardBack(x,h.y,h.w,h.h);
+    if(back) drawCardBack(x,h.y,h.w,h.h,false,!!(cards[i]&&cards[i].poison));
     else {
       const usedSp = cards[i].special && cards[i].used;
       ctx.save();
@@ -1017,8 +1037,8 @@ function cardBody(x,y,w,h,o,nameX,nameSize){
   if(o.cost)txt(w*0.5,h-36,'费 '+o.cost,20,'rgba(236,208,154,0.96)');
   ctx.restore();
 }
-function drawCardBack(x,y,w,h,special){
-  const img=special?IMG.backS:IMG.backN;
+function drawCardBack(x,y,w,h,special,poison){
+  const img=poison?IMG.backP:(special?IMG.backS:IMG.backN);
   if(img&&img.complete&&img.naturalWidth){
     ctx.save();
     ctx.shadowColor='rgba(0,0,0,0.55)';ctx.shadowBlur=12;ctx.shadowOffsetY=4;
@@ -1814,7 +1834,7 @@ function drawPilePanels(){
     if(i===hoverIdx){ continue; }
     const card=arr[i];
     const back = (kind==='hidden') || (kind==='special' && !card.used && forOpp);
-    if(back) drawCardBack(cx,py+9,cw,ch,true);
+    if(back) drawCardBack(cx,py+9,cw,ch,true,!!card.poison);
     else cardBody(cx,py+9,cw,ch,card);
     HIT.push({id:'pcard'+i,x:cx,y:py+9,w:step,h:ch});
   }
@@ -1824,11 +1844,36 @@ function drawPilePanels(){
     const nx=cx-(w2-cw)/2, ny=py+9-(w2-cw)*0.35;
     const card=arr[hoverIdx];
     const back = (kind==='hidden') || (kind==='special' && !card.used && forOpp);
-    if(back) drawCardBack(nx,ny,w2,h2,true);
+    if(back) drawCardBack(nx,ny,w2,h2,true,!!card.poison);
     else cardBody(nx,ny,w2,h2,card);
     HIT.push({id:'pcard'+hoverIdx,x:nx,y:ny,w:w2,h:h2});
     if(!back) S.tip={card:card, ax:nx+w2/2, ay:ny};
   }
+}
+
+// ===== 毒袋悬停说明 =====
+function drawPoisonBagTip(){
+  if(S.hover !== 'poisonbag' && S.hover !== 'opoisonbag') return;
+  const opp = S.hover.indexOf('o') === 0;
+  const pv = opp ? G.players[oppIdx()] : G.players[meIdx()];
+  const bag = pv.poisonBag || [];
+  const z = P.zones;
+  const bx = z.x0 - 300 - 14, by = z.y - 60;
+  const bw = 292, bh = 60 + Math.min(bag.length, 5) * 16;
+  ctx.save();
+  ctx.fillStyle = 'rgba(8,10,16,0.92)';
+  rr(bx, by, bw, bh, 10); ctx.fill();
+  ctx.strokeStyle = 'rgba(170,235,170,0.45)'; ctx.lineWidth = 1.2;
+  rr(bx, by, bw, bh, 10); ctx.stroke();
+  txt(bx+12, by+20, '毒袋（剩 ' + bag.length + ' 张）', 13, '#bff0b0', 'left');
+  ctx.font='500 12px "Songti SC",serif';
+  ctx.textAlign='left'; ctx.textBaseline='top';
+  ctx.fillStyle='rgba(228,240,228,0.9)';
+  bag.slice(0, 5).forEach(function (c, i) {
+    ctx.fillText((i+1) + '. ' + c.name, bx+14, by+40+i*16);
+  });
+  if(!bag.length) ctx.fillText('（空）', bx+14, by+40);
+  ctx.restore();
 }
 
 // ===== 女神被动提示 =====
@@ -1956,7 +2001,7 @@ function frameBody(ts){
     }
     ctx.restore();
   }
-  if(S.shakeRestore){}drawFlash();drawAvatarTip();drawPilePanels();drawBanner();drawDialog();drawToast();drawCardTip();
+  if(S.shakeRestore){}drawFlash();drawAvatarTip();drawPoisonBagTip();drawPilePanels();drawBanner();drawDialog();drawToast();drawCardTip();
   requestAnimationFrame(frame);
 }
 

@@ -270,4 +270,37 @@ group('一次攻击只能被一张对应牌对应');
   }
 }
 
+/* ============================================================ */
+group('重组：毒牌洗完后放牌库顶');
+{
+  let s = mk([], { distance: 4 });
+  s.players[0].deck = [cardById('01-yurina-o-n-1'), cardById('01-yurina-o-n-2')];
+  s.players[0].discard = [
+    { id: '09-chikage-o-p-1', name: '麻痺毒', kind: 'poison', types: ['action'], poison: true },
+    cardById('09-chikage-o-n-1'), cardById('09-chikage-o-n-2')
+  ];
+  s.players[0].hidden = [];
+  const okr = E.rules.reshuffle(s, 0, false);
+  ok('重组成功', okr, okr);
+  eq('毒在牌库顶', s.players[0].deck[0].id, '09-chikage-o-p-1');
+  ok('剩下的牌里没有毒了',
+     s.players[0].deck.slice(1).every(c => !E.rules.isPoison(c)));
+}
+
+/* ============================================================ */
+group('抜き足：破弃之后间合要还回去');
+{
+  let s = mk([], { distance: 5, dust: 8 });
+  s.players[0].hand = [cardById('09-chikage-o-n-6')];
+  let r = autoNabu(A(s, { type: 'playCard', player: 0, cardId: '09-chikage-o-n-6' }));
+  eq('展开中：间合 5 → 3', E.rules.effDistance(r.state), 3);
+
+  // 把结晶打光 → 破弃
+  let st = r.state;
+  st.players[0].attachments[0].crystals = 0;
+  E.rules.tickAttachments(st, 0);
+  eq('破弃后：间合回到 5', E.rules.effDistance(st), 5);
+  eq('付与区清空', st.players[0].attachments.length, 0);
+}
+
 H.report();

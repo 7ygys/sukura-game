@@ -46,7 +46,11 @@
     ['hand', 'deck', 'hidden'].forEach(function (k) {
       if (k === 'hand' && peek) return;          // 引用：手牌可以看
       const arr = s.players[opp][k] || [];
-      s.players[opp][k] = arr.map(function () { return blankCard('normal'); });
+      s.players[opp][k] = arr.map(function (c) {
+        const b = blankCard('normal');
+        if (c && (c.poison === true || c.kind === 'poison')) b.poison = true;   // 毒用毒卡背
+        return b;
+      });
     });
 
     // ---- 对方的王牌：用过的公开，没用过的保密 ----
