@@ -52,10 +52,16 @@ function report() {
 /* ---------- 造状态 ---------- */
 function cardById(id) {
   for (const g of db.goddesses) {
-    const c = g.cards.find(x => x.id === id);
+    const c = (g.cards || []).find(x => x.id === id) || (g.poisons || []).find(x => x.id === id);
     if (c) return JSON.parse(JSON.stringify(c));
   }
   throw new Error('没有这张卡: ' + id);
+}
+
+/** 某个女神的毒袋（千影才有） */
+function poisonsOf(key) {
+  const g = db.goddesses.find(x => x.key === key);
+  return g && g.poisons ? JSON.parse(JSON.stringify(g.poisons)) : null;
 }
 function deckOf(key) {
   const g = db.goddesses.find(x => x.key === key);
@@ -147,6 +153,6 @@ function settleResponse(r) {
 module.exports = {
   E, db,
   ok, eq, group, report,
-  cardById, deckOf, fresh, withHand, autoNabu, endTurnAuto, cardTotal,
+  cardById, deckOf, fresh, withHand, autoNabu, endTurnAuto, cardTotal, poisonsOf,
   settleResponse
 };

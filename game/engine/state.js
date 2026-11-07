@@ -39,6 +39,9 @@
       focus: INIT.FOCUS,
       staggered: false,   // 畏缩
       umbrella: 'closed', // 雪姬的伞：'closed' 闭 / 'open' 开（开局是闭）
+      poisonBag: [],      // 千影的毒袋（毒牌本身不在这 10 张卡组里）
+      basicBan: {},       // 本回合被禁止的基本动作 {advance:true, ...}
+      basicBanAll: false, // 本回合所有基本动作都被禁止
       plan: 'kami',       // 雪拉的计略：'kami' 神谋 / 'oni' 鬼谋（开局必为神谋）
       planRevealed: false, // 计略是否已向对方公开（执行中才公开）
       deck: [],           // 牌库（索引 0 = 牌堆顶）
@@ -84,6 +87,10 @@
       p.deck = Engine.rng.shuffle(normal);
       p.specials = special.map(c => Object.assign({}, c, { used: false }));
     });
+
+    // 千影：毒袋（5 张毒不进牌库，单独放在毒袋里）
+    if (opts.myPoisons) Engine.rules.initPoisonBag(state, 0, opts.myPoisons);
+    if (opts.oppPoisons) Engine.rules.initPoisonBag(state, 1, opts.oppPoisons);
 
     // 先手随机
     state.active = Math.random() < 0.5 ? 0 : 1;

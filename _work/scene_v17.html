@@ -153,7 +153,7 @@ window.addEventListener('unhandledrejection', function(e){
 const IMG={};
 (function(){
   const base='../素材/Sprite/';
-  ['01','02','03','04','06','07'].forEach(function(n){const i=new Image();i.src=base+n+'.png';IMG['av'+n]=i;});
+  ['01','02','03','04','06','07','09'].forEach(function(n){const i=new Image();i.src=base+n+'.png';IMG['av'+n]=i;});
   IMG.planKami=new Image(); IMG.planKami.src=base+'plan_blue.png';   // 神谋
   IMG.planOni=new Image();  IMG.planOni.src=base+'plan_red.png';     // 鬼谋
   IMG.planBack=new Image(); IMG.planBack.src=base+'plan_back.png';   // 背面（对方视角）
@@ -236,9 +236,16 @@ const E = window.Engine;
 const ALL = {};
 ((window.GAME_DATA && window.GAME_DATA.goddesses) || []).forEach(function(g){
   g.cards.forEach(function(c){ ALL[c.id] = Object.assign({ goddessKey: g.key }, c); });
+  (g.poisons || []).forEach(function(c){ ALL[c.id] = Object.assign({ goddessKey: g.key, poison: true }, c); });
 });
 
 /** 从女神 key 组出 7 通常 + 3 王牌 */
+/** 取某个女神的毒袋（千影才有） */
+function poisonsOf(key){
+  const g = (window.GAME_DATA.goddesses||[]).find(x => x.key === key);
+  return (g && g.poisons) ? g.poisons : null;
+}
+
 function deckOf(keys){
   const out = [];
   keys.forEach(function(k){
@@ -273,7 +280,10 @@ const G = (function(){
   let opp = o ? o.split(',').map(function(id){ return ALL[id]; }).filter(Boolean) : null;
   if (!opp || !opp.length) opp = deckOf(['saine']);
 
-  const st = E.state.create({ myCards: mine, oppCards: opp });
+  const st = E.state.create({
+    myCards: mine, oppCards: opp,
+    myPoisons: poisonsOf(gkeysOf(mine)[0]), oppPoisons: poisonsOf(gkeysOf(opp)[0])
+  });
   st.players[0].goddesses = gkeysOf(mine);
   st.players[1].goddesses = gkeysOf(opp);
   return st;
@@ -496,6 +506,9 @@ function syncPendingRaw(){
   S.dialog=null;
 }
 
+function state_turnUsed(){ return (G.turnUsed && G.turnUsed[G.active]) || 0; }
+function usedBasic(){ return !!(G.players[G.active] && G.players[G.active].usedBasicThisTurn); }
+
 function doPick(mode){
   const cp=G.cardPick;
   if(!cp||!S.pickSel) return;
@@ -649,7 +662,7 @@ function drawSide(isMine){
     const x=i?mid+4:z.x0,w=mid-z.x0-4;
     glass(x,z.y,w,z.h,10,0.34);
     const key = gk[i];
-    const num = key ? ({yurina:'01',saine:'02',himika:'03',tokoyo:'04',yukihi:'06',shinra:'07'})[key] : null;
+    const num = key ? ({yurina:'01',saine:'02',himika:'03',tokoyo:'04',yukihi:'06',shinra:'07',chikage:'09'})[key] : null;
     const av = num ? IMG['av'+num] : null;
     if(av&&av.complete&&av.naturalWidth){
       const aw=62, ah=aw*av.naturalHeight/av.naturalWidth;
@@ -1487,14 +1500,44 @@ function drawDialog(){
   }
 
   if(d.type==='response'){
-    txt(bx+bw*0.56,by+bh*0.36,'是否要对应这次攻击？',21,'#f2ece2');
-    txt(bx+bw*0.56,by+bh*0.55, d.canReact?'（对应需要打出一张带《对应》的牌）':'（手上没有可以对应的牌）',
+    // 把正在打的这张牌摆出来，鼠标移上去能看效果
+    const inc = G.pending && G.pending.cardId ? ALL[G.pending.cardId] : null;
+    if(inc){
+      const cwX=84, chX=116, cxX=bx+bw*0.56, cyX=by+bh*0.16;
+      cardBody(cxX-cwX/2, cyX, cwX, chX, inc, true, 9);
+      HIT.push({id:'dlg_incCard', x:cxX-cwX/2, y:cyX, w:cwX, h:chX});
+      if(S.hover==='dlg_incCard') S.tip={card:inc, ax:cxX, ay:cyX};
+      const dmgTxt=(G.pending.damage.aura===null?'-':G.pending.damage.aura)+'/'+
+                   (G.pending.damage.life===null?'-':G.pending.damage.life);
+      txt(cxX, cyX+chX+14, (G.pending.cardName||'攻击')+'　'+dmgTxt, 12, '#ffd9a0');
+    }
+    txt(bx+bw*0.56,by+bh*0.52,'是否要对应这次攻击？',21,'#f2ece2');
+    txt(bx+bw*0.56,by+bh*0.62, d.canReact?'（对应需要打出一张带《对应》的牌）':'（手上没有可以对应的牌）',
         12, d.canReact?'rgba(230,226,220,0.7)':'rgba(240,170,170,0.85)');
     ctx.save();
     if(!d.canReact) ctx.globalAlpha=0.3;
     drawButton(IMG.byes, bx+bw*0.60, by+bh*0.74, 62,'是','yes');
     ctx.restore();
     drawButton(IMG.bno , bx+bw*0.78, by+bh*0.74, 62,'否','no');
+  } else if(d.type==='fp'){
+    const c = d.card;
+    const cwF=92, chF=126, cxF=bx+bw*0.56, cyF=by+bh*0.14;
+    if(c && ALL[c.id]) cardBody(cxF-cwF/2, cyF, cwF, chF, ALL[c.id], true, 9);
+    txt(bx+bw*0.56, cyF+chF+16, '要把这张牌「全力化」吗？', 18, '#f2ece2');
+    txt(bx+bw*0.56, cyF+chF+38, '全力化：伤害 +1/+2、送毒、之后本回合结束。当对应使用时不能全力化。', 11, 'rgba(235,230,225,0.75)');
+    const canFp = !(state_turnUsed() > 0 || usedBasic());
+    ctx.save();
+    if(!canFp) ctx.globalAlpha = 0.35;
+    glass(bx+bw*0.36, by+bh*0.80, 150, 46, 8, 0.66);
+    txt(bx+bw*0.36+75, by+bh*0.80+23, '全力化', 14, '#ffd9a0');
+    if(canFp) HIT.push({id:'dlg_fp_yes', x:bx+bw*0.36, y:by+bh*0.80, w:150, h:46});
+    ctx.restore();
+    glass(bx+bw*0.55, by+bh*0.80, 150, 46, 8, 0.66);
+    txt(bx+bw*0.55+75, by+bh*0.80+23, '普通使用', 14, '#f2ece2');
+    HIT.push({id:'dlg_fp_no', x:bx+bw*0.55, y:by+bh*0.80, w:150, h:46});
+    glass(bx+bw*0.74, by+bh*0.80, 110, 46, 8, 0.5);
+    txt(bx+bw*0.74+55, by+bh*0.80+23, '取消', 13, '#d8d8e0');
+    HIT.push({id:'dlg_fp_cancel', x:bx+bw*0.74, y:by+bh*0.80, w:110, h:46});
   } else if(d.type==='pickReact'){
     txt(bx+bw*0.56,by+bh*0.22,'选择要打出的对应牌',18,'#f2ece2');
     drawButton(IMG.bno, bx+bw*0.14, by+bh*0.78, 50, '返回', 'back');
@@ -1966,6 +2009,13 @@ cvs.addEventListener('mouseup',function(e){
 
   if(inVoid){
     // 交给引擎出牌；成功了才播动画
+    const meta = ALL[card.id] || {};
+    if(meta.fullpowerable){
+      // 全力化：先问要不要当《全力》用
+      S.fpAsk = { card: card };
+      S.dialog = { type:'fp', card: card };
+      return;
+    }
     if(act({type:'playCard', player:G.active, cardId:card.id})){
       S.play={card:card,t0:S.t};
       if(S.handMode==='special') S.handMode='hand';
@@ -2027,6 +2077,14 @@ function handleClick(e){
     } else if(dlg.type==='exhaust'){
       if(tag==='exAura') act({type:'resolveExhaust', player:G.exhaust.who, choice:'aura'});
       if(tag==='exLife') act({type:'resolveExhaust', player:G.exhaust.who, choice:'life'});
+      return;
+    } else if(dlg.type==='fp'){
+      const c = dlg.card;
+      if(!c) { S.dialog=null; return; }
+      const card2 = G.players[G.active].hand.find(function(x){return x.id===c.id;});
+      if(tag==='fp_yes'){ S.dialog=null; act({type:'playCard', player:G.active, cardId:c.id, fp:true}); }
+      else if(tag==='fp_no'){ S.dialog=null; act({type:'playCard', player:G.active, cardId:c.id, fp:false}); }
+      else if(tag==='fp_cancel'){ S.dialog=null; }
       return;
     } else if(dlg.type==='plan'){
       const pend=G.planPending;

@@ -79,6 +79,12 @@
 
     // 执行完任何动作后，都检查一次「即再起」（规则 10-8：条件满足就立刻回未使用）
     function afterAction(st) {
+      // 「结束本阶段」的牌（麻痺毒）：直接把回合推到结束阶段
+      if (st.phaseEnded) {
+        st.phaseEnded = false;
+        const r2 = Engine.rules.endTurn(st);
+        if (r2 && r2.ok === false) { /* 结束阶段还要选牌的话，交给状态里的 pending */ }
+      }
       if (Engine.rules && Engine.rules.tryRevive) {
         Engine.rules.tryRevive(st, 0, 'instant');
         Engine.rules.tryRevive(st, 1, 'instant');
@@ -194,7 +200,7 @@
       case 'playCard': {
         if (action.player !== next.active)
           return { ok: false, state, error: '不是你的回合' };
-        const r = R.playCard(next, action.player, action.cardId);
+        const r = R.playCard(next, action.player, action.cardId, { fp: action.fp === true });
         if (!r.ok) return { ok: false, state, error: r.error };
         return { ok: true, state: afterAction(next) };
       }

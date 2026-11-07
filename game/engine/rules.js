@@ -257,6 +257,7 @@
     const p = state.players[who];
     const idx = handIndexOf(p, cardId);
     if (idx < 0) return { ok: false, error: '手上没有这张牌' };
+    if (isPoison(p.hand[idx])) return { ok: false, error: '毒牌不能盖成伏札，只能使用它' };
 
     const card = p.hand.splice(idx, 1)[0];
     p.hidden.push(card);
@@ -385,6 +386,11 @@
     } else {
       // 命里的结晶被打掉后**不会消失**，它飞到气里去
       moveCrystal(state, who, 'life', 'flare', lifeDmg);
+      // 【展开中】受到命伤时的付与效果（闇昏千影の生きる道）
+      (p.attachments || []).forEach(function (a) {
+        const ae = (Engine.effects && Engine.effects.cards && Engine.effects.cards[a.id]) || {};
+        if (ae.onLifeDamage) ae.onLifeDamage(state, who, a);
+      });
       Engine.state.emit(state, 'damage', { who: who, kind: 'life', n: lifeDmg });
 
       // 《隙》（规则 10-6）：受到 1 点以上命伤时（重组除外），
@@ -644,8 +650,11 @@
       return state;
     }
 
-    if (p.hand.length > limit) {
-      const need = p.hand.length - limit;       // 要盖几张
+    // 毒牌不能因为"手牌上限"被丢掉（规则：毒只能使用）
+    const discardable = p.hand.filter(function (c) { return !isPoison(c); });
+    const over = discardable.length - limit;
+    if (over > 0) {
+      const need = over;                        // 要盖几张（只从非毒牌里选）
 
       // 没指定 → 先把"要选几张"挂起来，等玩家自己挑
       if (!discardIdx || !discardIdx.length) {
@@ -654,7 +663,10 @@
         return state;
       }
 
-      const picked = discardIdx.slice(0, need);
+      const picked = discardIdx.filter(function (i) {
+      const c = p.hand[i];
+      return c && !isPoison(c);
+    }).slice(0, need);
 
       // 规则 8-3-2：超出的手牌是**盖成伏札**，不是丢进弃牌区
       picked.sort((a, b) => b - a).forEach(i => {
@@ -737,8 +749,9 @@
 
     // 伞处理完，接着走"手牌超限盖伏札"，再换人
     const limit = Engine.state.INIT.END_HAND;
-    if (p.hand.length > limit) {
-      state.endTurnPending = { who: who, need: p.hand.length - limit };
+    const discardable2 = p.hand.filter(function (c) { return !isPoison(c); });
+    if (discardable2.length > limit) {
+      state.endTurnPending = { who: who, need: discardable2.length - limit };
       log(state, 'P' + (who + 1) + ' 需要盖掉 ' + state.endTurnPending.need + ' 张手牌');
       return { ok: true };
     }
@@ -823,7 +836,16 @@
    * 修正不需要搬结晶，是凭空加上去的，效果结束就消失。
    */
   function effDistance(state) {
-    const d = state.distance + (state.distanceMod || 0);
+    // 付与【展开中】的"间合减少"（抜き足）
+    let minus = 0;
+    const tbl = (Engine.effects && Engine.effects.cards) || {};
+    state.players.forEach(function (p) {
+      (p.attachments || []).forEach(function (a) {
+        const e = tbl[a.id];
+        if (e && e.distanceMinus) minus += e.distanceMinus;
+      });
+    });
+    const d = state.distance + (state.distanceMod || 0) - minus;
     return Math.max(0, Math.min(10, d));
   }
 
@@ -908,11 +930,36 @@
     return base;
   }
 
+  /** 这个基本动作现在被禁止了吗？（遁術 / 泥濘 / 麻痺毒 之类） */
+  function basicBanned(state, who, which) {
+    const p = state.players[who];
+    if (!p) return null;
+    if (p.basicBanAll) return '本回合不能进行任何基本动作';
+    if (p.basicBan && p.basicBan[which]) return '本回合不能进行基本动作《' + (BASIC[which] ? BASIC[which].name : which) + '》';
+    // 付与【展开中】的禁令（泥濘）：按"谁出的这张牌"来判
+    //   自己场上的 banBasics → 自己不能
+    //   对方场上的 banBasics → 我不能
+    const tbl = (Engine.effects && Engine.effects.cards) || {};
+    let reason = null;
+    state.players.forEach(function (owner, idx) {
+      (owner.attachments || []).forEach(function (a) {
+        const e = tbl[a.id];
+        if (!e || !e.banBasics) return;
+        const hit = (e.banBasics === 'all' || (e.banBasics || []).indexOf(which) >= 0);
+        if (!hit) return;
+        const affectsMe = (idx === who) ? !e.banOpponent : !!e.banOpponent;
+        if (affectsMe) reason = '「' + a.name + '」【展开中】：不能进行这个基本动作';
+      });
+    });
+    return reason;
+  }
+
   function canBasic(state, who, which) {
     const b = BASIC[which];
     if (!b) return false;
     const p = state.players[who];
     if (p.focus < 1) return false;
+    if (basicBanned(state, who, which)) return false;
     return b.need(state, p);
   }
 
@@ -935,6 +982,8 @@
     if (p.terminated) return { ok: false, error: '终端：本回合不能再使用牌或做基本动作' };
     // 用了《全力》卡之后就进入全力行动，不能再做基本动作
     if (p.fullpowerUsed) return { ok: false, error: '全力行动：本回合已经用过牌了' };
+    const banned = basicBanned(state, who, which);
+    if (banned) return { ok: false, error: banned };
     if (!b.need(state, p)) {
       const reason = b.why ? b.why(state, p) : '条件不满足';
       return { ok: false, error: b.name + '：' + reason };
@@ -1013,6 +1062,38 @@
    * 从手牌里找一张牌（按 id），找不到返回 -1
    * 用 id 而不是下标，是因为手牌会变动，下标不可靠。
    */
+  /* ---------------- 毒（千影） ---------------- */
+
+  /** 建局时把 5 张毒放进毒袋（只有带千影的牌组才有） */
+  function initPoisonBag(state, who, poisons) {
+    const p = state.players[who];
+    if (!p || !poisons) return;
+    p.poisonBag = poisons.map(function (c) { return JSON.parse(JSON.stringify(c)); });
+  }
+
+  /** 从毒袋取一张（按 id），取不到返回 null */
+  function takePoison(state, who, cardId) {
+    const bag = state.players[who].poisonBag || [];
+    const i = bag.findIndex(function (c) { return c.id === cardId; });
+    if (i < 0) return null;
+    return bag.splice(i, 1)[0];
+  }
+
+  /** 毒放回毒袋 */
+  function returnPoison(state, who, card) {
+    if (!card) return;
+    const clean = Object.assign({}, card, { crystals: 0 });
+    delete clean.used;
+    state.players[who].poisonBag = state.players[who].poisonBag || [];
+    state.players[who].poisonBag.push(clean);
+    log(state, '「' + card.name + '」回到 P' + (who + 1) + ' 的毒袋');
+  }
+
+  /** 这张牌是毒吗（毒不能盖成伏札） */
+  function isPoison(card) {
+    return !!(card && (card.poison === true || card.kind === 'poison'));
+  }
+
   function handIndexOf(player, cardId) {
     return player.hand.findIndex(c => c.id === cardId);
   }
@@ -1027,7 +1108,12 @@
    *   5. 如果是攻击 → 生成 pending，等对方决定要不要对应
    *      如果是行动 → 直接结算（阶段 3 里还没有行动效果，就先只记账）
    */
-  function playCard(state, who, cardId) {
+  function table0_lazy(card) {
+    return ((Engine.effects && Engine.effects.cards) || {})[card.id] || {};
+  }
+
+  function playCard(state, who, cardId, opts) {
+    opts = opts || {};
     const p = state.players[who];
 
     // 牌可能在手牌里，也可能是一张「还没用过的王牌」
@@ -1050,11 +1136,21 @@
     // 用过《全力》卡之后，本回合能做的只有「结束回合」
     if (p.fullpowerUsed)
       return { ok: false, error: '全力行动：本回合只能结束回合' };
+    // 全力化：这张牌可以"当作《全力》用"（暗器）
+    const fpCard = !!((card.fullpowerable || table0_lazy(card).fullpowerable) && opts.fp === true);
+    const asFullpower = types.indexOf('fullpower') >= 0 || fpCard;
+
     // 规则 8-2-2：《全力》卡只能在「全力行动」里用。
     // 简化判断：本回合已经出过牌或做过基本动作 → 就进不了全力行动
-    if (types.indexOf('fullpower') >= 0 &&
-        (state.turnUsed[who] > 0 || p.usedBasicThisTurn)) {
+    if (asFullpower && (state.turnUsed[who] > 0 || p.usedBasicThisTurn)) {
       return { ok: false, error: '《全力》卡只能在全力行动中使用（本回合已经行动过了）' };
+    }
+    // 弛緩毒【展开中】：不能用《攻击》牌
+    if ((p.attachments || []).some(function (a) {
+      const e = (Engine.effects && Engine.effects.cards && Engine.effects.cards[a.id]) || {};
+      return e.noAttackCards;
+    }) && (types.indexOf('attack') >= 0)) {
+      return { ok: false, error: '中了弛緩毒：本回合不能使用《攻击》牌' };
     }
 
     // ---- 「能不能用」的额外条件（例如底力的决死前置） ----
@@ -1173,6 +1269,7 @@
         chokoku: false,
         both: false,
         fromSpecial: fromSpecial,     // 这一发是不是来自王牌（切札）
+        fullpowered: fpCard,
         tags: {}
       };
       p.buff = { aura: 0, life: 0 };
@@ -1202,6 +1299,22 @@
         }
       }
 
+      // 叛旗の纏毒：【展开中】双方"装伤或命伤有一边是 -"的攻击被抵消
+      const cancelDash = state.players.some(function (pl) {
+        return (pl.attachments || []).some(function (a) {
+          const ae = (Engine.effects && Engine.effects.cards && Engine.effects.cards[a.id]) || {};
+          return ae.cancelDashAttacks;
+        });
+      });
+      const hasDash = (ctx.aura === null || ctx.aura === undefined || ctx.life === null || ctx.life === undefined);
+      if (cancelDash && hasDash) {
+        Engine.state.log(state, '「' + card.name + '」因为带着「-」的伤害，被叛旗の纏毒抵消');
+        Engine.state.emit(state, 'cancel', { who: 1 - who });
+        p.buff = { aura: 0, life: 0 };
+        return { ok: true };
+      }
+
+      if (fpCard) p.fullpowerUsed = true;      // 全力化：本回合只能到此为止
       if (ctx.aura !== null && !ctx.chokoku && ctx.aura > 5) ctx.aura = 5;
       state.pending = {
         kind: 'attack',
@@ -1620,7 +1733,7 @@
     // 回合
     startTurn, endTurn, tickAttachments, sweepAttachments,
     // 基本动作
-    BASIC, canBasic, basicAction, hideCard, taijinOf, shadowAura, moveCrystal, recheckRange, effDistance, resolveAuraSplit, triggerGap, nextQueuedAttack, cardAt, hasUmbrella, toggleUmbrella, resolveUmbrella, oppDeckToHidden, sealUnder, unsealAll, confirmNabu, cancelNabu, confirmEndTurn,
+    BASIC, canBasic, basicAction, hideCard, taijinOf, shadowAura, moveCrystal, recheckRange, effDistance, resolveAuraSplit, triggerGap, nextQueuedAttack, cardAt, hasUmbrella, toggleUmbrella, resolveUmbrella, oppDeckToHidden, sealUnder, unsealAll, isPoison, basicBanned, initPoisonBag, takePoison, returnPoison, confirmNabu, cancelNabu, confirmEndTurn,
     // 再起
     tryRevive, stagger,
     // 出牌与攻防

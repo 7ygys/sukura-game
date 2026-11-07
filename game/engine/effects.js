@@ -916,6 +916,161 @@
         }
       }
     },
+
+
+    /* ===== 千影（毒袋） ===== */
+
+    // 毒針：攻击后从毒袋选一张，放到对方牌库顶
+    "09-chikage-o-n-2": {
+      onAfterAttack(state, who) {
+        openCardPick(state, who, {
+          target: who, zone: 'poisonBag', filter: 'poisonDeckTop',
+          prompt: '毒针：选一张毒，放到对方牌库顶',
+          modes: ['poisonTop']
+        });
+      }
+    },
+
+    // 遁術：自装→间合 1、虚→间合 1；本回合对方不能《前进》
+    "09-chikage-o-n-3": {
+      onAfterAttack(state, who) {
+        Engine.effects.fx.moveCrystal(state, who, 'aura', 'distance', 1);
+        Engine.effects.fx.moveCrystal(state, who, 'dust', 'distance', 1);
+        const opp = state.players[1 - who];
+        opp.basicBan = opp.basicBan || {};
+        opp.basicBan.advance = true;
+        Engine.state.log(state, '遁術：本回合对方不能《前进》');
+        Engine.state.emit(state, 'basicBan', { who: 1 - who });
+      }
+    },
+
+    // 暗器：对应 / 全力化（+1/+2、送毒、缠绕）
+    "09-chikage-o-n-4": {
+      attackOnRespond: true,
+      onAttack(state, who, ctx, card) {
+        // 全力化时 +1/+2（由 playCard 打上 fullpowered 标记）
+        if (ctx && ctx.fullpowered) { ctx.aura += 1; ctx.life += 2; }
+      },
+      onAfterAttack(state, who, pd) {
+        const fp = !!pd.fullpowered;
+        if (fp) {
+          openCardPick(state, who, {
+            target: who, zone: 'poisonBag', filter: 'poison',
+            prompt: '暗器（全力化）：对方从你的毒袋选一张加入其手牌',
+            modes: ['poisonToHand']
+          });
+        }
+        const opp = state.players[1 - who];
+        if ((opp.hand || []).some(function (c) { return Engine.rules.isPoison(c); })) {
+          Engine.rules.basicAction(state, who, 'gather', { free: true });
+          Engine.state.log(state, '暗器：对方手牌有毒 → 基本动作《缠绕》');
+        }
+      }
+    },
+
+    // 毒霧：从毒袋选一张加入对方手牌
+    "09-chikage-o-n-5": {
+      onUse(state, who) {
+        openCardPick(state, who, {
+          target: who, zone: 'poisonBag', filter: 'poison',
+          prompt: '毒雾：选一张毒加入对方手牌',
+          modes: ['poisonToHand']
+        });
+      }
+    },
+
+    // 抜き足：【展开中】当前间合 -2
+    "09-chikage-o-n-6": { distanceMinus: 2, hasGap: true },
+
+    // 泥濘：【展开中】对方不能《后退》《离脱》
+    "09-chikage-o-n-7": { banBasics: ['retreat', 'disengage'], banOpponent: true },
+
+    // 滅灯の魂毒：把「滅灯毒」放对方牌库顶
+    "09-chikage-o-s-1": {
+      onUse(state, who) {
+        openCardPick(state, who, {
+          target: who, zone: 'poisonBag', filter: 'poisonHoro',
+          prompt: '魂毒：把「滅灯毒」放到对方牌库顶',
+          modes: ['poisonTop']
+        });
+      }
+    },
+
+    // 叛旗の纏毒：【展开中】双方"有一边是 -"的攻击被抵消
+    "09-chikage-o-s-2": { cancelDashAttacks: true },
+
+    // 流転の霞毒：纯攻击（再起见 revive 表）
+    // 闇昏千影の生きる道
+    "09-chikage-o-s-4": {
+      onExpanded(state, who) {
+        Engine.state.log(state, '闇昏千影の生きる道 展开');
+      },
+      // 受到 1 点以上命伤 → 结晶全进虚、此牌回未使用（破弃时效果失败）
+      onLifeDamage(state, who, self) {
+        const n = (self && self.crystals) || 0;
+        if (n > 0) { self.crystals = 0; state.dust += n; }
+        // 从付与区拿下来，回到王牌区（已使用状态）——不走"破弃"
+        const p = state.players[who];
+        p.attachments = (p.attachments || []).filter(function (a) { return a !== self; });
+        const back = Object.assign({}, self, { crystals: 0, used: true });
+        delete back._returnToUnused;
+        delete back.sealed;
+        p.specials.push(back);
+        Engine.state.log(state, '闇昏千影：受到命伤 → 结晶全进虚，此牌回到王牌区（已使用）');
+      },
+      onBreak(state, who, self) {
+        if (self && self._returnToUnused) return;      // 不算破弃
+        const others = (state.players[who].specials || []).filter(function (c) {
+          return c.id !== '09-chikage-o-s-4';
+        });
+        if (others.length && others.every(function (c) { return c.used; })) {
+          state.winner = who;
+          Engine.state.log(state, '闇昏千影の生きる道：其他切札全部已使用 → P' + (who + 1) + ' 胜利');
+          Engine.state.emit(state, 'gameover', { winner: who, reason: '闇昏千影' });
+        } else {
+          Engine.state.log(state, '闇昏千影：其他切札还没全用掉，没有达成胜利条件');
+        }
+      }
+    },
+
+    /* ---- 毒（在毒袋里，被效果塞给对方） ---- */
+
+    // 麻痺毒：本回合做过基本动作就不能用；用掉回毒袋并结束阶段
+    "09-chikage-o-p-1": {
+      canUse(state, who) {
+        if (state.players[who].usedBasicThisTurn) return '本回合已经做过基本动作，不能用这张毒';
+        return true;
+      },
+      onUse(state, who, card) {
+        Engine.rules.returnPoison(state, 1 - who, card);
+        state.phaseEnded = true;
+        Engine.state.log(state, '麻痺毒：结束本阶段');
+      }
+    },
+
+    // 幻覚毒：回毒袋，自气 → 虚 2
+    "09-chikage-o-p-2": {
+      onUse(state, who, card) {
+        Engine.rules.returnPoison(state, 1 - who, card);
+        Engine.effects.fx.moveCrystal(state, who, 'flare', 'dust', 2);
+      }
+    },
+
+    // 弛緩毒：【展开中】不能使用《攻击》牌；破弃时回毒袋
+    "09-chikage-o-p-3": {
+      noAttackCards: true,
+      onBreak(state, who, self) {
+        Engine.rules.returnPoison(state, 1 - who, self);
+      }
+    },
+
+    // 滅灯毒：自装 → 虚 2，回毒袋
+    "09-chikage-o-p-4": {
+      onUse(state, who, card) {
+        Engine.effects.fx.moveCrystal(state, who, 'aura', 'dust', 2);
+        Engine.rules.returnPoison(state, 1 - who, card);
+      }
+    },
   };
 
   /* ============================================================
@@ -1015,6 +1170,9 @@
     if (cp.zone === 'hand') list = t.hand.slice();
     else if (cp.zone === 'discard') list = t.discard.slice();
     else if (cp.zone === 'attachments') list = t.attachments.slice();
+    else if (cp.zone === 'poisonBag') {
+      list = (t.poisonBag || []).slice();
+    }
     else if (cp.zone === 'reuse') {
       list = t.discard.filter(c => (c.types || []).indexOf('enhance') >= 0)
         .concat((t.specials || []).filter(c => c.used && (c.types || []).indexOf('enhance') >= 0));
@@ -1022,6 +1180,10 @@
     if (cp.filter === 'attack') list = list.filter(c => (c.types || []).indexOf('attack') >= 0);
     if (cp.filter === 'enhance') list = list.filter(c => (c.types || []).indexOf('enhance') >= 0);
     if (cp.nonSpecial) list = list.filter(c => c.kind !== 'special');
+    if (cp.filter === 'poison') list = list.filter(c => c.poison || c.kind === 'poison');
+    if (cp.filter === 'poisonDeckTop')
+      list = list.filter(c => ['09-chikage-o-p-1','09-chikage-o-p-2','09-chikage-o-p-3'].indexOf(c.id) >= 0);
+    if (cp.filter === 'poisonHoro') list = list.filter(c => c.id === '09-chikage-o-p-4');
     return list;
   }
 
@@ -1094,6 +1256,18 @@
         crystals: 0, sealOnly: true, forever: true, sealed: [card]
       });
       Engine.state.log(state, '「' + card.name + '」被永久封印');
+    } else if (mode === 'poisonTop') {
+      const owner = cp.target;
+      const pc = Engine.rules.takePoison(state, owner, card.id);
+      if (!pc) return { ok: false, error: '毒袋里没有这张毒' };
+      state.players[1 - owner].deck.unshift(pc);
+      Engine.state.log(state, '「' + pc.name + '」被放到 P' + (2 - owner) + ' 的牌库顶');
+    } else if (mode === 'poisonToHand') {
+      const owner = cp.target;
+      const pc = Engine.rules.takePoison(state, owner, card.id);
+      if (!pc) return { ok: false, error: '毒袋里没有这张毒' };
+      state.players[1 - owner].hand.push(pc);
+      Engine.state.log(state, '「' + pc.name + '」被加入 P' + (2 - owner) + ' 的手牌');
     } else if (mode === 'drain') {
       const i = t.attachments.findIndex(a => a.id === card.id);
       if (i >= 0) {
@@ -1176,6 +1350,8 @@
     "03-himika-o-s-4": (state, who) => state.players[who].hand.length === 0,
     // 無窮ノ風【再起】境地：自集中力 = 2
     "04-tokoyo-o-s-3": (state, who) => state.players[who].focus === 2,
+    // 流転の霞毒【再起】对方手牌 2 张以上
+    "09-chikage-o-s-3": (state, who) => (state.players[1 - who].hand.length >= 2),
     // はらりゆき【再起】你进行伞的开合：使用之后开合过就算
     "06-yukihi-o-s-1": (state, who) => {
       const p = state.players[who];
