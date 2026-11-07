@@ -454,7 +454,7 @@ group('6. 用《对应》牌对应：减伤生效');
   ok('通常札「衝音晶」可以当对应', r2.ok, r2.error);
   eq('减伤 -1/+0 → 2/1', r2.state.pending.damage, { aura: 2, life: 1 });
   eq('通常札对应不花气', r2.state.players[1].flare, flare0);
-  eq('对应牌进弃牌区', r2.state.players[1].discard.length, 1);
+  eq('付与牌当对应 → 进付与区', r2.state.players[1].attachments.length, 1);
   eq('手牌少一张', r2.state.players[1].hand.length, 0);
   eqc(r2.state, '衝音晶 对应');
 

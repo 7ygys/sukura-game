@@ -334,7 +334,9 @@ function visHand(){
 
 /** 现在能显示的基本行动（离脱只在间合 ≤2 时出现） */
 function visActions(){
-  return ACTIONS.filter(function(a){ return !a.onlyLow || G.distance <= 2; });
+  // 「离脱」看的是**有效距离**（抜き足 会让间合 -2）
+  const eff = (E.rules && E.rules.effDistance) ? E.rules.effDistance(G) : G.distance;
+  return ACTIONS.filter(function(a){ return !a.onlyLow || eff <= 2; });
 }
 
 /** 联机模式下，拿到新视图就整份换掉 */

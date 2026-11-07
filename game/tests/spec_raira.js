@@ -258,4 +258,28 @@ group('风雷分配：可以拆分给风和雷');
   eq('放弃后风雷仍是 0', G.total(skip.state, 0), 0);
 }
 
+/* ============================================================ */
+group('即时风雷：用完其他女神的牌立刻弹窗（不管效果有没有生效）');
+{
+  // 風走り 是莱拉自己的牌 → 不弹
+  let s = mk(['12-raira-o-n-4'], { distance: 4 });
+  let r = A(s, { type: 'playCard', player: 0, cardId: '12-raira-o-n-4' });
+  ok('自己的牌不弹风雷窗', !r.state.choice, r.state.choice);
+
+  // 用其他女神的牌（斩）→ 立刻弹
+  let s2 = mk([], { distance: 3 });
+  s2.players[0].hand = [cardById('01-yurina-o-n-1')];
+  let r2 = A(s2, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-1' });
+  ok('用其他女神的牌 → 立刻弹风雷窗', !!(r2.state.choice && r2.state.choice.sourceId === 'raira_instant'),
+     r2.state.choice);
+  const ch = A(r2.state, { type: 'choose', player: 0, option: 'thunder' });
+  eq('选雷 → 雷神 1', G.thunder(ch.state, 0), 1);
+
+  // 即使这张牌效果没生效（间合不符），也要问
+  let s3 = mk([], { distance: 8 });
+  s3.players[0].hand = [cardById('12-raira-o-n-4').id === 'x' ? null : cardById('02-saine-o-n-2')]; // 薙斬り 4-5
+  let r3 = A(s3, { type: 'playCard', player: 0, cardId: '02-saine-o-n-2' });
+  ok('打不出来的牌不会问（它根本没进弃牌区）', !r3.ok, r3.ok);
+}
+
 H.report();

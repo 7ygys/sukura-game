@@ -266,8 +266,10 @@ group('衝音晶（02-saine-o-n-6）· 对应 -1/+0；破弃时 1/- 攻击 + 虚
   ok('衝音晶可以当对应', r2.ok, r2.error);
   r2 = settleResponse(r2);
   eq('被对应的攻击 -1/+0 → 2/1', r2.state.pending.damage, { aura: 2, life: 1 });
-  eq('当对应时不会展开到付与区', r2.state.players[1].attachments.length, 0);
-  eq('用掉后进弃牌区', r2.state.players[1].discard.map(c => c.id), ['02-saine-o-n-6']);
+  // 付与牌当对应使用 → 也要展开到付与区（规则 9-2-3）
+  eq('当对应时会展开到付与区', r2.state.players[1].attachments.length, 1);
+  eq('付与区里是衝音晶', r2.state.players[1].attachments[0].id, '02-saine-o-n-6');
+  eq('没有进弃牌区', r2.state.players[1].discard.length, 0);
 
   // 破弃时：1/- 攻击 + 虚→间合 1 颗
   let t = setup(['02-saine-o-n-6'], { distance: 3, dust: 1, aura: 0 });

@@ -84,6 +84,21 @@
 
     // 执行完任何动作后，都检查一次「即再起」（规则 10-8：条件满足就立刻回未使用）
     function afterAction(st) {
+      // 莱拉【即时】：有没分配的风雷点数，且当前没有别的选择 → 立刻问
+      try {
+        if (Engine.gauge && !st.choice) {
+          [st.active, 1 - st.active].forEach(function (who) {
+            if (st.choice) return;
+            if (Engine.gauge.pendingPoints(st, who) > 0) {
+              st.choice = {
+                who: who, sourceId: 'raira_instant',
+                prompt: '使用其他女神的牌：风神 +1 还是雷神 +1？',
+                options: ['wind', 'thunder']
+              };
+            }
+          });
+        }
+      } catch (e) {}
       // 「结束本阶段」的牌（麻痺毒）：直接把回合推到结束阶段
       if (st.phaseEnded) {
         st.phaseEnded = false;

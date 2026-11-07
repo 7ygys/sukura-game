@@ -1525,7 +1525,25 @@
         log(state, '支付 ' + cost + ' 点气 → 虚 +' + cost);
       } else {
         p.hand.splice(idx, 1);
-        p.discard.push(card);
+        if ((card.types || []).indexOf('enhance') < 0) p.discard.push(card);
+      }
+
+      // 《付与》牌当对应使用：也要走"纳 → 付与区"，不能直接丢进弃牌区
+      if ((card.types || []).indexOf('enhance') >= 0) {
+        const cap = card.capacity || 0;
+        const take = Math.min(cap, state.dust);
+        const rest = cap - take;
+        if (take) { state.dust -= take; }
+        if (rest) { p.aura = Math.max(0, p.aura - Math.min(p.aura, rest)); }
+        p.attachments.push(Object.assign({}, card, {
+          crystals: cap,
+          fromSpecial: fromSpecial
+        }));
+        const et2 = (Engine.effects && Engine.effects.cards) || {};
+        const ee2 = et2[card.id];
+        if (ee2 && ee2.onExpanded) ee2.onExpanded(state, who, p.attachments[p.attachments.length - 1]);
+        Engine.state.emit(state, 'enhance', { who: who });
+        log(state, '「' + card.name + '」作为对应展开（纳 ' + cap + '）');
       }
 
       pd.responded = true;
