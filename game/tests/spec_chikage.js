@@ -303,4 +303,114 @@ group('抜き足：破弃之后间合要还回去');
   eq('付与区清空', st.players[0].attachments.length, 0);
 }
 
+/* ============================================================ */
+group('毒袋空了：毒相关的效果静默失效，其他照常');
+{
+  // 把毒袋清空
+  let s = mk(['09-chikage-o-n-2'], { distance: 4 });
+  s.players[0].poisonBag = [];
+  let r = A(s, { type: 'playCard', player: 0, cardId: '09-chikage-o-n-2' });
+  ok('毒袋空也能打出毒針', r.ok, r.error);
+  r = A(r.state, { type: 'respond', player: 1, cardId: null });
+  r = A(r.state, { type: 'resolveDamage', player: 1, choice: 'aura' });
+  ok('毒針 结算完成', r.ok, r.error);
+  eq('没有弹出选毒（没牌可选）', r.state.cardPick || null, null);
+  eq('伤害照常：对方装 3 → 2', r.state.players[1].aura, 2);
+  eq('毒袋仍是空的', bag(r.state, 0), 0);
+
+  // 毒霧：毒袋空 → 只花掉这张牌，对方手牌不变
+  let s2 = mk(['09-chikage-o-n-5']);
+  s2.players[0].poisonBag = [];
+  s2.players[1].hand = [];
+  const r2 = A(s2, { type: 'playCard', player: 0, cardId: '09-chikage-o-n-5' });
+  ok('毒袋空也能打出毒霧', r2.ok, r2.error);
+  eq('对方手牌没变', r2.state.players[1].hand.length, 0);
+  eq('没有挂起选牌', r2.state.cardPick || null, null);
+}
+
+/* ============================================================ */
+group('毒用掉之后回到毒袋，可以再次使用');
+{
+  let s = mk([]);
+  eq('开局 5 张', bag(s, 0), 5);
+  // 手动取一张给对方，再用掉
+  const pc = E.rules.takePoison(s, 0, '09-chikage-o-p-2');
+  ok('从毒袋取出幻覚毒', !!pc);
+  eq('毒袋 4', bag(s, 0), 4);
+  s.players[1].hand = [pc];
+  s.active = 1;
+  s.players[1].flare = 4;
+  s.players[1].focus = 1;
+  let r = A(s, { type: 'playCard', player: 1, cardId: '09-chikage-o-p-2' });
+  ok('对方用掉幻覚毒', r.ok, r.error);
+  eq('回到毒袋 → 5', bag(r.state, 0), 5);
+  eq('对方手牌清空', r.state.players[1].hand.length, 0);
+}
+
+/* ============================================================ */
+group('弛緩毒：展开中不能用攻击牌，破弃后回毒袋');
+{
+  let s = mk([]);
+  const pc = E.rules.takePoison(s, 0, '09-chikage-o-p-3');
+  s.players[1].hand = [pc, cardById('01-yurina-o-n-1')];
+  s.players[1].flare = 5;
+  s.players[1].focus = 2;
+  s.active = 1;
+  s.distance = 3;
+  let r = A(s, { type: 'playCard', player: 1, cardId: '09-chikage-o-p-3' });
+  ok('展开弛緩毒', r.ok, r.error);
+  const nabu = r.state.nabu;
+  if (nabu) {
+    const fd = Math.min(r.state.dust, nabu.cap);
+    const fa = Math.min(r.state.players[1].aura, nabu.cap - fd);
+    r = A(r.state, { type: 'confirmNabu', player: 1, fromDust: fd, fromAura: fa });
+  }
+  ok('纳完', r.ok, r.error);
+  const atk = A(r.state, { type: 'playCard', player: 1, cardId: '01-yurina-o-n-1' });
+  ok('中了弛緩毒 → 不能使用攻击牌', !atk.ok, atk.error);
+
+  // 破弃 → 回千影的毒袋
+  let st = r.state;
+  const att = st.players[1].attachments.find(a => a.id === '09-chikage-o-p-3');
+  att.crystals = 0;
+  E.rules.tickAttachments(st, 1);
+  eq('破弃后回到毒袋', bag(st, 0), 5);
+}
+
+/* ============================================================ */
+group('洗牌：弃牌区里的毒不会被洗进牌库中间');
+{
+  let s = mk([], { distance: 4 });
+  s.players[0].deck = [cardById('01-yurina-o-n-1')];
+  s.players[0].discard = [
+    cardById('09-chikage-o-n-1'),
+    { id: '09-chikage-o-p-2', name: '幻覚毒', kind: 'poison', types: ['action'], poison: true },
+    { id: '09-chikage-o-p-4', name: '滅灯毒', kind: 'poison', types: ['action'], poison: true }
+  ];
+  E.rules.reshuffle(s, 0, false);
+  eq('两张毒都在牌库顶', s.players[0].deck.slice(0, 2).map(c => c.id),
+     ['09-chikage-o-p-2', '09-chikage-o-p-4']);
+  const rest = s.players[0].deck.slice(2).map(c => c.id).sort();
+  eq('毒下面的都是普通牌（洗过，顺序不定）', rest,
+     ['01-yurina-o-n-1', '09-chikage-o-n-1']);
+}
+
+/* ============================================================ */
+group('麻痺毒：本回合做过基本动作就不能用');
+{
+  let s = mk([]);
+  const pc1 = E.rules.takePoison(s, 0, '09-chikage-o-p-1');
+  s.players[1].hand = [pc1];
+  s.players[1].focus = 2;
+  s.players[1].usedBasicThisTurn = true;
+  s.active = 1;
+  const bad = A(s, { type: 'playCard', player: 1, cardId: '09-chikage-o-p-1' });
+  ok('做过基本动作 → 麻痺毒用不了', !bad.ok, bad.error);
+
+  s.players[1].usedBasicThisTurn = false;
+  const good = A(s, { type: 'playCard', player: 1, cardId: '09-chikage-o-p-1' });
+  ok('没做过基本动作 → 可以用', good.ok, good.error);
+  eq('用掉后回到毒袋', bag(good.state, 0), 5);
+}
+
 H.report();
