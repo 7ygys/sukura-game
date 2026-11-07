@@ -1693,6 +1693,17 @@
       table[pd.cardId].onAfterAttack(state, pd.attacker,
         Object.assign({}, pd, { usedAsResponse: !!pd.fromResponse }));
 
+    // 【展开中】「对方攻击解决后」的付与（円環輪廻旋 等）
+    // 每发攻击只通知一次；被打消的也算"解决完"了
+    if (!pd._notifiedDefender) {
+      pd._notifiedDefender = true;
+      const dt = (Engine.effects && Engine.effects.cards) || {};
+      (state.players[pd.defender] && state.players[pd.defender].attachments || []).forEach(function (a) {
+        const ae = dt[a.id];
+        if (ae && ae.afterOpponentAttack) ae.afterOpponentAttack(state, pd.defender, a);
+      });
+    }
+
     // 只有"还是这次攻击"时才清空
     if (state.pending === pd) state.pending = null;
 

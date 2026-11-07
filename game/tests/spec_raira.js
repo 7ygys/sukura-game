@@ -326,4 +326,35 @@ group('付与+对应 的牌：当对应也要进付与区');
   ok('付与札上有结晶', res.state.players[0].attachments[0].crystals > 0);
 }
 
+/* ============================================================ */
+group('円環輪廻旋：对应展开 + 攻击解决后移动加计略');
+{
+  let s = mk([], { distance: 3, dust: 6 });
+  s.players[0].flare = 8;
+  s.players[0].focus = 1;
+  s.players[0].specials = [Object.assign(cardById('12-raira-o-s-4'), { used: false })];
+  s.players[1].hand = [cardById('01-yurina-o-n-1')];
+  s.players[1].firstTurnDone = true;
+  s.active = 1;
+
+  let r = A(s, { type: 'playCard', player: 1, cardId: '01-yurina-o-n-1' });
+  ok('对方打出斬', r.ok, r.error);
+  const res = A(r.state, { type: 'respond', player: 0, cardId: '12-raira-o-s-4' });
+  ok('円環輪廻旋 可以对应', res.ok, res.error);
+  eq('作为对应进了付与区', res.state.players[0].attachments.length, 1);
+  eq('付与区里是円環', res.state.players[0].attachments[0].id, '12-raira-o-s-4');
+
+  // 攻击解决后 → 弹「要移动并加计略吗」
+  let st = res.state;
+  st = A(st, { type: 'resolveDamage', player: 0, choice: 'aura' }).state;
+  ok('攻击解决后弹出円環的选择', !!(st.choice && st.choice.sourceId === 'raira_enkan'), st.choice);
+  const yes = A(st, { type: 'choose', player: 0, option: 'yes' });
+  ok('选「要」→ 再问方向', !!(yes.state.choice && yes.state.choice.sourceId === 'raira_enkan_dir'), yes.state.choice);
+  const d0 = yes.state.distance, dust0 = yes.state.dust;
+  const dir = A(yes.state, { type: 'choose', player: 0, option: 'to_dist' });
+  eq('间合 +1', dir.state.distance, d0 + 1);
+  eq('虚 -1', dir.state.dust, dust0 - 1);
+  eq('风神 +1', G.wind(dir.state, 0), 1);
+}
+
 H.report();
