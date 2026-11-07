@@ -70,7 +70,9 @@
     // 攻击没结算时，只能做"处理这次攻击"相关的动作；
     // 「选择」「纳分配」这些是子步骤，不算打断
     const pending = next.pending;
-    const allowedDuringPending = ['respond', 'resolveDamage', 'resolveAuraSplit', 'choose', 'confirmNabu', 'cancelNabu', 'damage', 'resolveExhaust'];
+    // 「計略」「选牌」和「纳分配」「选择」一样，都是攻击结算过程中的子步骤
+    const allowedDuringPending = ['respond', 'resolveDamage', 'resolveAuraSplit', 'choose',
+      'confirmNabu', 'cancelNabu', 'damage', 'resolveExhaust', 'plan', 'pickCard'];
     if (pending && allowedDuringPending.indexOf(action.type) < 0) {
       return { ok: false, state, error: '有一张攻击还没结算' };
     }

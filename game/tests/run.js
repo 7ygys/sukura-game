@@ -28,6 +28,31 @@ function eq(name, actual, expected) {
 }
 function group(title) { console.log('\n[' + title + ']'); }
 
+/** 把「对应牌自己打出的那一发」结算掉（规则 9-4-ⅰ + 9-2-1） */
+function settleResponse(r) {
+  let st = (r && r.state) ? r.state : r;
+  let guard = 0;
+  while (st.pending && st.pending.fromResponse && guard++ < 8) {
+    const pd = st.pending;
+    if (pd.stage === 'respond') {
+      const a = E.actions.applyAction(st, { type: 'respond', player: pd.defender, cardId: null });
+      if (!a.ok) break;
+      st = a.state; continue;
+    }
+    if (pd.stage !== 'damage') break;
+    const dmg2 = pd.damage || {};
+    const def = st.players[pd.defender];
+    let choice = 'aura';
+    if (dmg2.aura === null || dmg2.aura === undefined) choice = 'life';
+    else if (dmg2.life !== null && dmg2.life !== undefined && def.aura < dmg2.aura) choice = 'life';
+    const a = E.actions.applyAction(st, { type: 'resolveDamage', player: pd.defender, choice: choice });
+    if (!a.ok) break;
+    st = a.state;
+  }
+  return { ok: (r && r.ok !== undefined) ? r.ok : true, state: st };
+}
+
+
 /* ---------- 牌库数据 ---------- */
 const db = JSON.parse(fs.readFileSync(path.join(__dirname, '../../data/cards.json'), 'utf8'));
 function deckOf(key) {
@@ -643,6 +668,7 @@ group('摇波的其余效果');
   eq('对应前 3/1', s.pending.damage, { aura: 3, life: 1 });
   r = E.actions.applyAction(s, { type: 'respond', player: 1, cardId: '01-yurina-o-s-2' });
   ok('用浦波嵐对应', r.ok, r.error);
+  r = settleResponse(r);
   eq('对应后 1/1', r.state.pending.damage, { aura: 1, life: 1 });
 }
 
@@ -811,6 +837,7 @@ group('细音的效果');
   let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '02-saine-o-n-2' });
   r = E.actions.applyAction(r.state, { type: 'respond', player: 1, cardId: '02-saine-o-s-3' });
   ok('用音無砕氷对应', r.ok, r.error);
+  r = settleResponse(r);
   eq('对应后 2/0', r.state.pending.damage, { aura: 2, life: 0 });
 }
 
@@ -1020,6 +1047,7 @@ group('常世的效果');
   let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-1' });
   r = E.actions.applyAction(r.state, { type: 'respond', player: 1, cardId: '04-tokoyo-o-n-2' });
   ok('用雅打ち对应', r.ok, r.error);
+  r = settleResponse(r);
   ok('攻击被打消（没有待结算）', !r.state.pending);
   eq('命没掉', r.state.players[1].life, 10);
 }
@@ -1033,6 +1061,7 @@ group('常世的效果');
   let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-1' });
   r = E.actions.applyAction(r.state, { type: 'respond', player: 1, cardId: '04-tokoyo-o-s-1' });
   ok('用久遠ノ花对应', r.ok, r.error);
+  r = settleResponse(r);
   ok('攻击被打消', !r.state.pending);
 }
 
@@ -1420,6 +1449,7 @@ group('梳流 / 雅打ち');
   s.distance = 3;
   let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-1' });
   r = E.actions.applyAction(r.state, { type: 'respond', player: 1, cardId: '04-tokoyo-o-n-2' });
+  r = settleResponse(r);
   ok('雅打ち 能打消通常札的攻击', r.ok && !r.state.pending);
 
   // 王牌攻击 → 打不掉

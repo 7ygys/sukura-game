@@ -27,7 +27,7 @@
  *        （含 distanceMod 的「现在的间合」）；目前没有卡设置 distanceMod，属潜在不一致
  * ============================================================ */
 const H = require('./harness');
-const { E, ok, eq, group, report, fresh, withHand, cardById, autoNabu, cardTotal } = H;
+const { E, ok, eq, group, report, fresh, withHand, cardById, autoNabu, cardTotal, settleResponse } = H;
 
 /** 做动作（内部会 clone），成功返回新状态 */
 function doAct(s, action) {
@@ -106,6 +106,7 @@ group('薙斬り（02-saine-o-n-2）· 攻击 + 对应；对应时被对应的�
   let r1 = A(t, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-1' });
   let r2 = A(r1.state, { type: 'respond', player: 1, cardId: '02-saine-o-n-2' });
   ok('间合 4 在 4-5 内：可以拿薙斬り当对应', r2.ok, r2.error);
+  r2 = settleResponse(r2);
   eq('卡面只有「可割入使用」，没有减伤 → 被对应的攻击仍是 3/1', r2.state.pending.damage, { aura: 3, life: 1 });
   eq('对应用的薙斬り进弃牌区', r2.state.players[1].discard.map(c => c.id), ['02-saine-o-n-2']);
 
@@ -263,6 +264,7 @@ group('衝音晶（02-saine-o-n-6）· 对应 -1/+0；破弃时 1/- 攻击 + 虚
   let r1 = A(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-1' });
   let r2 = A(r1.state, { type: 'respond', player: 1, cardId: '02-saine-o-n-6' });
   ok('衝音晶可以当对应', r2.ok, r2.error);
+  r2 = settleResponse(r2);
   eq('被对应的攻击 -1/+0 → 2/1', r2.state.pending.damage, { aura: 2, life: 1 });
   eq('当对应时不会展开到付与区', r2.state.players[1].attachments.length, 0);
   eq('用掉后进弃牌区', r2.state.players[1].discard.map(c => c.id), ['02-saine-o-n-6']);
@@ -453,9 +455,11 @@ group('音無砕氷（02-saine-o-s-3）· 对应 -1/-1；【再起】八相');
   let r1 = A(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-1' });
   let r2 = A(r1.state, { type: 'respond', player: 1, cardId: '02-saine-o-s-3' });
   ok('适正 0-10：哪里都能当对应', r2.ok, r2.error);
+  r2 = settleResponse(r2);
   eq('被对应的攻击 -1/-1 → 2/0', r2.state.pending.damage, { aura: 2, life: 0 });
   eq('王牌费用 2 点气（2→0）', r2.state.players[1].flare, 0);
-  eq('付掉的气进虚', r2.state.dust, 2);
+  // 付掉的 2 点气进虚；音無砕氷 自己那发又打了 1 点气伤 → 虚 +1
+  eq('付掉的气 + 自己那发的气伤都进虚', r2.state.dust, 3);
   eq('用掉的王牌标记 used', r2.state.players[1].specials[0].used, true);
 
   // 再起：八相（自装 ≤1）

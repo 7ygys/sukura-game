@@ -773,6 +773,12 @@
 
     // はらりゆき：【攻击后】+1 集中力（再起条件见 revive 表）
     "06-yukihi-o-s-1": {
+      // 出牌时记下"已经开合过几次"，之后多过一次才算再起条件达成
+      onAttack(state, who) {
+        const p = state.players[who];
+        const sp = (p.specials || []).find(function (c) { return c.id === '06-yukihi-o-s-1'; });
+        if (sp) sp.toggleBase = p.umbrellaCount || 0;
+      },
       onAfterAttack(state, who) {
         Engine.effects.fx.gainFocus(state, who, 1);
         Engine.state.log(state, 'はらりゆき：获得 1 点集中力');

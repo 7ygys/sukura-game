@@ -1315,7 +1315,8 @@
 
       // 如果这张对应牌本身是《攻击》牌，并且其效果写明"作为对应时使用"，
       // 那么它自己的攻击要先打出来（嵌套解决），打完才轮到原攻击
-      if (re && re.attackOnRespond && (card.types || []).indexOf('attack') >= 0) {
+      // 规则 9-4-ⅰ + 9-2-1：任何《攻击》牌当对应使用时，都会生成并解决自己的《攻击》
+      if ((card.types || []).indexOf('attack') >= 0) {
         const dmg = card.damage || { aura: 0, life: 0 };
         state.attackStack = state.attackStack || [];
         state.attackStack.push(pd);
@@ -1564,10 +1565,15 @@
     const p = state.players[who];
     const table = (Engine.effects && Engine.effects.revive) || {};
     let revived = 0;
+    // 规则 10-7 / 10-8：
+    //   【再起】只在**自己的结束阶段**检查一次
+    //   【即再起】满足条件就立刻检查（任何时候都可能触发）
+    // 所以没传 mode（伤害结算途中之类）时，只能查"即再起"。
+    const wantNormal = (mode === 'normal');
     p.specials.forEach(function (sp) {
       if (!sp.used || !sp.revive) return;
-      // mode: 'normal' = 结束阶段的再起；'instant' = 随时触发的即再起
-      if (mode && sp.revive !== mode) return;
+      // 'normal' 只查【再起】；其余（含不传）只查【即再起】
+      if (wantNormal ? sp.revive !== 'normal' : sp.revive !== 'instant') return;
       const cond = table[sp.id];
       if (typeof cond !== 'function') return;
       if (cond(state, who, sp)) {

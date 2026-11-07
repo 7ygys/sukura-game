@@ -392,4 +392,41 @@ group('守恒');
   eq('结晶总数不变', crystalTotal(st), crys0);
 }
 
+/* ============================================================ */
+group('再起 vs 即再起：时机不能混');
+{
+  // 音無砕氷 是【再起】：只在自己的结束阶段检查
+  let s = H.fresh('saine', 'yurina');
+  s.players[0].goddesses = ['saine']; s.players[1].goddesses = ['yurina'];
+  s.players[0].specials = [Object.assign(cardById('02-saine-o-s-3'), { used: true })];
+  s.players[0].aura = 1;                       // 八相满足
+  eq('伤害结算途中（不传 mode）不查【再起】', E.rules.tryRevive(s, 0), 0);
+  eq('结束阶段才查【再起】', E.rules.tryRevive(s, 0, 'normal'), 1);
+
+  // 浮舟宿 是【即再起】：随时可查
+  let t2 = H.fresh('yurina', 'saine');
+  t2.players[0].specials = [Object.assign(cardById('01-yurina-o-s-3'), { used: true })];
+  t2.players[0].life = 3;                      // 决死满足
+  eq('结束阶段的检查不处理【即再起】', E.rules.tryRevive(t2, 0, 'normal'), 0);
+  eq('【即再起】随时可以复位', E.rules.tryRevive(t2, 0, 'instant'), 1);
+}
+
+/* ============================================================ */
+group('对应牌的攻击必须打出来（9-4-ⅰ + 9-2-1）');
+{
+  // 氷雨 5/5：作为对应时要打出 5/5（只能对应王牌攻击）
+  let s = mk([], { distance: 3 });
+  s.players[0].flare = 6;
+  s.players[0].specials = [Object.assign(cardById('02-saine-o-s-4'), { used: false })];
+  s.players[1].flare = 10;
+  s.players[1].specials = [Object.assign(cardById('01-yurina-o-s-1'), { used: false })];  // 月影落 3-4
+  s.players[1].firstTurnDone = true;
+  s.active = 1;
+  let r = A(s, { type: 'playCard', player: 1, cardId: '01-yurina-o-s-1' });
+  ok('对方打出王牌攻击', r.ok, r.error);
+  const res = A(r.state, { type: 'respond', player: 0, cardId: '02-saine-o-s-4' });
+  ok('氷雨 可以对应王牌攻击', res.ok, res.error);
+  eq('氷雨 自己那一发是 5/5', res.state.pending.damage, { aura: 5, life: 5 });
+}
+
 H.report();

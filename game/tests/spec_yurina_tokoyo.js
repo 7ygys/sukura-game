@@ -17,7 +17,7 @@
  * 跑法：node game/tests/spec_yurina_tokoyo.js
  * ========================================================================== */
 const H = require('./harness');
-const { E, ok, eq, group, report, fresh, withHand, cardById, autoNabu, cardTotal } = H;
+const { E, ok, eq, group, report, fresh, withHand, cardById, autoNabu, cardTotal, settleResponse } = H;
 
 /* ============================================================================
  * 一、本地小工具
@@ -487,9 +487,11 @@ group('刀·浦波嵐（01-yurina-o-s-2）：2/- 是攻击；对应时把对方�
   eq('对方打出斬 3/1', dmg(atk.state), [3, 1]);
   const res = respondCard(atk.state, '01-yurina-o-s-2');
   ok('浦波嵐可以作为《对应》使用', res.ok, res.error);
-  eq('对应后：3-2 / 1 = 1/1', dmg(res.state), [1, 1]);
+  eq('浦波嵐 自己那一发先打（2/-）', dmg(res.state), [2, null]);
+  const settle1 = settleResponse(res);
+  eq('对应后：3-2 / 1 = 1/1', dmg(settle1.state), [1, 1]);
 
-  const done = takeDamage(res.state, 'aura');
+  const done = takeDamage(settle1.state, 'aura');
   ok('结算成功', done.ok, done.error);
   eq('P0 只掉了 1 点装（3-1=2）', done.state.players[0].aura, 2);
   eq('命没掉', done.state.players[0].life, 10);
@@ -631,10 +633,14 @@ group('扇·雅打ち（04-tokoyo-o-n-2）：境地时打消"非王牌"的攻击
   ok('对方打出斬', atk.ok, atk.error);
   const res = respondCard(atk.state, '04-tokoyo-o-n-2');
   ok('雅打ち可以对应', res.ok, res.error);
-  eq('境地：这次攻击被完全打消（没有待结算攻击）', res.state.pending, null);
+  const settled = settleResponse(res);
+  eq('境地：这次攻击被完全打消（没有待结算攻击）', settled.state.pending, null);
   ok('打消时发出了 cancel 事件（界面要靠它播动画）',
-    res.state.events.some(function (e) { return e.type === 'cancel'; }));
-  eq('P0 的命和装都没事', [res.state.players[0].life, res.state.players[0].aura], [10, 3]);
+    settled.state.events.some(function (e) { return e.type === 'cancel'; }));
+  // 雅打ち 自己那发 2/1 打在攻击方 P0 身上 → 装 3 → 1；命没掉
+  // 雅打ち 自己那发 2/1 打在"攻击方 P1"身上
+  eq('P1 被雅打ち 打掉 2 点装', settled.state.players[1].aura, 1);
+  eq('P0 的命和装都没事', [settled.state.players[0].life, settled.state.players[0].aura], [10, 3]);
 
   // ---- 非境地（集中力 1）：打不掉，伤害照常 ----
   const s1 = scene(['04-tokoyo-o-n-2'], { distance: 3, hand1: ['01-yurina-o-n-1'], p0: { focus: 1 } });
@@ -642,8 +648,9 @@ group('扇·雅打ち（04-tokoyo-o-n-2）：境地时打消"非王牌"的攻击
   const atk1 = play(s1, '01-yurina-o-n-1');
   const res1 = respondCard(atk1.state, '04-tokoyo-o-n-2');
   ok('集中力 1（非境地）时雅打ち仍可对应（只是打不掉）', res1.ok, res1.error);
-  ok('非境地：攻击没有被打消，还在等结算', !!res1.state.pending);
-  const take1 = takeDamage(res1.state, 'life');
+  const set1 = settleResponse(res1);
+  ok('非境地：攻击没有被打消，还在等结算', !!set1.state.pending);
+  const take1 = takeDamage(set1.state, 'life');
   eq('非境地：命照吃 10→9', take1.state.players[0].life, 9);
 
   // ---- 王牌攻击：境地也打不掉 ----
@@ -654,8 +661,9 @@ group('扇·雅打ち（04-tokoyo-o-n-2）：境地时打消"非王牌"的攻击
   ok('对方打出王牌攻击月影落', atkSp.ok, atkSp.error);
   const resSp = respondCard(atkSp.state, '04-tokoyo-o-n-2');
   ok('雅打ち仍能使用', resSp.ok, resSp.error);
-  ok('王牌（切札）攻击打不掉：待结算攻击还在', !!resSp.state.pending);
-  eq('伤害也没被改：仍是 4/4', dmg(resSp.state), [4, 4]);
+  const setSp = settleResponse(resSp);
+  ok('王牌（切札）攻击打不掉：待结算攻击还在', !!setSp.state.pending);
+  eq('伤害也没被改：仍是 4/4', dmg(setSp.state), [4, 4]);
 }
 
 /* -------------------------------------------------------------------------
@@ -880,9 +888,12 @@ group('扇·久遠ノ花（04-tokoyo-o-s-1）：对应时打消攻击');
   ok('对方打出斬', atk.ok, atk.error);
   const res = respondCard(atk.state, '04-tokoyo-o-s-1');
   ok('久遠ノ花可以对应', res.ok, res.error);
-  eq('对应后攻击被完全打消：没有待结算攻击', res.state.pending, null);
-  eq('P0 的命和装都没事', [res.state.players[0].life, res.state.players[0].aura], [10, 3]);
-  eq('付了 5 点气', res.state.players[0].flare, 0);
+  const setK = settleResponse(res);
+  eq('对应后攻击被完全打消：没有待结算攻击', setK.state.pending, null);
+  // 久遠ノ花 自己那发 -/1 打在攻击方 P1 身上
+  eq('P1 被久遠ノ花 打掉 1 点命', setK.state.players[1].life, 9);
+  eq('P0 的命和装都没事', [setK.state.players[0].life, setK.state.players[0].aura], [10, 3]);
+  eq('付了 5 点气', setK.state.players[0].flare, 0);
 
   // ---- 对王牌攻击一样能打消（卡面没有"非切札"限制）----
   const sSp = scene([], { distance: 3, p1: { flare: 7 }, p0: { flare: 5 } });
@@ -893,7 +904,8 @@ group('扇·久遠ノ花（04-tokoyo-o-s-1）：对应时打消攻击');
   ok('对方打出王牌攻击月影落', atkSp.ok, atkSp.error);
   const resSp = respondCard(atkSp.state, '04-tokoyo-o-s-1');
   ok('对王牌攻击也能对应', resSp.ok, resSp.error);
-  eq('王牌攻击也被打消了', resSp.state.pending, null);
+  const setKSp = settleResponse(resSp);
+  eq('王牌攻击也被打消了', setKSp.state.pending, null);
 
   // ---- 气不够：不能当对应用 ----
   const sPoor = scene([], { distance: 3, hand1: ['01-yurina-o-n-1'], p0: { flare: 4 } });

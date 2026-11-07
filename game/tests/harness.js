@@ -108,8 +108,45 @@ function cardTotal(s) {
   return n;
 }
 
+
+/**
+ * 把「对应牌自己打出的那一发」结算掉。
+ *
+ * 规则 9-4-ⅰ + 9-2-1：任何《攻击》牌当对应使用时，会先生成并解决
+ * 它自己的《攻击》（嵌套解决），打完才轮到被对应的那一发。
+ * 测试里常常只关心"被对应的攻击变成什么样"，所以用这个把嵌套那发清掉。
+ *
+ * @param {{ok:boolean,state:object}} r  applyAction 的返回值
+ * @returns {{ok:boolean,state:object}}
+ */
+function settleResponse(r) {
+  let st = (r && r.state) ? r.state : r;
+  let guard = 0;
+  // 只清"对应牌自己打出的那一发"（fromResponse），被对应的那一发要留给调用方断言
+  while (st.pending && st.pending.fromResponse && guard++ < 8) {
+    const pd = st.pending;
+    if (pd.stage === 'respond') {
+      const a = E.actions.applyAction(st, { type: 'respond', player: pd.defender, cardId: null });
+      if (!a.ok) break;
+      st = a.state;
+      continue;
+    }
+    if (pd.stage !== 'damage') break;
+    const dmg = pd.damage || {};
+    const def = st.players[pd.defender];
+    let choice = 'aura';
+    if (dmg.aura === null || dmg.aura === undefined) choice = 'life';
+    else if (dmg.life !== null && dmg.life !== undefined && def.aura < dmg.aura) choice = 'life';
+    const a = E.actions.applyAction(st, { type: 'resolveDamage', player: pd.defender, choice: choice });
+    if (!a.ok) break;
+    st = a.state;
+  }
+  return { ok: (r && r.ok !== undefined) ? r.ok : true, state: st };
+}
+
 module.exports = {
   E, db,
   ok, eq, group, report,
-  cardById, deckOf, fresh, withHand, autoNabu, endTurnAuto, cardTotal
+  cardById, deckOf, fresh, withHand, autoNabu, endTurnAuto, cardTotal,
+  settleResponse
 };

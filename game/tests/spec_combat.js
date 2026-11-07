@@ -34,7 +34,7 @@
  *   - 断言说明用中文。
  * ============================================================ */
 const H = require('./harness');
-const { E, ok, eq, group, report, fresh, withHand, cardById, autoNabu, endTurnAuto, cardTotal } = H;
+const { E, ok, eq, group, report, fresh, withHand, cardById, autoNabu, endTurnAuto, cardTotal, settleResponse } = H;
 
 const A = E.actions.applyAction;
 
@@ -432,9 +432,11 @@ group('6. 用《对应》牌对应：减伤生效');
   const dust0 = r.state.dust;
   r = A(r.state, { type: 'respond', player: 1, cardId: '01-yurina-o-s-2' });
   ok('用浦波嵐对应', r.ok, r.error);
-  eq('被对应的攻击 -2/+0 → 1/1', r.state.pending.damage, { aura: 1, life: 1 });
+  eq('浦波嵐 自己那一发先打（2/-）', r.state.pending.damage, { aura: 2, life: null });
   eq('王牌当对应要付 3 点气 → 气归 0', r.state.players[1].flare, 0);
   eq('付掉的 3 点气变成虚里的结晶', r.state.dust, dust0 + 3);
+  r = settleResponse(r);
+  eq('被对应的攻击 -2/+0 → 1/1', r.state.pending.damage, { aura: 1, life: 1 });
   const sp = r.state.players[1].specials.find(function (x) { return x.id === '01-yurina-o-s-2'; });
   eq('王牌标记为已使用', sp.used, true);
   eq('攻击方还能选伤害（没被打消）', r.state.pending.stage, 'damage');
@@ -463,6 +465,8 @@ group('6. 用《对应》牌对应：减伤生效');
   let r3 = A(s3, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-1' });
   r3 = A(r3.state, { type: 'respond', player: 1, cardId: '02-saine-o-s-3' });
   ok('用音無砕氷对应', r3.ok, r3.error);
+  eq('音無砕氷 自己那一发先打（1/1）', r3.state.pending.damage, { aura: 1, life: 1 });
+  r3 = settleResponse(r3);
   eq('减伤 -1/-1 → 2/0', r3.state.pending.damage, { aura: 2, life: 0 });
   r3 = A(r3.state, { type: 'resolveDamage', player: 1, choice: 'life' });
   ok('命伤被减到 0 时选命仍然合法', r3.ok, r3.error);
@@ -677,11 +681,15 @@ group('11. 打消');
   ok('打出斬（通常札攻击）', r.ok, r.error);
   r = A(r.state, { type: 'respond', player: 1, cardId: '04-tokoyo-o-n-2' });
   ok('雅打ち 可以对应', r.ok, r.error);
+  eq('雅打ち 自己那一发先打（2/1）', r.state.pending.damage, { aura: 2, life: 1 });
+  r = settleResponse(r);
   s = r.state;
   eq('攻击被打消：pending 清空', s.pending, null);
   eq('P1 命没掉', s.players[1].life, 10);
   eq('P1 装没掉', s.players[1].aura, 3);
-  eq('结晶一颗没动（打消 = 攻击失败，不结算伤害）', s.dust, dust0);
+  // 雅打ち 自己那一发（2/1）打在攻击方 P0 身上 → 虚 +2
+  eq('虚只多了雅打ち自己那 2 点气伤', s.dust, dust0 + 2);
+  eq('攻击方 P0 的装被打掉 2', s.players[0].aura, 1);
   eq('雅打ち 进弃牌区', s.players[1].discard.length, 1);
   eqc(s, '打消');
 
@@ -692,10 +700,13 @@ group('11. 打消');
   let r2 = A(s2, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-1' });
   r2 = A(r2.state, { type: 'respond', player: 1, cardId: '04-tokoyo-o-n-2' });
   ok('非境地时也能打出雅打ち', r2.ok, r2.error);
+  r2 = settleResponse(r2);
   eq('但攻击没被打消', !!r2.state.pending, true);
+  eq('雅打ち 的气伤打在攻击方身上 → P1 的装还没动', r2.state.players[1].aura, 3);
+  eq('攻击方 P0 的装 3 → 1', r2.state.players[0].aura, 1);
   r2 = A(r2.state, { type: 'resolveDamage', player: 1, choice: 'aura' });
   ok('攻击照常结算', r2.ok, r2.error);
-  eq('装 3 → 0', r2.state.players[1].aura, 0);
+  eq('再吃下斬的 3 点气伤 → 装归 0', r2.state.players[1].aura, 0);
   eqc(r2.state, '非境地的雅打ち');
 
   // 王牌攻击 → 打不掉（音無砕氷 1/1，0-10）
@@ -708,10 +719,11 @@ group('11. 打消');
   eq('这次攻击来自王牌', r3.state.pending.fromSpecial, true);
   r3 = A(r3.state, { type: 'respond', player: 1, cardId: '04-tokoyo-o-n-2' });
   ok('雅打ち 可以对应王牌攻击', r3.ok, r3.error);
+  r3 = settleResponse(r3);
   eq('但打消不掉王牌攻击', !!r3.state.pending, true);
   r3 = A(r3.state, { type: 'resolveDamage', player: 1, choice: 'aura' });
   ok('王牌攻击照常结算', r3.ok, r3.error);
-  eq('装 3 → 2（吃下 1 点气伤）', r3.state.players[1].aura, 2);
+  eq('P1 只吃音無砕氷 的 1 点气伤 → 装 3 → 2', r3.state.players[1].aura, 2);
   eqc(r3.state, '王牌攻击打不掉');
 }
 
@@ -825,8 +837,9 @@ group('14. 距离扩大：気迫 给下一发「非王牌」攻击');
   const badNormal = A(s, { type: 'respond', player: 1, cardId: '02-saine-o-n-2' });
   ok('不可被通常札对应：P1 的薙斬り（间合 4 本来打得中）被拒', !badNormal.ok, badNormal.error);
   give(s, 1, 'flare', 2);
-  const okSpecial = A(s, { type: 'respond', player: 1, cardId: '02-saine-o-s-3' });
+  let okSpecial = A(s, { type: 'respond', player: 1, cardId: '02-saine-o-s-3' });
   ok('但王牌对应仍然可以（只禁通常札）', okSpecial.ok, okSpecial.error);
+  okSpecial = settleResponse(okSpecial);
   eq('音無砕氷 -1/-1 → 2/0', okSpecial.state.pending.damage, { aura: 2, life: 0 });
   eqc(okSpecial.state, '気迫 加成');
 

@@ -340,8 +340,18 @@ group('联机：打消之后不该卡在选牌弹窗');
   s.distance = 3;
   let r = E.actions.applyAction(s, { type: 'playCard', player: 0, cardId: '01-yurina-o-n-1' });
   r = E.actions.applyAction(r.state, { type: 'respond', player: 1, cardId: '04-tokoyo-o-n-2' });
-  H.ok('雅打ち 打消成功', r.ok && !r.state.pending, r.error);
-  H.ok('打消之后没有待处理攻击', !r.state.pending, r.state.pending);
+  // 雅打ち 自己也是《攻击》牌：先结算它那一发（2/1）再回来看被打消的原攻击
+  let st = r.state;
+  let guard = 0;
+  while (st.pending && st.pending.fromResponse && guard++ < 6) {
+    if (st.pending.stage === 'respond') {
+      st = E.actions.applyAction(st, { type: 'respond', player: st.pending.defender, cardId: null }).state;
+    } else {
+      st = E.actions.applyAction(st, { type: 'resolveDamage', player: st.pending.defender, choice: 'aura' }).state;
+    }
+  }
+  H.ok('雅打ち 的 2/1 打出来了', st.players[0].aura <= 3);
+  H.ok('打消之后没有待处理攻击', !st.pending, st.pending);
 }
 
 H.report();
