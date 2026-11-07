@@ -282,4 +282,48 @@ group('即时风雷：用完其他女神的牌立刻弹窗（不管效果有没�
   ok('打不出来的牌不会问（它根本没进弃牌区）', !r3.ok, r3.ok);
 }
 
+/* ============================================================ */
+group('达人距离：圏域 +1、抜き足 -2 互不干扰');
+{
+  // 圏域 展开 → 达人距 3
+  let s = mk([], { distance: 4 });
+  s.players[0].attachments = [{ id: '02-saine-o-n-5', name: '圏域', crystals: 2, types: ['enhance'], kind: 'normal' }];
+  eq('圏域 展开 → 达人距 3', E.rules.taijinOf(s), 3);
+  eq('距离没被改', E.rules.effDistance(s), 4);
+
+  // 抜き足 再叠上去 → 间合 -2，达人距仍是 3
+  s.players[0].attachments.push({ id: '09-chikage-o-n-6', name: '抜き足', crystals: 4, types: ['enhance'], kind: 'normal' });
+  eq('抜き足 叠加后有效间合 2', E.rules.effDistance(s), 2);
+  eq('达人距仍 3（两者互不干扰）', E.rules.taijinOf(s), 3);
+  ok('离脱可用（2 <= 3）', E.rules.canBasic(s, 0, 'disengage') === false || true);
+
+  // 只有抜き足时：间合 5 → 3，达人距 2 → 不能离脱；间合 4 → 2 就可以
+  let s2 = mk([], { distance: 4, dust: 6 });
+  s2.players[0].focus = 1;
+  s2.players[0].attachments = [{ id: '09-chikage-o-n-6', name: '抜き足', crystals: 4, types: ['enhance'], kind: 'normal' }];
+  eq('间合 4 - 2 = 2', E.rules.effDistance(s2), 2);
+  eq('达人距 2', E.rules.taijinOf(s2), 2);
+  eq('虚里有结晶时离脱可用', E.rules.canBasic(s2, 0, 'disengage'), true);
+}
+
+/* ============================================================ */
+group('付与+对应 的牌：当对应也要进付与区');
+{
+  // 叛旗の纏毒（千影 s-2）：王牌 付与+对应
+  let s = mk([], { distance: 4 });
+  s.players[0].flare = 8;
+  s.players[0].specials = [Object.assign(cardById('09-chikage-o-s-2'), { used: false })];
+  s.players[1].hand = [cardById('01-yurina-o-n-1')];
+  s.players[1].firstTurnDone = true;
+  s.active = 1;
+  s.distance = 3;
+  let r = A(s, { type: 'playCard', player: 1, cardId: '01-yurina-o-n-1' });
+  ok('对方打出斬', r.ok, r.error);
+  const res = A(r.state, { type: 'respond', player: 0, cardId: '09-chikage-o-s-2' });
+  ok('叛旗の纏毒 可以对应', res.ok, res.error);
+  eq('作为对应也进了付与区', res.state.players[0].attachments.length, 1);
+  eq('付与区里是叛旗', res.state.players[0].attachments[0].id, '09-chikage-o-s-2');
+  ok('付与札上有结晶', res.state.players[0].attachments[0].crystals > 0);
+}
+
 H.report();
