@@ -249,6 +249,14 @@ function poisonsOf(key){
   const g = (window.GAME_DATA.goddesses||[]).find(x => x.key === key);
   return (g && g.poisons) ? g.poisons : null;
 }
+/** 从牌组 id 推女神，再取毒袋（建局兜底） */
+function poisonsForDeck(cards){
+  const keys = [];
+  (cards||[]).forEach(function(c){ const k=String(c.id).split('-')[1]; if(k&&keys.indexOf(k)<0) keys.push(k); });
+  for (let i=0;i<keys.length;i++){ const p2=poisonsOf(keys[i]); if(p2) return clampPoisons(p2); }
+  return null;
+}
+function clampPoisons(list){ return list && list.length ? list : null; }
 
 /** 追加札（莱拉的风魔招来孔用；全局一份） */
 function extrasOf(){
@@ -292,7 +300,7 @@ const G = (function(){
 
   const st = E.state.create({
     myCards: mine, oppCards: opp,
-    myPoisons: poisonsOf(gkeysOf(mine)[0]), oppPoisons: poisonsOf(gkeysOf(opp)[0]),
+    myPoisons: poisonsForDeck(mine), oppPoisons: poisonsForDeck(opp),
     extras: extrasOf()
   });
   st.players[0].goddesses = gkeysOf(mine);

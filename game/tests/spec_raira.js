@@ -152,14 +152,14 @@ group('呼び声：畏缩 + 二选一');
 }
 
 /* ============================================================ */
-group('空駆け：间合⇄虚 2');
+group('空駆け：间合⇄虚 3');
 {
   let s = mk(['12-raira-o-n-7'], { distance: 4, dust: 4 });
   let r = A(s, { type: 'playCard', player: 0, cardId: '12-raira-o-n-7' });
   ok('打出空駆け', r.ok, r.error);
   const ch = A(r.state, { type: 'choose', player: 0, option: 'to_dist' });
-  eq('虚→间合 2：间合 6', ch.state.distance, 6);
-  eq('虚 4 → 2', ch.state.dust, 2);
+  eq('虚→间合 3：间合 7', ch.state.distance, 7);
+  eq('虚 4 → 1', ch.state.dust, 1);
 }
 
 /* ============================================================ */

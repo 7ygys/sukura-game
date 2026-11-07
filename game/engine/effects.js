@@ -233,8 +233,8 @@
     }
   };
   choices.raira_sorakake = {
-    to_dist(state, who) { Engine.effects.fx.moveCrystal(state, who, 'dust', 'distance', 2); },
-    to_dust(state, who) { Engine.effects.fx.moveCrystal(state, who, 'distance', 'dust', 2); }
+    to_dist(state, who) { Engine.effects.fx.moveCrystal(state, who, 'dust', 'distance', 3); },
+    to_dust(state, who) { Engine.effects.fx.moveCrystal(state, who, 'distance', 'dust', 3); }
   };
   choices.raira_enkan = {
     yes(state, who) {
@@ -304,8 +304,8 @@
     }
   };
   choices.raira_sorakake = {
-    to_dist(state, who) { Engine.effects.fx.moveCrystal(state, who, 'dust', 'distance', 2); },
-    to_dust(state, who) { Engine.effects.fx.moveCrystal(state, who, 'distance', 'dust', 2); }
+    to_dist(state, who) { Engine.effects.fx.moveCrystal(state, who, 'dust', 'distance', 3); },
+    to_dust(state, who) { Engine.effects.fx.moveCrystal(state, who, 'distance', 'dust', 3); }
   };
   choices.raira_enkan = {
     yes(state, who) {
