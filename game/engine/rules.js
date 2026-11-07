@@ -232,6 +232,14 @@
 
     state.turnUsed[who] = (state.turnUsed[who] || 0) + 1;
     Engine.gauge.noteOtherCard(state, who, card);
+    // 即时版：用完其他女神的牌，立刻问"风还是雷 +1"
+    if (Engine.gauge.pendingPoints(state, who) > 0 && !state.choice) {
+      state.choice = {
+        who: who, sourceId: 'raira_instant',
+        prompt: '使用其他女神的牌：风神 +1 还是雷神 +1？',
+        options: ['wind', 'thunder']
+      };
+    }
     if ((card.types || []).indexOf('fullpower') >= 0) p.fullpowerUsed = true;
     state.quietSpark = true;      // 别把这次减装画成"飞向虚"
 
@@ -1412,6 +1420,14 @@
 
       if (fpCard) p.fullpowerUsed = true;      // 全力化：本回合只能到此为止
       Engine.gauge.noteOtherCard(state, who, card);
+    // 即时版：用完其他女神的牌，立刻问"风还是雷 +1"
+    if (Engine.gauge.pendingPoints(state, who) > 0 && !state.choice) {
+      state.choice = {
+        who: who, sourceId: 'raira_instant',
+        prompt: '使用其他女神的牌：风神 +1 还是雷神 +1？',
+        options: ['wind', 'thunder']
+      };
+    }
       if (ctx.aura !== null && !ctx.chokoku && ctx.aura > 5) ctx.aura = 5;
       state.pending = {
         kind: 'attack',

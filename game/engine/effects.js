@@ -212,6 +212,10 @@
   };
 
   // 莱拉
+  choices.raira_instant = {
+    wind(state, who) { Engine.gauge.claim(state, who, 'wind', 1); },
+    thunder(state, who) { Engine.gauge.claim(state, who, 'thunder', 1); }
+  };
   choices.raira_gauge1 = {
     wind(state, who) { Engine.gauge.add(state, who, 'wind', 1); },
     thunder(state, who) { Engine.gauge.add(state, who, 'thunder', 1); }
@@ -279,6 +283,10 @@
   };
 
   // 莱拉
+  choices.raira_instant = {
+    wind(state, who) { Engine.gauge.claim(state, who, 'wind', 1); },
+    thunder(state, who) { Engine.gauge.claim(state, who, 'thunder', 1); }
+  };
   choices.raira_gauge1 = {
     wind(state, who) { Engine.gauge.add(state, who, 'wind', 1); },
     thunder(state, who) { Engine.gauge.add(state, who, 'thunder', 1); }

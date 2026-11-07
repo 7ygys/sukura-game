@@ -191,8 +191,8 @@ const IMG={};
   IMG.turnEnd=new Image(); IMG.turnEnd.src=base+'TurnEnd_Player_Normal.png';
   IMG.backN=new Image(); IMG.backN.src=base+'cardback_normal.png';
   IMG.backS=new Image(); IMG.backS.src=base+'cardback_special.png';
-  IMG.windI=new Image(); IMG.windI.src=base+'wind.png';
-  IMG.thunderI=new Image(); IMG.thunderI.src=base+'thunder.png';
+  IMG.windI=new Image(); IMG.windI.src='../素材/卡面/raira/wind.png';
+  IMG.thunderI=new Image(); IMG.thunderI.src='../素材/卡面/raira/thunder.png';
   IMG.backP=new Image(); IMG.backP.src=base+'../卡面/chikage/cardback_poison.png';   // 毒专用卡背
   IMG.vigor=new Image(); IMG.vigor.src=base+'vigor_opp.png';
   IMG.vnum0=new Image(); IMG.vnum0.src=base+'vigor_num0.png';
@@ -737,9 +737,9 @@ function drawSide(isMine){
     ];
     rows.forEach(function (r, i) {
       const ry = wy + i*32;
-      if(r.img && r.img.complete && r.img.naturalWidth) ctx.drawImage(r.img, wx, ry, 22, 22);
-      else txt(wx+11, ry+11, r.label, 11, '#cfe3ff');
-      txt(wx+26, ry+11, String(r.v), 14, r.v >= 4 ? '#ffe08a' : '#dfe9f8', 'left');
+      if(r.img && r.img.complete && r.img.naturalWidth) ctx.drawImage(r.img, wx, ry, 24, 24);
+      else txt(wx+12, ry+12, r.label, 12, '#cfe3ff');
+      txt(wx+30, ry+13, String(r.v), 15, r.v >= 4 ? '#ffe08a' : '#dfe9f8', 'left');
     });
     HITP(rlIdx ? 'oraigauge' : 'raigauge', wx-4, wy-6, 56, 64);
   }
