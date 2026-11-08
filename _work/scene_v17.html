@@ -334,9 +334,11 @@ function visHand(){
 
 /** 现在能显示的基本行动（离脱只在间合 ≤2 时出现） */
 function visActions(){
-  // 「离脱」看的是**有效距离**（抜き足 会让间合 -2）
+  // 「离脱」的显示条件 = 有效间合 ≤ **达人距离**（不是写死的 2）
+  //   抜き足 会把有效间合 -2；圏域 会把达人距 +1
   const eff = (E.rules && E.rules.effDistance) ? E.rules.effDistance(G) : G.distance;
-  return ACTIONS.filter(function(a){ return !a.onlyLow || eff <= 2; });
+  const tj = (E.rules && E.rules.taijinOf) ? E.rules.taijinOf(G) : 2;
+  return ACTIONS.filter(function(a){ return !a.onlyLow || eff <= tj; });
 }
 
 /** 联机模式下，拿到新视图就整份换掉 */

@@ -357,4 +357,23 @@ group('円環輪廻旋：对应展开 + 攻击解决后移动加计略');
   eq('风神 +1', G.wind(dir.state, 0), 1);
 }
 
+/* ============================================================ */
+group('离脱的可用性 = 有效间合 ≤ 达人距（不是写死 2）');
+{
+  // 间合 3、达人距 2 → 不能离脱
+  let s = mk([], { distance: 3, dust: 6 });
+  s.players[0].focus = 1;
+  eq('间合 3 > 达人距 2 → 离脱不可用', E.rules.canBasic(s, 0, 'disengage'), false);
+
+  // 加上圏域 → 达人距 3 → 就可以离脱了
+  s.players[0].attachments = [{ id: '02-saine-o-n-5', name: '圏域', crystals: 2, types: ['enhance'], kind: 'normal' }];
+  eq('圏域 → 达人距 3', E.rules.taijinOf(s), 3);
+  eq('间合 3 ≤ 达人距 3 → 离脱可用', E.rules.canBasic(s, 0, 'disengage'), true);
+
+  // 抜き足 叠上去：间合 3-2=1，达人距 3 → 依然可用
+  s.players[0].attachments.push({ id: '09-chikage-o-n-6', name: '抜き足', crystals: 4, types: ['enhance'], kind: 'normal' });
+  eq('有效间合 1', E.rules.effDistance(s), 1);
+  eq('离脱仍可用', E.rules.canBasic(s, 0, 'disengage'), true);
+}
+
 H.report();
