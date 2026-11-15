@@ -18,7 +18,7 @@
 <body>
 <div id="wrap">
   <!-- 背景：循环视频（整段 240 秒，接缝四分钟才出现一次） -->
-  <video id="bg" src="../背景-灵梦泡水/灵梦.mp4" autoplay muted playsinline preload="auto"></video>
+  <video id="bg" src="背景-灵梦泡水/灵梦.mp4" autoplay muted playsinline preload="auto"></video>
   <canvas id="stage"></canvas>
 </div>
 <div id="loading">载入背景…</div>
@@ -49,21 +49,21 @@
 #netBar button:hover{background:#243044}
 #netBar button:disabled{opacity:0.45;cursor:default}
 </style>
-<script src="assets.js"></script>
-<script src="gamedata.js"></script>
-<script src="../game/engine/rng.js"></script>
-<script src="../game/engine/umbrella.js"></script>
-<script src="../game/engine/plan.js"></script>
-<script src="../game/engine/gauge.js"></script>
-<script src="../game/engine/state.js"></script>
-<script src="../game/engine/rules.js"></script>
-<script src="../game/engine/effects.js"></script>
-<script src="../game/engine/actions.js"></script>
-<script src="../net/lz.js"></script>
-<script src="../net/redact.js"></script>
-<script src="../net/proto.js"></script>
-<script src="../net/webrtc.js"></script>
-<script src="../net/session.js"></script>
+<script src="_work/assets.js"></script>
+<script src="_work/gamedata.js"></script>
+<script src="game/engine/rng.js"></script>
+<script src="game/engine/umbrella.js"></script>
+<script src="game/engine/plan.js"></script>
+<script src="game/engine/gauge.js"></script>
+<script src="game/engine/state.js"></script>
+<script src="game/engine/rules.js"></script>
+<script src="game/engine/effects.js"></script>
+<script src="game/engine/actions.js"></script>
+<script src="net/lz.js"></script>
+<script src="net/redact.js"></script>
+<script src="net/proto.js"></script>
+<script src="net/webrtc.js"></script>
+<script src="net/session.js"></script>
 <script>
 (function(){
 'use strict';
@@ -94,7 +94,7 @@ function hexPath(cx,cy,r,rot){rot=rot||0;ctx.beginPath();
   i?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.closePath();}
 const FORCE_SWEEP=/[?&]sweep=1/.test(location.search);
 /* ---------- 音效 ---------- */
-const AUDIO_BASE = '../素材/AudioClip/';
+const AUDIO_BASE = '素材/AudioClip/';
 const SFX = {};
 let bgm = null;
 function loadSfx(){
@@ -153,7 +153,7 @@ window.addEventListener('unhandledrejection', function(e){
 
 const IMG={};
 (function(){
-  const base='../素材/Sprite/';
+  const base='素材/Sprite/';
   ['01','02','03','04','06','07','09','12'].forEach(function(n){const i=new Image();i.src=base+n+'.png';IMG['av'+n]=i;});
   IMG.planKami=new Image(); IMG.planKami.src=base+'plan_blue.png';   // 神谋
   IMG.planOni=new Image();  IMG.planOni.src=base+'plan_red.png';     // 鬼谋
@@ -182,7 +182,7 @@ const IMG={};
       const img=new Image();
       img.onload=function(){ IMG['c'+id]=img; };
       img.onerror=function(){ k++; next(); };
-      img.src='../素材/卡面/'+list[k];
+      img.src='素材/卡面/'+list[k];
     })();
   }
   // 载入清单里的全部卡面（44 张），不再写死某几柱女神
@@ -191,9 +191,9 @@ const IMG={};
   IMG.turnEnd=new Image(); IMG.turnEnd.src=base+'TurnEnd_Player_Normal.png';
   IMG.backN=new Image(); IMG.backN.src=base+'cardback_normal.png';
   IMG.backS=new Image(); IMG.backS.src=base+'cardback_special.png';
-  IMG.windI=new Image(); IMG.windI.src='../素材/卡面/raira/wind.png';
-  IMG.thunderI=new Image(); IMG.thunderI.src='../素材/卡面/raira/thunder.png';
-  IMG.backP=new Image(); IMG.backP.src=base+'../卡面/chikage/cardback_poison.png';   // 毒专用卡背
+  IMG.windI=new Image(); IMG.windI.src='素材/卡面/raira/wind.png';
+  IMG.thunderI=new Image(); IMG.thunderI.src='素材/卡面/raira/thunder.png';
+  IMG.backP=new Image(); IMG.backP.src=base+'卡面/chikage/cardback_poison.png';   // 毒专用卡背
   IMG.vigor=new Image(); IMG.vigor.src=base+'vigor_opp.png';
   IMG.vnum0=new Image(); IMG.vnum0.src=base+'vigor_num0.png';
   IMG.vnum1=new Image(); IMG.vnum1.src=base+'vigor_num1.png';
@@ -234,7 +234,7 @@ const S={t:0,handMode:'hand',hover:null,bgReady:false,sweep:null,play:null,dista
  * 引擎接入
  * ==========================================================================
  * 界面只负责「把 state 画出来」和「把点击翻译成动作」。
- * 规则全部在 ../game/engine/ 里，这里一行规则判断都不该有。
+ * 规则全部在 game/engine/ 里，这里一行规则判断都不该有。
  */
 const E = window.Engine;
 const ALL = {};

@@ -16,8 +16,8 @@
 | 项 | 值 |
 | --- | --- |
 | 系统 | Windows 11，**x64**（Intel/AMD） |
-| 主力盘 | `E:\`（`E:\Agent`、`E:\TotalLanguage`、`E:\codeblocks`、`E:\Tools` 等） |
-| 工作区 | `E:\Agent\DeepSeek Harness\大肥鱼工作区` |
+| 主力盘 | `E:\`（本项目所在盘） |
+| 工作区 | 项目根目录的上一级 |
 | **.NET** | 已装 **.NET Desktop Runtime 8.0.33 (x64)**；另有 .NET 10 SDK 在 `E:\TotalLanguage\C#\dotnet`（**但只有 NETCore.App，没有 WindowsDesktop**） |
 | **Git** | ✅ 已装（安装过程卡过一次，后来自己恢复） |
 | **代理** | ✅ Clash Verge Rev v2.5.8（x64-setup 版） |

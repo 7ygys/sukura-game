@@ -43,9 +43,10 @@ assets/
 _work/*
 _output/
 
-# ---------- 例外：游戏本体（纯代码，不含素材）----------
-!_work/scene_v17.html
-!_work/prep.html
+# ---------- 例外：游戏本体已移到根目录（index.html / prep.html）----------
+# _work 里只放行两个"生成物"——它们是游戏能跑起来的最小数据
+!_work/assets.js
+!_work/gamedata.js
 
 Thumbs.db
 desktop.ini

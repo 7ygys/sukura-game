@@ -236,28 +236,28 @@
 
 </div>
 
-<script src="assets.js"></script>
-<script src="gamedata.js"></script>
-<script src="../game/engine/rng.js"></script>
-<script src="../game/engine/umbrella.js"></script>
-<script src="../game/engine/plan.js"></script>
-<script src="../game/engine/gauge.js"></script>
-<script src="../game/engine/state.js"></script>
-<script src="../game/engine/rules.js"></script>
-<script src="../game/engine/effects.js"></script>
-<script src="../game/engine/actions.js"></script>
-<script src="../net/lz.js"></script>
-<script src="../net/redact.js"></script>
-<script src="../net/proto.js"></script>
-<script src="../net/webrtc.js"></script>
-<script src="../net/session.js"></script>
+<script src="_work/assets.js"></script>
+<script src="_work/gamedata.js"></script>
+<script src="game/engine/rng.js"></script>
+<script src="game/engine/umbrella.js"></script>
+<script src="game/engine/plan.js"></script>
+<script src="game/engine/gauge.js"></script>
+<script src="game/engine/state.js"></script>
+<script src="game/engine/rules.js"></script>
+<script src="game/engine/effects.js"></script>
+<script src="game/engine/actions.js"></script>
+<script src="net/lz.js"></script>
+<script src="net/redact.js"></script>
+<script src="net/proto.js"></script>
+<script src="net/webrtc.js"></script>
+<script src="net/session.js"></script>
 <script>
 (function(){
 'use strict';
 const $=s=>document.querySelector(s);
 const G = window.GAME_DATA.goddesses;
 const AVATAR = {yurina:'01',saine:'02',himika:'03',tokoyo:'04',yukihi:'06',shinra:'07',chikage:'09',raira:'12'};
-const AV='../素材/Sprite/';
+const AV='素材/Sprite/';
 const state = { myHalf:[], oppHalf:[], picks:[], deck:{normal:[],special:[]}, screen:'title' };
 
 function show(id){
@@ -505,7 +505,7 @@ function openBattleFrame(){
   nbHide();
   $('#battleWrap').classList.add('on');
   const f = $('#battleFrame');
-  f.src = 'scene_v17.html?embed=1&seat=' + (netSession ? netSession.seat : 0);
+  f.src = 'index.html?embed=1&seat=' + (netSession ? netSession.seat : 0);
 }
 
 /** 战斗页 ready 之后，把后续视图都转给它 */
@@ -642,7 +642,7 @@ $('#toBattle').onclick=()=>{
     return;
   }
   const q='?deck='+encodeURIComponent(state.deck.normal.concat(state.deck.special).join(','));
-  location.href='scene_v17.html'+q;
+  location.href='index.html'+q;
 };
 
 renderSelect();
